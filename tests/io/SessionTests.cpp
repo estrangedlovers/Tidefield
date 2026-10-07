@@ -2,6 +2,7 @@
 #include <engine/midi/MidiManager.h>
 #include <engine/mix/FxManager.h>
 #include <engine/mod/SeasonManager.h>
+#include <engine/scene/PathManager.h>
 #include <engine/scene/SceneManager.h>
 #include <io/Session.h>
 
@@ -293,4 +294,33 @@ TEST_CASE("A session from before a parameter or slot existed resets it to defaul
     }
     CHECK(f.paramTargets[engine::idx(engine::P::WeatherWind)] == Approx(0.0f));
     CHECK(fx.getType(engine::FxManager::findSlot("weather.fx1")).empty());
+}
+
+TEST_CASE("A drawn path round-trips through a session and a session without one clears it", "[session][path]")
+{
+    engine::Engine e;
+    e.prepare(kFs, 256);
+    engine::SceneManager scenes(e);
+    engine::FxManager fx(e);
+    engine::PathManager paths(e);
+    paths.set({ { 0.2f, 0.2f }, { 0.8f, 0.25f }, { 0.6f, 0.9f } });
+
+    engine::TelemetryFrame frame;
+    auto data = io::captureSession(e, frame, scenes, fx, nullptr, nullptr, &paths);
+    juce::String error;
+    auto parsed = io::sessionFromJson(juce::JSON::parse(juce::JSON::toString(io::sessionToJson(data))), error);
+    REQUIRE(parsed.has_value());
+
+    engine::Engine e2;
+    e2.prepare(kFs, 256);
+    engine::SceneManager scenes2(e2);
+    engine::FxManager fx2(e2);
+    engine::PathManager paths2(e2);
+    io::applySession(*parsed, e2, scenes2, fx2, true, nullptr, nullptr, &paths2);
+    REQUIRE(paths2.getStroke().size() == 3);
+    CHECK(paths2.getStroke()[1].x == Approx(0.8f));
+    CHECK(paths2.getStroke()[2].y == Approx(0.9f));
+
+    io::applySession(io::defaultSession(e2), e2, scenes2, fx2, true, nullptr, nullptr, &paths2);
+    CHECK_FALSE(paths2.hasPath());
 }

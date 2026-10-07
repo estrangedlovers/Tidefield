@@ -7,6 +7,7 @@
 #include <engine/capture/CatchManager.h>
 #include <engine/midi/MidiManager.h>
 #include <engine/mix/FxManager.h>
+#include <engine/scene/PathManager.h>
 #include <engine/scene/SceneManager.h>
 #include <io/Recorder.h>
 
@@ -34,6 +35,7 @@ public:
     engine::CatchManager catcher;
     engine::MidiManager midi;
     engine::SeasonManager seasons;
+    engine::PathManager paths;
     MidiInputs midiInputs;
     SessionController session;
     io::Recorder recorder;

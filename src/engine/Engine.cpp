@@ -274,6 +274,7 @@ void Engine::collectGarbage()
 {
     sceneChannel.collectGarbage();
     seasonChannel.collectGarbage();
+    pathChannel.collectGarbage();
     midiMapChannel.collectGarbage();
     bloomBuffers.collectGarbage();
     for (auto& c : clouds)
@@ -304,6 +305,7 @@ void Engine::drainControl() noexcept
 {
     sceneChannel.acquire();
     seasonChannel.acquire();
+    pathChannel.acquire();
     if (midiMapChannel.acquire())
     {
         // A new map: every binding must pick up again.
@@ -558,8 +560,9 @@ void Engine::updateTerrain(float dt) noexcept
     cursor = { cursorX.next(), cursorY.next() };
 
     const auto* set = sceneChannel.current();
-    const auto style = static_cast<Wander::Style>(std::clamp(toInt(params.current(P::TerrainWanderStyle)), 0, 3));
-    position = wander.update(cursor, params.current(P::TerrainWander), params.current(P::TerrainWanderRate), style, set, dt * tide);
+    const auto style = static_cast<Wander::Style>(std::clamp(toInt(params.current(P::TerrainWanderStyle)), 0, 4));
+    position = wander.update(cursor, params.current(P::TerrainWander), params.current(P::TerrainWanderRate), style, set, dt * tide,
+                             pathChannel.current());
 
     if (set == nullptr || set->numScenes == 0)
         return;

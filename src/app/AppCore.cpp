@@ -9,8 +9,8 @@
 namespace tf::app {
 
 AppCore::AppCore(AudioHost& h)
-    : host(h), engine(h.getEngine()), scenes(h.getEngine()), fx(h.getEngine()), catcher(h.getEngine()), midi(h.getEngine()), seasons(h.getEngine()),
-      midiInputs(h.getEngine(), h.getSettings()), session(h.getEngine(), scenes, fx, &midi, &seasons), recorder(h.getEngine().getRecordTap())
+    : host(h), engine(h.getEngine()), scenes(h.getEngine()), fx(h.getEngine()), catcher(h.getEngine()), midi(h.getEngine()), seasons(h.getEngine()), paths(h.getEngine()),
+      midiInputs(h.getEngine(), h.getSettings()), session(h.getEngine(), scenes, fx, &midi, &seasons, &paths), recorder(h.getEngine().getRecordTap())
 {
     engine.setGuardrailsEnabled(true);
     fxjuce::registerUserEffects(); // before any slot or session asks for an FX type
@@ -149,6 +149,7 @@ void AppCore::timerCallback()
     fx.tick();
     midi.tick();
     seasons.tick();
+    paths.tick();
     engine.collectGarbage();
 
     engine::RawMidi monitored;

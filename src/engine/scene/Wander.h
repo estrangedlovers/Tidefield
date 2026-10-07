@@ -1,6 +1,7 @@
 #pragma once
 
 #include "SceneSet.h"
+#include "TerrainPath.h"
 #include "TerrainMath.h"
 
 #include <dsp/core/MathUtil.h>
@@ -24,33 +25,70 @@ namespace tf::engine {
                   to settle into scenes, linger, then get washed out again.
       Journey   - travels from scene to scene on its own (nearer scenes are likelier
                   next stops), easing in and out of each and dwelling there; Wander
-                  sets how far it pulls away from the performer's cursor (1 = fully). */
+                  sets how far it pulls away from the performer's cursor (1 = fully).
+      Path      - travels a loop the performer drew, at a steady speed (one lap takes
+                  1 / rate seconds of Tide-scaled time); Wander sets how far it
+                  follows the path rather than the cursor. No path: drift. */
 class Wander
 {
 public:
-    enum class Style : int { Drift = 0, Orbit = 1, TidePool = 2, Journey = 3 };
+    enum class Style : int { Drift = 0, Orbit = 1, TidePool = 2, Journey = 3, Path = 4 };
 
     void setSeed(std::uint64_t seed) noexcept
     {
         rng.setSeed(seed);
         radiusDrift.setSeed(seed + 1);
         speedDrift.setSeed(seed + 2);
-        offset = {};
+        offset = { 0.0f, 0.0f };
         angle = 0.0f;
         journeyTo = -1;
+        pathPhase = 0.0f;
     }
 
     void reset() noexcept
     {
-        offset = {};
+        offset = { 0.0f, 0.0f };
         journeyTo = -1;
     }
 
     /** Advances by dt seconds of (tide-scaled) time and returns the effective position. */
-    Point2 update(Point2 cursor, float amount, float rateHz, Style style, const SceneSet* scenes, float dt) noexcept
+    Point2 update(Point2 cursor, float amount, float rateHz, Style style, const SceneSet* scenes, float dt,
+                  const TerrainPath* path = nullptr) noexcept
     {
         rateHz = std::max(rateHz, 0.0001f);
         const float reach = 0.45f * std::clamp(amount, 0.0f, 1.0f);
+
+        if (style == Style::Path && path != nullptr && path->count >= 2)
+        {
+            if (path->version != pathVersion)
+            {
+                // A new path: start at the point nearest to where the sound is, so
+                // drawing never makes it jump.
+                pathVersion = path->version;
+                const Point2 here { cursor.x + offset.x * reach, cursor.y + offset.y * reach };
+                float best = 1.0e9f;
+                for (int i = 0; i < path->count; ++i)
+                {
+                    const auto& q = path->points[static_cast<std::size_t>(i)];
+                    const float d = (q.x - here.x) * (q.x - here.x) + (q.y - here.y) * (q.y - here.y);
+                    if (d < best)
+                    {
+                        best = d;
+                        pathPhase = static_cast<float>(i) / static_cast<float>(path->count);
+                    }
+                }
+            }
+            pathPhase += dt * rateHz;
+            pathPhase -= std::floor(pathPhase);
+            const Point2 at = path->at(pathPhase);
+            const float a = std::clamp(amount, 0.0f, 1.0f);
+            const Point2 pos { cursor.x + (at.x - cursor.x) * a, cursor.y + (at.y - cursor.y) * a };
+            if (reach > 0.0f)
+                offset = { std::clamp((pos.x - cursor.x) / reach, -1.5f, 1.5f), std::clamp((pos.y - cursor.y) / reach, -1.5f, 1.5f) };
+            return { std::clamp(pos.x, 0.0f, 1.0f), std::clamp(pos.y, 0.0f, 1.0f) };
+        }
+        if (style == Style::Path) // no path drawn yet: drift
+            style = Style::Drift;
 
         if (style == Style::Journey && scenes != nullptr && scenes->numScenes >= 2)
         {
@@ -70,6 +108,7 @@ public:
             case Style::Drift: stepOu(rateHz, dt, Point2 { 0.0f, 0.0f }, 0.0f); break;
             case Style::Orbit: stepOrbit(rateHz, dt); break;
             case Style::Journey: // fewer than two scenes: nowhere to travel, so drift
+            case Style::Path:
                 stepOu(rateHz, dt, Point2 { 0.0f, 0.0f }, 0.0f);
                 break;
             case Style::TidePool:
@@ -194,6 +233,8 @@ private:
     Point2 journeyFrom { 0.5f, 0.5f };
     int journeyTo = -1;
     float journeyPhase = 0.0f, journeyDwell = 0.0f;
+    float pathPhase = 0.0f;
+    std::uint64_t pathVersion = 0;
 };
 
 } // namespace tf::engine

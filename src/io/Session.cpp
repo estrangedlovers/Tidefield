@@ -1,13 +1,12 @@
 #include "Session.h"
 
-#include <engine/mod/SeasonManager.h>
-
 #include "AudioFileIO.h"
 
 #include <engine/Engine.h>
 #include <engine/midi/MidiManager.h>
 #include <engine/mix/FxManager.h>
 #include <engine/mod/SeasonManager.h>
+#include <engine/scene/PathManager.h>
 #include <engine/scene/SceneManager.h>
 
 namespace tf::io {
@@ -172,7 +171,8 @@ std::vector<std::string> applySeasonsJson(const juce::var& json, engine::SeasonM
 }
 
 SessionData captureSession(const engine::Engine& engine, const engine::TelemetryFrame& latest, const engine::SceneManager& scenes,
-                           const engine::FxManager& fx, const engine::MidiManager* midi, const engine::SeasonManager* seasons)
+                           const engine::FxManager& fx, const engine::MidiManager* midi, const engine::SeasonManager* seasons,
+                           const engine::PathManager* path)
 {
     const auto& reg = engine.getRegistry();
     SessionData s;
@@ -204,6 +204,8 @@ SessionData captureSession(const engine::Engine& engine, const engine::Telemetry
         s.midi = midiToJson(*midi, reg);
     if (seasons != nullptr)
         s.seasons = seasonsToJson(*seasons, reg);
+    if (path != nullptr)
+        s.path = path->getStroke();
     return s;
 }
 
@@ -223,7 +225,7 @@ SessionData defaultSession(const engine::Engine& engine)
 
 std::vector<std::string> applySession(const SessionData& session, engine::Engine& engine, engine::SceneManager& scenes,
                                       engine::FxManager& fx, bool snap, engine::MidiManager* midi,
-                                      engine::SeasonManager* seasons)
+                                      engine::SeasonManager* seasons, engine::PathManager* path)
 {
     const auto& reg = engine.getRegistry();
     std::vector<std::string> warnings = session.warnings;
@@ -302,6 +304,8 @@ std::vector<std::string> applySession(const SessionData& session, engine::Engine
     if (midi != nullptr)
         for (auto& w : applyMidiJson(session.midi, *midi, reg))
             warnings.push_back(std::move(w));
+    if (path != nullptr)
+        path->set(session.path);
     return warnings;
 }
 
@@ -338,6 +342,16 @@ juce::var sessionToJson(const SessionData& s)
     root->setProperty("midi", s.midi);
     if (s.seasons.isArray())
         root->setProperty("seasons", s.seasons);
+    if (! s.path.empty())
+    {
+        juce::Array<juce::var> pts; // flat: x0, y0, x1, y1, ...
+        for (const auto& p : s.path)
+        {
+            pts.add(std::round(p.x * 10000.0f) / 10000.0f);
+            pts.add(std::round(p.y * 10000.0f) / 10000.0f);
+        }
+        root->setProperty("path", pts);
+    }
 
     auto* samples = new juce::DynamicObject();
     for (const auto& [slot, buffer] : s.samples)
@@ -393,6 +407,9 @@ std::optional<SessionData> sessionFromJson(const juce::var& json, juce::String& 
             s.fx[prop.name.toString().toStdString()] = prop.value.toString().toStdString();
     s.midi = root->getProperty("midi");
     s.seasons = root->getProperty("seasons");
+    if (const auto* pts = root->getProperty("path").getArray())
+        for (int i = 0; i + 1 < pts->size(); i += 2)
+            s.path.push_back({ static_cast<float>(static_cast<double>((*pts)[i])), static_cast<float>(static_cast<double>((*pts)[i + 1])) });
     return s;
 }
 

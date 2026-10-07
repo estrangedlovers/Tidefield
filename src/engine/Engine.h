@@ -16,6 +16,7 @@
 #include "record/RecordTap.h"
 #include "SampleHandle.h"
 #include "scene/SceneSet.h"
+#include "scene/TerrainPath.h"
 #include "scene/Wander.h"
 
 #include <dsp/core/SampleBuffer.h>
@@ -92,6 +93,8 @@ public:
 
     bool publishScenes(std::unique_ptr<SceneSet> scenes) { return sceneChannel.publish(std::move(scenes)); }
     bool publishSeasons(std::unique_ptr<SeasonSet> set) { return seasonChannel.publish(std::move(set)); }
+    /** Message thread: the loop the Path wander style travels (PathManager does this). */
+    bool publishPath(std::unique_ptr<TerrainPath> path) { return pathChannel.publish(std::move(path)); }
 
     /** Hands a sample to a granular cloud (0..3); nullptr unloads it. The cloud fades
         out, swaps, fades back in. Returns false if too many swaps are queued (retry
@@ -192,6 +195,7 @@ private:
     SpscQueue<EngineNotice> noticeQueue;
     SnapshotChannel<SceneSet> sceneChannel;
     SnapshotChannel<SeasonSet> seasonChannel { 4 };
+    SnapshotChannel<TerrainPath> pathChannel { 4 };
 
     // MIDI.
     std::array<std::unique_ptr<SpscQueue<RawMidi>>, kMaxMidiPorts> midiQueues;

@@ -70,7 +70,7 @@ inline constexpr unsigned kDiscrete = 1u << 4;      // integer choice; scenes pi
     X(TerrainFocus,     "terrain.focus",      "Focus",             1.0f,   6.0f,    2.5f, Linear,  Exponential,    0.3f,  "",   kMidiLearnable) \
     X(TerrainWander,    "terrain.wander",     "Wander",            0.0f,   1.0f,    0.0f, Linear,  Exponential,    0.5f,  "",   kMidiLearnable | kPerformance) \
     X(TerrainWanderRate,"terrain.wanderRate", "Wander Rate",       0.002f, 0.5f,    0.03f, Log,    LogExponential, 0.5f,  "Hz", kMidiLearnable | kTideScaled) \
-    X(TerrainWanderStyle,"terrain.wanderStyle","Wander Style",     0.0f,   3.0f,    0.0f, Linear,  Linear,         0.0f,  "",   kMidiLearnable | kDiscrete) \
+    X(TerrainWanderStyle,"terrain.wanderStyle","Wander Style",     0.0f,   4.0f,    0.0f, Linear,  Linear,         0.0f,  "",   kMidiLearnable | kDiscrete) \
     X(TideRate,         "tide.rate",          "Tide",              0.05f,  8.0f,    1.0f, Log,     LogExponential, 1.5f,  "x",  kMidiLearnable | kPerformance | kTerrainBound) \
     X(HarmonyRoot,      "harmony.root",       "Key",               0.0f,  11.0f,    2.0f, Linear,  Linear,         0.0f,  "",   TF_TB_ML | kDiscrete | kPerformance) \
     X(HarmonyScale,     "harmony.scale",      "Scale",             0.0f,  11.0f,    1.0f, Linear,  Linear,         0.0f,  "",   TF_TB_ML | kDiscrete | kPerformance) \

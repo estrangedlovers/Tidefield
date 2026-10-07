@@ -520,7 +520,7 @@ public:
           root(m, P::HarmonyRoot, 6, "the key: every source retunes to it over the key-morph time"),
           scale(m, P::HarmonyScale, "the scale every source plays in"),
           medium(m, P::MediumType, 2, "what the whole piece sounds recorded on"),
-          style(m, P::TerrainWanderStyle, 2, "how the sound wanders: drift, orbit, tide pool or a journey between scenes")
+          style(m, P::TerrainWanderStyle, 3, "how the sound wanders: drift, orbit, tide pool, a journey between scenes, or along a path you draw")
     {
         tide.setLabel("Tide");
         wander.setLabel("Wander");
@@ -714,7 +714,7 @@ public:
         }
         g.setColour(colour::textDim);
         g.drawText(help.isNotEmpty() ? help
-                                     : juce::String("Space fade   Esc panic   drag the terrain to move   1-9 scenes   C capture   S/H/T hold gestures   M keys   Tab pages"),
+                                     : juce::String("Space fade   Esc panic   drag the terrain to move   1-9 scenes   C capture   S/H/T hold gestures   P draw a path   M keys   Tab pages"),
                    r, juce::Justification::centredLeft, true);
     }
 
@@ -940,6 +940,11 @@ bool MainView::keyPressed(const juce::KeyPress& key)
         core.engine.command(st == engine::FadeState::Silent || st == engine::FadeState::FadingOut ? engine::Command::FadeIn : engine::Command::FadeOut);
         return true;
     }
+    if (key == juce::KeyPress::escapeKey && terrain->isDrawMode())
+    {
+        terrain->setDrawMode(false);
+        return true;
+    }
     if (key == juce::KeyPress::escapeKey)
     {
         core.engine.command(model.frame().panicActive ? engine::Command::ResumeFromPanic : engine::Command::Panic);
@@ -996,6 +1001,7 @@ bool MainView::keyPressed(const juce::KeyPress& key)
         case 'E': model.toggle(P::LoopsOn); break;
         case 'L': core.engine.command(mods.isShiftDown() ? engine::Command::LoopClear : engine::Command::LoopRecord); break;
         case 'K': core.engine.command(engine::Command::Catch); break;
+        case 'P': terrain->setDrawMode(! terrain->isDrawMode()); break;
         case 'C': core.captureSceneAtCursor(); break;
         case 'R':
             if (mods.isShiftDown())

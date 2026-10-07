@@ -64,6 +64,16 @@ TerrainView::TerrainView(Model& m) : model(m)
 {
     model.add(this);
     setOpaque(false);
+    drawButton.setHelp(&model, "draw a loop on the terrain and the sound travels it by itself; Wander sets how closely (P)");
+    drawButton.onClick = [this] { setDrawMode(! drawMode); };
+    clearButton.setHelp(&model, "forget the drawn path; the sound wanders freely again");
+    clearButton.onClick = [this] {
+        model.core.paths.clear();
+        if (juce::roundToInt(model.value(engine::P::TerrainWanderStyle)) == 4)
+            model.set(engine::P::TerrainWanderStyle, 0.0f);
+    };
+    addAndMakeVisible(drawButton);
+    addChildComponent(clearButton);
     lastTime = juce::Time::getMillisecondCounterHiRes();
 }
 
@@ -118,7 +128,23 @@ juce::Colour TerrainView::soundColour() const
     return juce::Colour::fromFloatRGBA(r / total, g / total, b / total, 1.0f);
 }
 
-void TerrainView::resized() { renderBackdrop(); }
+void TerrainView::resized()
+{
+    auto r = getLocalBounds().reduced(8).removeFromTop(24);
+    drawButton.setBounds(r.removeFromRight(86));
+    r.removeFromRight(4);
+    clearButton.setBounds(r.removeFromRight(86));
+    renderBackdrop();
+}
+
+void TerrainView::setDrawMode(bool on)
+{
+    drawMode = on;
+    drawButton.setToggleState(on, juce::dontSendNotification);
+    drawButton.setButtonText(on ? "Drawing..." : "Draw path");
+    setMouseCursor(on ? juce::MouseCursor::CrosshairCursor : juce::MouseCursor::NormalCursor);
+    repaint();
+}
 
 void TerrainView::renderBackdrop()
 {
@@ -180,6 +206,13 @@ void TerrainView::tick()
     {
         const float target = k < static_cast<std::size_t>(f.numScenes) ? f.sceneWeights[k] : 0.0f;
         shownWeights[k] += (target - shownWeights[k]) * ease(dt, 0.25f);
+    }
+    if (model.core.paths.getVersion() != shownPathVersion)
+    {
+        shownPathVersion = model.core.paths.getVersion();
+        const auto loop = engine::TerrainPath::build(model.core.paths.getStroke(), 0);
+        shownPath.assign(loop.points.begin(), loop.points.begin() + loop.count);
+        clearButton.setVisible(loop.count > 0);
     }
     tidePhase += dt * 0.12f * tide;
     orbit += dt * 0.35f * tide;
@@ -285,18 +318,26 @@ void TerrainView::paint(juce::Graphics& g)
     }
 
     // Drawn path the sound follows.
-    auto drawPath = [&](const std::vector<engine::Point2>& pts, juce::Colour c, float alpha) {
+    auto drawPath = [&](const std::vector<engine::Point2>& pts, juce::Colour c, float alpha, bool closed) {
         if (pts.size() < 2)
             return;
         juce::Path p;
         p.startNewSubPath(toScreen(pts.front()));
         for (std::size_t i = 1; i < pts.size(); ++i)
             p.lineTo(toScreen(pts[i]));
+        if (closed)
+            p.closeSubPath();
         g.setColour(c.withAlpha(alpha));
-        g.strokePath(p, juce::PathStrokeType(2.0f, juce::PathStrokeType::curved, juce::PathStrokeType::rounded));
+        const float dashes[] = { 6.0f, 5.0f };
+        juce::Path dashed;
+        juce::PathStrokeType(2.0f, juce::PathStrokeType::curved, juce::PathStrokeType::rounded).createDashedStroke(dashed, p, dashes, closed ? 2 : 0);
+        g.fillPath(closed ? dashed : p);
+        if (! closed)
+            g.strokePath(p, juce::PathStrokeType(2.0f, juce::PathStrokeType::curved, juce::PathStrokeType::rounded));
     };
-    drawPath(shownPath, colour::tide, 0.45f);
-    drawPath(drawing, colour::accent, 0.9f);
+    const bool following = juce::roundToInt(model.value(engine::P::TerrainWanderStyle)) == 4;
+    drawPath(shownPath, colour::tide, following ? 0.7f : 0.3f, true);
+    drawPath(drawing, colour::accent, 0.9f, false);
 
     // Trail of where the sound has been.
     for (std::size_t i = 1; i < trail.size(); ++i)
@@ -386,7 +427,7 @@ void TerrainView::paint(juce::Graphics& g)
     g.setFont(font(12.0f, 500));
     g.setColour(colour::textFaint);
     if (drawMode)
-        g.drawText("Draw a path: the sound will travel it on its own. Esc leaves draw mode.", f.reduced(12.0f), juce::Justification::topLeft, true);
+        g.drawText("Draw a loop: the sound will travel it on its own.", f.reduced(12.0f), juce::Justification::topLeft, true);
     else if (scenes.empty())
         g.drawText("Shape a sound, then double-click anywhere to place it here as a scene.", f.reduced(12.0f), juce::Justification::centredBottom, true);
 }
@@ -478,9 +519,17 @@ void TerrainView::mouseUp(const juce::MouseEvent& e)
     }
     else if (drag == Drag::Path)
     {
-        if (drawing.size() >= 3 && onPathDrawn)
-            onPathDrawn(drawing);
+        if (drawing.size() >= 3)
+        {
+            model.core.paths.set(drawing);
+            // Follow it: Path style, and enough Wander to hear it.
+            model.set(engine::P::TerrainWanderStyle, 4.0f);
+            if (model.value(engine::P::TerrainWander) < 0.6f)
+                model.set(engine::P::TerrainWander, 1.0f);
+            model.core.status("The sound now travels your path. Wander sets how closely; Wander Rate how fast.");
+        }
         drawing.clear();
+        setDrawMode(false);
     }
     drag = Drag::None;
 }

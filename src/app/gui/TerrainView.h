@@ -1,7 +1,6 @@
 #pragma once
 
-#include "Model.h"
-#include "Style.h"
+#include "Controls.h"
 
 #include <array>
 #include <deque>
@@ -23,7 +22,7 @@ void showSceneMenu(Model& model, int scene);
       drag a scene         move it
       double-click         capture what you hear as a new scene, right there
       right-click a scene  rename, update, delete
-      Draw mode            draw a path; the sound travels it on its own */
+      Draw (P)             draw a loop; the sound travels it on its own (Path wander) */
 class TerrainView final : public juce::Component, public Animated
 {
 public:
@@ -41,10 +40,9 @@ public:
     void mouseMove(const juce::MouseEvent& e) override;
     void mouseExit(const juce::MouseEvent& e) override;
 
-    /** Path drawing: while on, a drag records a path instead of moving the cursor. */
-    void setDrawMode(bool on) { drawMode = on; repaint(); }
+    /** Path drawing: while on, a drag records a loop instead of moving the cursor. */
+    void setDrawMode(bool on);
     bool isDrawMode() const noexcept { return drawMode; }
-    std::function<void(const std::vector<engine::Point2>&)> onPathDrawn;
 
 private:
     struct Particle
@@ -87,9 +85,9 @@ private:
     bool sceneMoved = false;
     bool drawMode = false;
     std::vector<engine::Point2> drawing;
-    std::vector<engine::Point2> shownPath; // the path the engine follows, if any
-public:
-    void setShownPath(std::vector<engine::Point2> p) { shownPath = std::move(p); }
+    std::vector<engine::Point2> shownPath; // the loop the engine follows, if any
+    std::uint64_t shownPathVersion = 0;
+    FlatButton drawButton { "Draw path", colour::tide }, clearButton { "Clear path" };
 };
 
 } // namespace tf::app::gui

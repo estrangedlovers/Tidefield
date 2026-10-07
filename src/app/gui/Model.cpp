@@ -83,7 +83,7 @@ juce::StringArray Model::choices(P p) const
         for (int t = 0; t < dsp::BloomSampler::kNumTransforms; ++t)
             c.add(dsp::BloomSampler::transformName(static_cast<dsp::BloomSampler::Transform>(t)));
     else if (id == "terrain.wanderStyle")
-        c = { "Drift", "Orbit", "Tide pool", "Journey" };
+        c = { "Drift", "Orbit", "Tide pool", "Journey", "Path" };
     else if (id == "catch.source")
         c = { "Output", "Live input" };
     else if (id == "catch.target")

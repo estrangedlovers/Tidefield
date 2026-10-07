@@ -161,7 +161,7 @@ juce::var buildSchema(const engine::Engine& engine)
     root->setProperty("noteNames", notes);
     root->setProperty("mediumTypes", media);
     root->setProperty("bloomTransforms", transforms);
-    root->setProperty("wanderStyles", arr({ "Drift", "Orbit", "Tide pool", "Journey" }));
+    root->setProperty("wanderStyles", arr({ "Drift", "Orbit", "Tide pool", "Journey", "Path" }));
 
     auto* limits = new juce::DynamicObject();
     limits->setProperty("scenes", kMaxScenes);

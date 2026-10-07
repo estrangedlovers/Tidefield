@@ -16,6 +16,7 @@ namespace tf::engine {
 class Engine;
 class FxManager;
 class MidiManager;
+class PathManager;
 class SceneManager;
 class SeasonManager;
 } // namespace tf::engine
@@ -44,6 +45,7 @@ struct SessionData
     std::map<std::string, std::string> fx;   // slot id -> processor type ("" = empty)
     juce::var midi;                          // MIDI mappings (phase 5)
     juce::var seasons;                       // slow macro curves (phase 8): array of objects
+    std::vector<engine::Point2> path;        // the loop the Path wander style travels, as drawn
     std::map<std::string, std::shared_ptr<const dsp::SampleBuffer>> samples; // "cloud1".."cloud4", "bloom"
 
     /** Things recall could not apply (unknown IDs from a newer version, etc.). */
@@ -53,14 +55,14 @@ struct SessionData
 /** Message thread: snapshot the running state. `latest` provides parameter targets. */
 SessionData captureSession(const engine::Engine& engine, const engine::TelemetryFrame& latest, const engine::SceneManager& scenes,
                            const engine::FxManager& fx, const engine::MidiManager* midi = nullptr,
-                           const engine::SeasonManager* seasons = nullptr);
+                           const engine::SeasonManager* seasons = nullptr, const engine::PathManager* path = nullptr);
 
 /** Message thread: apply a session. With `snap` true, parameters jump (use while the
     master is faded out); otherwise they glide through their smoothers. The live layer
     is released. Returns warnings. */
 std::vector<std::string> applySession(const SessionData& session, engine::Engine& engine, engine::SceneManager& scenes,
                                       engine::FxManager& fx, bool snap, engine::MidiManager* midi = nullptr,
-                                      engine::SeasonManager* seasons = nullptr);
+                                      engine::SeasonManager* seasons = nullptr, engine::PathManager* path = nullptr);
 
 /** MIDI mapping <-> JSON. A session without a "midi" object leaves the current mapping
     alone (a controller setup usually belongs to the rig, not the piece). */

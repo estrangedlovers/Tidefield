@@ -263,3 +263,34 @@ TEST_CASE("Seasons round-trip through a session and an empty list clears them", 
     io::applySession(io::defaultSession(e2), e2, scenes2, fx2, true, nullptr, &seasons2);
     CHECK(seasons2.getSeasons().empty());
 }
+
+TEST_CASE("A session from before a parameter or slot existed resets it to default", "[session]")
+{
+    engine::Engine e;
+    e.prepare(kFs, 256);
+    engine::SceneManager scenes(e);
+    engine::FxManager fx(e);
+    // The previous piece: wind blowing and an insert on the weather strip.
+    e.setParam(engine::P::WeatherWind, 0.8f);
+    fx.setType(engine::FxManager::findSlot("weather.fx1"), "tf.ensemble", false);
+
+    // An old session that knows nothing about weather.
+    auto old = io::defaultSession(e);
+    for (auto it = old.params.begin(); it != old.params.end();)
+        it = it->first.rfind("weather.", 0) == 0 ? old.params.erase(it) : std::next(it);
+    old.fx.erase("weather.fx1");
+    old.fx.erase("weather.fx2");
+
+    io::applySession(old, e, scenes, fx, true);
+    std::vector<float> l(256), r(256);
+    float* outs[2] = { l.data(), r.data() };
+    e.process(nullptr, 0, outs, 2, 256);
+    engine::TelemetryFrame f;
+    for (int b = 0; b < 400; ++b)
+    {
+        e.process(nullptr, 0, outs, 2, 256);
+        while (e.popTelemetry(f)) {}
+    }
+    CHECK(f.paramTargets[engine::idx(engine::P::WeatherWind)] == Approx(0.0f));
+    CHECK(fx.getType(engine::FxManager::findSlot("weather.fx1")).empty());
+}

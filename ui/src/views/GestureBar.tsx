@@ -159,11 +159,18 @@ function useGestureKeys() {
       else if (k === "h") store.setParamById("hush.hold", 0);
       else if (k === "t") store.setParamById("slow.hold", 0);
     };
+    // A key held while the window loses focus never sends its keyup: let go of every
+    // hold so a gesture cannot stay stuck on.
+    const releaseAll = () => {
+      for (const id of ["swell.hold", "hush.hold", "slow.hold"]) if (store.value(id) > 0.5) store.setParamById(id, 0);
+    };
     window.addEventListener("keydown", down);
     window.addEventListener("keyup", up);
+    window.addEventListener("blur", releaseAll);
     return () => {
       window.removeEventListener("keydown", down);
       window.removeEventListener("keyup", up);
+      window.removeEventListener("blur", releaseAll);
     };
   }, []);
 }

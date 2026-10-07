@@ -26,8 +26,13 @@ void AutoMaster::prepare(const ProcessSpec& s)
 {
     spec = s;
     fs = static_cast<float>(spec.sampleRate);
-    for (auto* b : { &kShelfL, &kShelfR, &kHpL, &kHpR, &lowSplit, &highSplit, &mudLo, &mudHi, &eqLowL, &eqLowR, &eqMudL, &eqMudR, &eqHighL, &eqHighR })
+    for (auto* b : { &kShelfL, &kShelfR, &kHpL, &kHpR, &kInShelfL, &kInShelfR, &kInHpL, &kInHpR, &lowSplit, &highSplit, &mudLo, &mudHi,
+                     &eqLowL, &eqLowR, &eqMudL, &eqMudR, &eqHighL, &eqHighR })
         b->prepare(spec.sampleRate);
+    for (auto* b : { &kInShelfL, &kInShelfR })
+        b->setHighShelf(1500.0f, 4.0f);
+    for (auto* b : { &kInHpL, &kInHpR })
+        b->setHighPass(38.0f, 0.5f);
     // ITU-R BS.1770 K-weighting, approximated with RBJ shapes.
     kShelfL.setHighShelf(1500.0f, 4.0f);
     kShelfR.setHighShelf(1500.0f, 4.0f);
@@ -44,11 +49,13 @@ void AutoMaster::prepare(const ProcessSpec& s)
 
 void AutoMaster::reset() noexcept
 {
-    for (auto* b : { &kShelfL, &kShelfR, &kHpL, &kHpR, &lowSplit, &highSplit, &mudLo, &mudHi, &eqLowL, &eqLowR, &eqMudL, &eqMudR, &eqHighL, &eqHighR })
+    for (auto* b : { &kShelfL, &kShelfR, &kHpL, &kHpR, &kInShelfL, &kInShelfR, &kInHpL, &kInHpR, &lowSplit, &highSplit, &mudLo, &mudHi,
+                     &eqLowL, &eqLowR, &eqMudL, &eqMudR, &eqHighL, &eqHighR })
         b->reset();
     sideLowCut.reset();
-    accK = accLow = accMud = accMid = accHigh = accSide = accMidSig = 0.0;
+    accK = accKIn = accLow = accMud = accMid = accHigh = accSide = accMidSig = 0.0;
     accCount = 0;
+    eKIn = 0.0f;
     eK = eLow = eMud = eMidBand = eHigh = eSide = eMidSig = 0.0f;
     compEnv = 0.0f;
     compGain = gainLin = gainTarget = widthCur = 1.0f;
@@ -66,15 +73,17 @@ void AutoMaster::control() noexcept
     const float k = 1.0f - std::exp(-dt / 3.0f);
     auto follow = [&](float& e, double acc) { e = flushDenormal(e + k * (static_cast<float>(acc / n) - e)); };
     follow(eK, accK);
+    follow(eKIn, accKIn);
     follow(eLow, accLow);
     follow(eMud, accMud);
     follow(eMidBand, accMid);
     follow(eHigh, accHigh);
     follow(eSide, accSide);
     follow(eMidSig, accMidSig);
-    accK = accLow = accMud = accMid = accHigh = accSide = accMidSig = 0.0;
+    accK = accKIn = accLow = accMud = accMid = accHigh = accSide = accMidSig = 0.0;
     accCount = 0;
 
+    state.inputLoudness = -0.691f + toDb(eKIn);
     state.loudness = -0.691f + toDb(eK);
     const bool audible = state.loudness > kSilenceLufs;
     const float amount = std::clamp(params.amount, 0.0f, 1.0f);
@@ -175,17 +184,26 @@ void AutoMaster::process(float* left, float* right, int n) noexcept
         l = mm + ss;
         r = mm - ss;
 
-        // Glue: RMS envelope, soft knee, threshold 8 dB over the measured loudness.
+        // Loudness of the glue's own input (EQ'd, widened): its threshold reference.
+        // Measured here, before it, so compression cannot lower its own threshold.
+        {
+            const float kl = kInHpL.process(kInShelfL.process(l));
+            const float kr = kInHpR.process(kInShelfR.process(r));
+            accKIn += static_cast<double>(kl) * kl + static_cast<double>(kr) * kr;
+        }
+
+        // Glue: RMS envelope, soft knee, threshold 8 dB over its input's loudness,
+        // at most 6 dB of reduction.
         const float e = 0.5f * (l * l + r * r);
         compEnv = flushDenormal(e > compEnv ? attack * compEnv + (1.0f - attack) * e : release * compEnv + (1.0f - release) * e);
         const float levelDb = 10.0f * std::log10(compEnv + 1.0e-12f);
-        const float threshold = state.loudness + 8.0f;
+        const float threshold = state.inputLoudness + 8.0f;
         const float over = levelDb - threshold;
         float grDb = 0.0f;
         if (over > -3.0f) // 6 dB soft knee
         {
             const float x = over < 3.0f ? (over + 3.0f) * (over + 3.0f) / 12.0f : over;
-            grDb = x * (1.0f - 1.0f / kRatio);
+            grDb = std::min(6.0f, x * (1.0f - 1.0f / kRatio));
         }
         compGain = dbToGain(-grDb);
         state.reductionDb = grDb;

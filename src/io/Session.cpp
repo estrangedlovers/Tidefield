@@ -229,7 +229,11 @@ std::vector<std::string> applySession(const SessionData& session, engine::Engine
     std::vector<std::string> warnings = session.warnings;
 
     // FX types first: loading a processor posts its defaults, which the stored
-    // values below then override.
+    // values below then override. Slots the session does not mention (it predates
+    // them) are emptied, so nothing carries over from the previous piece.
+    for (int slot = 0; slot < engine::kNumFxSlots; ++slot)
+        if (session.fx.find(engine::kFxSlots[static_cast<std::size_t>(slot)].id) == session.fx.end())
+            fx.setType(slot, "", false);
     for (const auto& [slotId, type] : session.fx)
     {
         const int slot = engine::FxManager::findSlot(slotId);
@@ -242,6 +246,14 @@ std::vector<std::string> applySession(const SessionData& session, engine::Engine
     }
 
     engine.command(engine::Command::ReleaseLiveLayer);
+    // Parameters added after the session was saved go to their defaults.
+    for (const auto& spec : reg.all())
+        if (session.params.find(spec.id) == session.params.end())
+        {
+            const auto index = reg.find(spec.id);
+            engine.post(snap ? engine::ControlEvent::snapParam(*index, spec.defaultValue, engine::ControlSource::UI)
+                             : engine::ControlEvent::setParam(*index, spec.defaultValue, engine::ControlSource::Terrain));
+        }
     for (const auto& [id, value] : session.params)
     {
         const auto index = reg.find(id);

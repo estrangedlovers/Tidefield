@@ -21,7 +21,8 @@ namespace tf::dsp {
       - three-band EQ (low shelf 150 Hz, bell 350 Hz, high shelf 4 kHz), up to
         -6..+4 dB, scaled by `amount`
       - glue: a gentle 1.6:1 RMS compressor whose threshold sits 8 dB above the
-        measured loudness, so it only rounds off swells
+        loudness of its own input (measured before it, so it cannot chase itself),
+        at most 6 dB of reduction, so it only rounds off swells
       - width toward a natural side/mid ratio, and lows below 120 Hz kept mono
       - make-up gain to the loudness target, -12..+12 dB; frozen when the input is
         near silence so it never drags hiss up between pieces
@@ -40,7 +41,8 @@ public:
 
     struct State
     {
-        float loudness = -70.0f;   // LUFS (short-term, before make-up)
+        float loudness = -70.0f;   // LUFS (short-term, after glue, before make-up)
+        float inputLoudness = -70.0f; // LUFS before glue (sets its threshold)
         float gainDb = 0.0f;       // make-up applied
         float lowDb = 0.0f, mudDb = 0.0f, highDb = 0.0f;
         float width = 1.0f;        // side gain
@@ -65,11 +67,12 @@ private:
     int untilControl = 0;
 
     // Analysis.
-    Biquad kShelfL, kShelfR, kHpL, kHpR;    // K-weighting
+    Biquad kShelfL, kShelfR, kHpL, kHpR;    // K-weighting after the glue
+    Biquad kInShelfL, kInShelfR, kInHpL, kInHpR; // and before it
     Biquad lowSplit, highSplit, mudLo, mudHi;
-    double accK = 0.0, accLow = 0.0, accMud = 0.0, accMid = 0.0, accHigh = 0.0, accSide = 0.0, accMidSig = 0.0;
+    double accK = 0.0, accKIn = 0.0, accLow = 0.0, accMud = 0.0, accMid = 0.0, accHigh = 0.0, accSide = 0.0, accMidSig = 0.0;
     int accCount = 0;
-    float eK = 0.0f, eLow = 0.0f, eMud = 0.0f, eMidBand = 0.0f, eHigh = 0.0f, eSide = 0.0f, eMidSig = 0.0f;
+    float eK = 0.0f, eKIn = 0.0f, eLow = 0.0f, eMud = 0.0f, eMidBand = 0.0f, eHigh = 0.0f, eSide = 0.0f, eMidSig = 0.0f;
 
     // Processing.
     Biquad eqLowL, eqLowR, eqMudL, eqMudR, eqHighL, eqHighR;

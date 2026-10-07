@@ -170,3 +170,21 @@ TEST_CASE("Engine with the auto master on stays under the ceiling", "[automaster
     CHECK(f.autoMaster[7] == 1.0f);   // fully on
     CHECK(f.autoMaster[1] > 3.0f);    // it had to lift the default drone toward -14 LUFS
 }
+
+TEST_CASE("Auto master glue only rounds off peaks of a steady mix", "[automaster]")
+{
+    AutoMaster am;
+    am.prepare({ kFs, kBlock });
+    AutoMaster::Params p;
+    p.enabled = true;
+    am.setParams(p);
+    float maxGr = 0.0f;
+    for (int k = 0; k < 20; ++k)
+    {
+        const auto s = run(am, 1.0, 0.1f, 0.0f, static_cast<std::uint64_t>(k + 9));
+        if (k >= 5)
+            maxGr = std::max(maxGr, s.reductionDb); // after the meters settle
+        CHECK(s.reductionDb <= 6.0f);              // never more than the cap, even at the start
+    }
+    CHECK(maxGr < 2.0f); // steady noise is not squashed
+}

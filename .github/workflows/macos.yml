@@ -67,6 +67,7 @@ jobs:
           test -f "$APP/Contents/Resources/ui/index.html"
           # The shipped binary: Apple Silicon, macOS 12+, and it passes its own self-test.
           lipo -info "$APP/Contents/MacOS/Tidefield"
+          vtool -show-build "$APP/Contents/MacOS/Tidefield" | grep -E "minos|platform"
           /usr/libexec/PlistBuddy -c "Print :LSMinimumSystemVersion" "$APP/Contents/Info.plist"
           /usr/libexec/PlistBuddy -c "Print :CFBundleShortVersionString" "$APP/Contents/Info.plist"
           "$APP/Contents/MacOS/Tidefield" --self-test

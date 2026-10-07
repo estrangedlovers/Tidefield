@@ -9,7 +9,10 @@ juce_add_gui_app(Tidefield
     MICROPHONE_PERMISSION_TEXT "Tidefield uses audio input for the live input channel."
     HARDENED_RUNTIME_ENABLED TRUE
     HARDENED_RUNTIME_OPTIONS com.apple.security.device.audio-input
-    NEEDS_WEB_BROWSER TRUE)
+    NEEDS_WEB_BROWSER TRUE
+    # Finder refuses to open the app on older macOS with a clear message instead of
+    # it failing at launch.
+    PLIST_TO_MERGE "<plist><dict><key>LSMinimumSystemVersion</key><string>${CMAKE_OSX_DEPLOYMENT_TARGET}</string></dict></plist>")
 
 # Built-in sounds (synthesized by tools/scripts/make_samples.py), compiled in so a
 # first launch has something to play.

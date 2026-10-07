@@ -497,3 +497,50 @@ h2.sub {
     grid-template-columns: 1fr 1fr;
   }
 }
+
+/* Auto master */
+.am-readout {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  font-size: 11.5px;
+  color: var(--text-3);
+}
+
+.am-row {
+  display: flex;
+  gap: 4px 14px;
+  flex-wrap: wrap;
+}
+
+.am-pair {
+  white-space: nowrap;
+}
+
+.am-num {
+  color: var(--text-2);
+  font-variant-numeric: tabular-nums;
+}
+
+.am-band {
+  display: grid;
+  grid-template-columns: 40px 1fr 64px;
+  align-items: center;
+  gap: 8px;
+}
+
+.am-track {
+  position: relative;
+  height: 4px;
+  border-radius: 999px;
+  background: var(--line);
+}
+
+.am-fill {
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  border-radius: 999px;
+  background: var(--accent);
+  transition: all 400ms var(--ease);
+}

@@ -46,6 +46,10 @@ export function choicesFor(spec: ParamSpec, schema: Schema): string[] | null {
     case "loops.on":
     case "swell.hold":
       return ["Off", "On"];
+    case "master.auto":
+      return ["Off", "On"];
+    case "master.autoTarget":
+      return ["Quiet (-23)", "Streaming (-16)", "Loud (-14)"];
     case "loop.source":
       return ["Live input", "The mix"];
     case "loops.target":
@@ -66,7 +70,9 @@ export function formatParam(spec: ParamSpec, v: number, schema: Schema): string 
 
   switch (spec.unit) {
     case "Hz":
-      return v >= 1000 ? `${trim(v / 1000, v >= 10000 ? 1 : 2)} kHz` : `${Math.round(v)} Hz`;
+      if (v >= 1000) return `${trim(v / 1000, v >= 10000 ? 1 : 2)} kHz`;
+      if (v < 1) return `${trim(v, v < 0.1 ? 3 : 2)} Hz`;
+      return v < 10 ? `${trim(v, 1)} Hz` : `${Math.round(v)} Hz`;
     case "s":
       return v < 1 ? `${Math.round(v * 1000)} ms` : `${trim(v, v < 10 ? 2 : 1)} s`;
     case "ms":

@@ -27,6 +27,7 @@ include(cmake/Dependencies.cmake)
 add_library(tidefield_dsp STATIC
     src/dsp/fx/Limiter.cpp
     src/dsp/fx/ProcessorFactory.cpp
+    src/dsp/master/AutoMaster.cpp
     src/dsp/fx/chorus/Ensemble.cpp
     src/dsp/fx/delay/WornEcho.cpp
     src/dsp/fx/spectral/SpectralBlur.cpp

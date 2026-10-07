@@ -494,6 +494,9 @@ class MockEngine {
         }),
       },
       input: [0, false, this.inputFreeze],
+      auto: t[P("master.auto")] > 0.5
+        ? [-22 + 2 * Math.sin(this.time * 0.1), [-23, -16, -14][Math.round(t[P("master.autoTarget")])] + 22, 1.5, -1.2, -2.0, 1.05, 0.8, 1]
+        : [-22, 0, 0, 0, 0, 1, 0, 0],
       perf: {
         swell: this.swell,
         freeze: this.freeze,

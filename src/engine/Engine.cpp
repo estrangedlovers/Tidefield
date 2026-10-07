@@ -91,6 +91,7 @@ void Engine::prepare(double newSampleRate, int maxBlockSize)
     preRingR.assign(preCapacity, 0.0f);
     preWritten = 0;
     medium.prepare(spec, config.seed + 300u);
+    autoMaster.prepare(spec);
     master.prepare(spec);
     for (auto& slot : fxSlots)
         slot.prepareAll(spec);
@@ -543,6 +544,7 @@ void Engine::resetFeedback() noexcept
     for (auto& slot : fxSlots)
         slot.reset();
     medium.reset();
+    autoMaster.reset();
     master.reset();
 }
 
@@ -701,6 +703,13 @@ void Engine::updateFx(float t) noexcept
     m.mix = params.current(P::MediumMix);
     medium.setParams(m);
     medium.setTimeScale(t);
+
+    static constexpr float kLoudnessTargets[] = { -23.0f, -16.0f, -14.0f };
+    dsp::AutoMaster::Params am;
+    am.enabled = params.current(P::MasterAuto) > 0.5f;
+    am.targetLufs = kLoudnessTargets[std::clamp(toInt(params.current(P::MasterAutoTarget)), 0, 2)];
+    am.amount = params.current(P::MasterAutoAmount);
+    autoMaster.setParams(am);
 }
 
 void Engine::controlTick() noexcept
@@ -1214,6 +1223,7 @@ void Engine::process(const float* const* inputs, int numInputs, float* const* ou
         }
         preWritten += static_cast<std::uint64_t>(block);
         medium.process(masterL.data(), masterR.data(), block);
+        autoMaster.process(masterL.data(), masterR.data(), block);
 
         const float levelEnd = dsp::dbToGain(params.current(P::MasterLevel));
         const auto ev = master.process(masterL.data(), masterR.data(), block, levelStart, levelEnd);
@@ -1377,6 +1387,10 @@ void Engine::accumulateTelemetry(const float* l, const float* r, int n) noexcept
     f.weatherWave = weather.getWave();
     f.freezeGain = freezeGain;
     f.swell = swellEnv;
+    {
+        const auto& a = autoMaster.getState();
+        f.autoMaster = { a.loudness, a.gainDb, a.lowDb, a.mudDb, a.highDb, a.width, a.reductionDb, a.mix };
+    }
     std::copy(seasonValue.begin(), seasonValue.end(), f.seasonValue.begin());
     std::copy(loopPhase.begin(), loopPhase.end(), f.loopPhase.begin());
     std::copy(loopNote.begin(), loopNote.end(), f.loopNote.begin());

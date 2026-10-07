@@ -21,6 +21,7 @@
 #include <dsp/core/SampleBuffer.h>
 #include <dsp/core/Smoother.h>
 #include <dsp/fx/medium/Medium.h>
+#include <dsp/master/AutoMaster.h>
 #include <dsp/harmony/HarmonicGravity.h>
 #include <dsp/mod/Drift.h>
 #include <dsp/sources/bloom/BloomSampler.h>
@@ -263,6 +264,7 @@ private:
     std::array<ChannelStrip, kNumStrips> strips;
     std::array<FxSlot, kNumFxSlots> fxSlots;
     dsp::Medium medium;
+    dsp::AutoMaster autoMaster;
     MasterChain master;
 
     // Buffers (maxBlock samples each).

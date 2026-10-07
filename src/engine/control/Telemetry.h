@@ -75,6 +75,9 @@ struct TelemetryFrame
     float weatherGust = 0.0f, weatherWave = 0.0f;
     float freezeGain = 0.0f;
 
+    // Auto master: loudness (LUFS), make-up dB, low/mud/high EQ dB, width, glue dB, mix.
+    std::array<float, 8> autoMaster {};
+
     // Performance layer.
     float swell = 0.0f;                         // envelope 0..1
     std::array<float, 8> seasonValue {};        // each season's curve, -1..1

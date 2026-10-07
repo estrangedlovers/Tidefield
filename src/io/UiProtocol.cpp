@@ -302,6 +302,10 @@ juce::var TelemetryEncoder::encode(const engine::TelemetryFrame& f)
     perf->setProperty("looper", arr({ f.loopState, q(f.loopPosition), q(f.loopSeconds, 100.0), f.loopPasses }));
     perf->setProperty("weather", arr({ q(f.weatherGust), q(f.weatherWave) }));
     o->setProperty("perf", juce::var(perf));
+    juce::Array<juce::var> am;
+    for (float v : f.autoMaster)
+        am.add(q(v, 100.0));
+    o->setProperty("auto", am);
 
     auto* terrain = new juce::DynamicObject();
     terrain->setProperty("cursor", arr({ q(f.cursor.x), q(f.cursor.y) }));

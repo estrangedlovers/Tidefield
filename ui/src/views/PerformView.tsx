@@ -49,6 +49,25 @@ function SceneStrip() {
   );
 }
 
+function AutoMasterToggle() {
+  const i = idx("master.auto");
+  useKey(`p:${i}`);
+  const on = store.params[i] > 0.5;
+  const a = store.telemetry?.auto ?? [];
+  const target = ["-23", "-16", "-14"][Math.round(store.value("master.autoTarget"))];
+  return (
+    <button
+      className={`auto-master${on ? " on" : ""}`}
+      onClick={() => store.setParam(i, on ? 0 : 1)}
+      title="Auto master: listens to the mix and eases tone, glue, width and loudness toward a finished sound. Settings in Edit, Master."
+    >
+      <span className="auto-dot" />
+      <span className="auto-title">Auto master</span>
+      <span className="auto-read">{on ? `${target} LUFS, ${(a[1] ?? 0) >= 0 ? "+" : ""}${(a[1] ?? 0).toFixed(1)} dB` : "off"}</span>
+    </button>
+  );
+}
+
 function MasterBlock() {
   useKey("telemetry");
   const t = store.telemetry;
@@ -66,6 +85,7 @@ function MasterBlock() {
         <span className="fade-progress" style={{ transform: `scaleX(${progress})` }} />
         <span className="fade-label">{panic ? "Resume" : label}</span>
       </button>
+      <AutoMasterToggle />
       <div className="master-row">
         <Knob param={idx("master.fadeSeconds")} label="Fade length" size="sm" />
         <Knob param={idx("master.level")} label="Master" size="sm" />

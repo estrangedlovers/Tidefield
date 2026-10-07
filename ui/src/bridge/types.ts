@@ -91,6 +91,8 @@ export interface TelemetryMessage {
   /** level, gate open, frozen pad gain */
   input: [number, boolean, number];
   perf: PerfTelemetry;
+  /** Auto master: loudness LUFS, make-up dB, low/mud/high EQ dB, width, glue dB, mix 0..1 */
+  auto: number[];
   terrain: { cursor: [number, number]; pos: [number, number]; n: number; version: number; w: number[] };
   full?: boolean;
   p?: [number, number][];

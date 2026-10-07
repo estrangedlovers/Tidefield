@@ -41,6 +41,33 @@ public:
                       (a + 1) + (a - 1) * c + sa, -2 * ((a - 1) + (a + 1) * c), (a + 1) + (a - 1) * c - sa);
     }
 
+    void setHighShelf(float hz, float gainDb) noexcept
+    {
+        const float a = std::pow(10.0f, gainDb / 40.0f);
+        const float w = omega(hz);
+        const float c = std::cos(w);
+        const float alpha = std::sin(w) / 2.0f * std::sqrt(2.0f);
+        const float sa = 2.0f * std::sqrt(a) * alpha;
+        setNormalised(a * ((a + 1) + (a - 1) * c + sa), -2 * a * ((a - 1) + (a + 1) * c), a * ((a + 1) + (a - 1) * c - sa),
+                      (a + 1) - (a - 1) * c + sa, 2 * ((a - 1) - (a + 1) * c), (a + 1) - (a - 1) * c - sa);
+    }
+
+    void setHighPass(float hz, float q = 0.7071f) noexcept
+    {
+        const float w = omega(hz);
+        const float c = std::cos(w);
+        const float alpha = std::sin(w) / (2.0f * q);
+        setNormalised(0.5f * (1.0f + c), -(1.0f + c), 0.5f * (1.0f + c), 1.0f + alpha, -2.0f * c, 1.0f - alpha);
+    }
+
+    void setLowPass(float hz, float q = 0.7071f) noexcept
+    {
+        const float w = omega(hz);
+        const float c = std::cos(w);
+        const float alpha = std::sin(w) / (2.0f * q);
+        setNormalised(0.5f * (1.0f - c), 1.0f - c, 0.5f * (1.0f - c), 1.0f + alpha, -2.0f * c, 1.0f - alpha);
+    }
+
     float process(float x) noexcept
     {
         const float y = b0 * x + z1;

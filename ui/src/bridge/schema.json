@@ -44,6 +44,48 @@
     },
     {
       "i": 3,
+      "id": "master.auto",
+      "name": "Auto Master",
+      "min": 0.0,
+      "max": 1.0,
+      "def": 0.0,
+      "taper": "linear",
+      "unit": "",
+      "terrain": false,
+      "midi": true,
+      "perform": true,
+      "discrete": true
+    },
+    {
+      "i": 4,
+      "id": "master.autoTarget",
+      "name": "Loudness",
+      "min": 0.0,
+      "max": 2.0,
+      "def": 1.0,
+      "taper": "linear",
+      "unit": "",
+      "terrain": false,
+      "midi": true,
+      "perform": false,
+      "discrete": true
+    },
+    {
+      "i": 5,
+      "id": "master.autoAmount",
+      "name": "Correction",
+      "min": 0.0,
+      "max": 1.0,
+      "def": 0.600000023841858,
+      "taper": "linear",
+      "unit": "",
+      "terrain": false,
+      "midi": true,
+      "perform": false,
+      "discrete": false
+    },
+    {
+      "i": 6,
       "id": "terrain.x",
       "name": "Terrain X",
       "min": 0.0,
@@ -57,7 +99,7 @@
       "discrete": false
     },
     {
-      "i": 4,
+      "i": 7,
       "id": "terrain.y",
       "name": "Terrain Y",
       "min": 0.0,
@@ -71,7 +113,7 @@
       "discrete": false
     },
     {
-      "i": 5,
+      "i": 8,
       "id": "terrain.glide",
       "name": "Glide",
       "min": 0.050000000745058,
@@ -85,7 +127,7 @@
       "discrete": false
     },
     {
-      "i": 6,
+      "i": 9,
       "id": "terrain.focus",
       "name": "Focus",
       "min": 1.0,
@@ -99,7 +141,7 @@
       "discrete": false
     },
     {
-      "i": 7,
+      "i": 10,
       "id": "terrain.wander",
       "name": "Wander",
       "min": 0.0,
@@ -113,7 +155,7 @@
       "discrete": false
     },
     {
-      "i": 8,
+      "i": 11,
       "id": "terrain.wanderRate",
       "name": "Wander Rate",
       "min": 0.002000000094995,
@@ -127,7 +169,7 @@
       "discrete": false
     },
     {
-      "i": 9,
+      "i": 12,
       "id": "terrain.wanderStyle",
       "name": "Wander Style",
       "min": 0.0,
@@ -141,7 +183,7 @@
       "discrete": true
     },
     {
-      "i": 10,
+      "i": 13,
       "id": "tide.rate",
       "name": "Tide",
       "min": 0.050000000745058,
@@ -155,7 +197,7 @@
       "discrete": false
     },
     {
-      "i": 11,
+      "i": 14,
       "id": "harmony.root",
       "name": "Key",
       "min": 0.0,
@@ -169,7 +211,7 @@
       "discrete": true
     },
     {
-      "i": 12,
+      "i": 15,
       "id": "harmony.scale",
       "name": "Scale",
       "min": 0.0,
@@ -183,7 +225,7 @@
       "discrete": true
     },
     {
-      "i": 13,
+      "i": 16,
       "id": "harmony.gravity",
       "name": "Gravity",
       "min": 0.0,
@@ -197,7 +239,7 @@
       "discrete": false
     },
     {
-      "i": 14,
+      "i": 17,
       "id": "harmony.morph",
       "name": "Key Morph",
       "min": 0.5,
@@ -211,7 +253,7 @@
       "discrete": false
     },
     {
-      "i": 15,
+      "i": 18,
       "id": "medium.type",
       "name": "Medium",
       "min": 0.0,
@@ -225,7 +267,7 @@
       "discrete": true
     },
     {
-      "i": 16,
+      "i": 19,
       "id": "medium.age",
       "name": "Age",
       "min": 0.0,
@@ -239,7 +281,7 @@
       "discrete": false
     },
     {
-      "i": 17,
+      "i": 20,
       "id": "medium.noise",
       "name": "Noise",
       "min": 0.0,
@@ -253,7 +295,7 @@
       "discrete": false
     },
     {
-      "i": 18,
+      "i": 21,
       "id": "medium.wobble",
       "name": "Wobble",
       "min": 0.0,
@@ -267,7 +309,7 @@
       "discrete": false
     },
     {
-      "i": 19,
+      "i": 22,
       "id": "medium.drive",
       "name": "Drive",
       "min": 0.0,
@@ -281,7 +323,7 @@
       "discrete": false
     },
     {
-      "i": 20,
+      "i": 23,
       "id": "medium.mix",
       "name": "Medium Mix",
       "min": 0.0,
@@ -295,7 +337,7 @@
       "discrete": false
     },
     {
-      "i": 21,
+      "i": 24,
       "id": "catch.seconds",
       "name": "Catch Length",
       "min": 5.0,
@@ -309,7 +351,7 @@
       "discrete": false
     },
     {
-      "i": 22,
+      "i": 25,
       "id": "catch.source",
       "name": "Catch Source",
       "min": 0.0,
@@ -323,7 +365,7 @@
       "discrete": true
     },
     {
-      "i": 23,
+      "i": 26,
       "id": "catch.target",
       "name": "Catch Into",
       "min": 0.0,
@@ -337,7 +379,7 @@
       "discrete": true
     },
     {
-      "i": 24,
+      "i": 27,
       "id": "swell.hold",
       "name": "Swell",
       "min": 0.0,
@@ -351,7 +393,7 @@
       "discrete": true
     },
     {
-      "i": 25,
+      "i": 28,
       "id": "swell.depth",
       "name": "Swell Depth",
       "min": 0.0,
@@ -365,7 +407,7 @@
       "discrete": false
     },
     {
-      "i": 26,
+      "i": 29,
       "id": "swell.attack",
       "name": "Swell Rise",
       "min": 0.200000002980232,
@@ -379,7 +421,7 @@
       "discrete": false
     },
     {
-      "i": 27,
+      "i": 30,
       "id": "swell.release",
       "name": "Swell Ebb",
       "min": 0.5,
@@ -393,7 +435,7 @@
       "discrete": false
     },
     {
-      "i": 28,
+      "i": 31,
       "id": "seasons.depth",
       "name": "Seasons",
       "min": 0.0,
@@ -407,7 +449,7 @@
       "discrete": false
     },
     {
-      "i": 29,
+      "i": 32,
       "id": "loops.on",
       "name": "Loops",
       "min": 0.0,
@@ -421,7 +463,7 @@
       "discrete": true
     },
     {
-      "i": 30,
+      "i": 33,
       "id": "loops.count",
       "name": "Voices",
       "min": 1.0,
@@ -435,7 +477,7 @@
       "discrete": true
     },
     {
-      "i": 31,
+      "i": 34,
       "id": "loops.rate",
       "name": "Pace",
       "min": 0.25,
@@ -449,7 +491,7 @@
       "discrete": false
     },
     {
-      "i": 32,
+      "i": 35,
       "id": "loops.density",
       "name": "Density",
       "min": 0.0,
@@ -463,7 +505,7 @@
       "discrete": false
     },
     {
-      "i": 33,
+      "i": 36,
       "id": "loops.register",
       "name": "Register",
       "min": 36.0,
@@ -477,7 +519,7 @@
       "discrete": false
     },
     {
-      "i": 34,
+      "i": 37,
       "id": "loops.spread",
       "name": "Spread",
       "min": 0.0,
@@ -491,7 +533,7 @@
       "discrete": false
     },
     {
-      "i": 35,
+      "i": 38,
       "id": "loops.velocity",
       "name": "Velocity",
       "min": 0.0,
@@ -505,7 +547,7 @@
       "discrete": false
     },
     {
-      "i": 36,
+      "i": 39,
       "id": "loops.target",
       "name": "Play Into",
       "min": 0.0,
@@ -519,7 +561,7 @@
       "discrete": true
     },
     {
-      "i": 37,
+      "i": 40,
       "id": "loops.pattern",
       "name": "Pattern",
       "min": 0.0,
@@ -533,7 +575,7 @@
       "discrete": true
     },
     {
-      "i": 38,
+      "i": 41,
       "id": "busA.level",
       "name": "Reverb Return",
       "min": -60.0,
@@ -547,7 +589,7 @@
       "discrete": false
     },
     {
-      "i": 39,
+      "i": 42,
       "id": "busB.level",
       "name": "Delay Return",
       "min": -60.0,
@@ -561,7 +603,7 @@
       "discrete": false
     },
     {
-      "i": 40,
+      "i": 43,
       "id": "drone.root",
       "name": "Root Note",
       "min": 24.0,
@@ -575,7 +617,7 @@
       "discrete": false
     },
     {
-      "i": 41,
+      "i": 44,
       "id": "drone.detune",
       "name": "Detune",
       "min": 0.0,
@@ -589,7 +631,7 @@
       "discrete": false
     },
     {
-      "i": 42,
+      "i": 45,
       "id": "drone.shape",
       "name": "Shape",
       "min": 0.0,
@@ -603,7 +645,7 @@
       "discrete": false
     },
     {
-      "i": 43,
+      "i": 46,
       "id": "drone.cutoff",
       "name": "Brightness",
       "min": 60.0,
@@ -617,7 +659,7 @@
       "discrete": false
     },
     {
-      "i": 44,
+      "i": 47,
       "id": "drone.resonance",
       "name": "Resonance",
       "min": 0.0,
@@ -631,7 +673,7 @@
       "discrete": false
     },
     {
-      "i": 45,
+      "i": 48,
       "id": "drone.noise",
       "name": "Breath",
       "min": 0.0,
@@ -645,7 +687,7 @@
       "discrete": false
     },
     {
-      "i": 46,
+      "i": 49,
       "id": "drone.driftDepth",
       "name": "Drift Depth",
       "min": 0.0,
@@ -659,7 +701,7 @@
       "discrete": false
     },
     {
-      "i": 47,
+      "i": 50,
       "id": "drone.driftRate",
       "name": "Drift Rate",
       "min": 0.004999999888241,
@@ -673,7 +715,7 @@
       "discrete": false
     },
     {
-      "i": 48,
+      "i": 51,
       "id": "drone.density",
       "name": "Density",
       "min": 1.0,
@@ -687,7 +729,7 @@
       "discrete": false
     },
     {
-      "i": 49,
+      "i": 52,
       "id": "drone.evolve",
       "name": "Evolve",
       "min": 0.0,
@@ -701,7 +743,7 @@
       "discrete": false
     },
     {
-      "i": 50,
+      "i": 53,
       "id": "drone.spread",
       "name": "Spread",
       "min": 0.0,
@@ -715,7 +757,7 @@
       "discrete": false
     },
     {
-      "i": 51,
+      "i": 54,
       "id": "drone.gravity",
       "name": "Gravity",
       "min": 0.0,
@@ -729,7 +771,7 @@
       "discrete": false
     },
     {
-      "i": 52,
+      "i": 55,
       "id": "drone.level",
       "name": "Level",
       "min": -60.0,
@@ -743,7 +785,7 @@
       "discrete": false
     },
     {
-      "i": 53,
+      "i": 56,
       "id": "drone.pan",
       "name": "Pan",
       "min": -1.0,
@@ -757,7 +799,7 @@
       "discrete": false
     },
     {
-      "i": 54,
+      "i": 57,
       "id": "drone.width",
       "name": "Width",
       "min": 0.0,
@@ -771,7 +813,7 @@
       "discrete": false
     },
     {
-      "i": 55,
+      "i": 58,
       "id": "drone.sendA",
       "name": "Reverb Send",
       "min": -60.0,
@@ -785,7 +827,7 @@
       "discrete": false
     },
     {
-      "i": 56,
+      "i": 59,
       "id": "drone.sendB",
       "name": "Delay Send",
       "min": -60.0,
@@ -799,7 +841,7 @@
       "discrete": false
     },
     {
-      "i": 57,
+      "i": 60,
       "id": "cloud1.density",
       "name": "Density",
       "min": 0.5,
@@ -813,7 +855,7 @@
       "discrete": false
     },
     {
-      "i": 58,
+      "i": 61,
       "id": "cloud1.grainMs",
       "name": "Grain Size",
       "min": 10.0,
@@ -827,7 +869,7 @@
       "discrete": false
     },
     {
-      "i": 59,
+      "i": 62,
       "id": "cloud1.position",
       "name": "Position",
       "min": 0.0,
@@ -841,7 +883,7 @@
       "discrete": false
     },
     {
-      "i": 60,
+      "i": 63,
       "id": "cloud1.spray",
       "name": "Spray",
       "min": 0.0,
@@ -855,7 +897,7 @@
       "discrete": false
     },
     {
-      "i": 61,
+      "i": 64,
       "id": "cloud1.scan",
       "name": "Scan",
       "min": -1.0,
@@ -869,7 +911,7 @@
       "discrete": false
     },
     {
-      "i": 62,
+      "i": 65,
       "id": "cloud1.pitch",
       "name": "Pitch",
       "min": -24.0,
@@ -883,7 +925,7 @@
       "discrete": false
     },
     {
-      "i": 63,
+      "i": 66,
       "id": "cloud1.pitchSpread",
       "name": "Detune",
       "min": 0.0,
@@ -897,7 +939,7 @@
       "discrete": false
     },
     {
-      "i": 64,
+      "i": 67,
       "id": "cloud1.harmonize",
       "name": "Harmonize",
       "min": 0.0,
@@ -911,7 +953,7 @@
       "discrete": false
     },
     {
-      "i": 65,
+      "i": 68,
       "id": "cloud1.reverse",
       "name": "Reverse",
       "min": 0.0,
@@ -925,7 +967,7 @@
       "discrete": false
     },
     {
-      "i": 66,
+      "i": 69,
       "id": "cloud1.shape",
       "name": "Envelope",
       "min": 0.0,
@@ -939,7 +981,7 @@
       "discrete": false
     },
     {
-      "i": 67,
+      "i": 70,
       "id": "cloud1.stereo",
       "name": "Stereo",
       "min": 0.0,
@@ -953,7 +995,7 @@
       "discrete": false
     },
     {
-      "i": 68,
+      "i": 71,
       "id": "cloud1.gravity",
       "name": "Gravity",
       "min": 0.0,
@@ -967,7 +1009,7 @@
       "discrete": false
     },
     {
-      "i": 69,
+      "i": 72,
       "id": "cloud2.density",
       "name": "Density",
       "min": 0.5,
@@ -981,7 +1023,7 @@
       "discrete": false
     },
     {
-      "i": 70,
+      "i": 73,
       "id": "cloud2.grainMs",
       "name": "Grain Size",
       "min": 10.0,
@@ -995,7 +1037,7 @@
       "discrete": false
     },
     {
-      "i": 71,
+      "i": 74,
       "id": "cloud2.position",
       "name": "Position",
       "min": 0.0,
@@ -1009,7 +1051,7 @@
       "discrete": false
     },
     {
-      "i": 72,
+      "i": 75,
       "id": "cloud2.spray",
       "name": "Spray",
       "min": 0.0,
@@ -1023,7 +1065,7 @@
       "discrete": false
     },
     {
-      "i": 73,
+      "i": 76,
       "id": "cloud2.scan",
       "name": "Scan",
       "min": -1.0,
@@ -1037,7 +1079,7 @@
       "discrete": false
     },
     {
-      "i": 74,
+      "i": 77,
       "id": "cloud2.pitch",
       "name": "Pitch",
       "min": -24.0,
@@ -1051,7 +1093,7 @@
       "discrete": false
     },
     {
-      "i": 75,
+      "i": 78,
       "id": "cloud2.pitchSpread",
       "name": "Detune",
       "min": 0.0,
@@ -1065,7 +1107,7 @@
       "discrete": false
     },
     {
-      "i": 76,
+      "i": 79,
       "id": "cloud2.harmonize",
       "name": "Harmonize",
       "min": 0.0,
@@ -1079,7 +1121,7 @@
       "discrete": false
     },
     {
-      "i": 77,
+      "i": 80,
       "id": "cloud2.reverse",
       "name": "Reverse",
       "min": 0.0,
@@ -1093,7 +1135,7 @@
       "discrete": false
     },
     {
-      "i": 78,
+      "i": 81,
       "id": "cloud2.shape",
       "name": "Envelope",
       "min": 0.0,
@@ -1107,7 +1149,7 @@
       "discrete": false
     },
     {
-      "i": 79,
+      "i": 82,
       "id": "cloud2.stereo",
       "name": "Stereo",
       "min": 0.0,
@@ -1121,7 +1163,7 @@
       "discrete": false
     },
     {
-      "i": 80,
+      "i": 83,
       "id": "cloud2.gravity",
       "name": "Gravity",
       "min": 0.0,
@@ -1135,7 +1177,7 @@
       "discrete": false
     },
     {
-      "i": 81,
+      "i": 84,
       "id": "cloud3.density",
       "name": "Density",
       "min": 0.5,
@@ -1149,7 +1191,7 @@
       "discrete": false
     },
     {
-      "i": 82,
+      "i": 85,
       "id": "cloud3.grainMs",
       "name": "Grain Size",
       "min": 10.0,
@@ -1163,7 +1205,7 @@
       "discrete": false
     },
     {
-      "i": 83,
+      "i": 86,
       "id": "cloud3.position",
       "name": "Position",
       "min": 0.0,
@@ -1177,7 +1219,7 @@
       "discrete": false
     },
     {
-      "i": 84,
+      "i": 87,
       "id": "cloud3.spray",
       "name": "Spray",
       "min": 0.0,
@@ -1191,7 +1233,7 @@
       "discrete": false
     },
     {
-      "i": 85,
+      "i": 88,
       "id": "cloud3.scan",
       "name": "Scan",
       "min": -1.0,
@@ -1205,7 +1247,7 @@
       "discrete": false
     },
     {
-      "i": 86,
+      "i": 89,
       "id": "cloud3.pitch",
       "name": "Pitch",
       "min": -24.0,
@@ -1219,7 +1261,7 @@
       "discrete": false
     },
     {
-      "i": 87,
+      "i": 90,
       "id": "cloud3.pitchSpread",
       "name": "Detune",
       "min": 0.0,
@@ -1233,7 +1275,7 @@
       "discrete": false
     },
     {
-      "i": 88,
+      "i": 91,
       "id": "cloud3.harmonize",
       "name": "Harmonize",
       "min": 0.0,
@@ -1247,7 +1289,7 @@
       "discrete": false
     },
     {
-      "i": 89,
+      "i": 92,
       "id": "cloud3.reverse",
       "name": "Reverse",
       "min": 0.0,
@@ -1261,7 +1303,7 @@
       "discrete": false
     },
     {
-      "i": 90,
+      "i": 93,
       "id": "cloud3.shape",
       "name": "Envelope",
       "min": 0.0,
@@ -1275,7 +1317,7 @@
       "discrete": false
     },
     {
-      "i": 91,
+      "i": 94,
       "id": "cloud3.stereo",
       "name": "Stereo",
       "min": 0.0,
@@ -1289,7 +1331,7 @@
       "discrete": false
     },
     {
-      "i": 92,
+      "i": 95,
       "id": "cloud3.gravity",
       "name": "Gravity",
       "min": 0.0,
@@ -1303,7 +1345,7 @@
       "discrete": false
     },
     {
-      "i": 93,
+      "i": 96,
       "id": "cloud4.density",
       "name": "Density",
       "min": 0.5,
@@ -1317,7 +1359,7 @@
       "discrete": false
     },
     {
-      "i": 94,
+      "i": 97,
       "id": "cloud4.grainMs",
       "name": "Grain Size",
       "min": 10.0,
@@ -1331,7 +1373,7 @@
       "discrete": false
     },
     {
-      "i": 95,
+      "i": 98,
       "id": "cloud4.position",
       "name": "Position",
       "min": 0.0,
@@ -1345,7 +1387,7 @@
       "discrete": false
     },
     {
-      "i": 96,
+      "i": 99,
       "id": "cloud4.spray",
       "name": "Spray",
       "min": 0.0,
@@ -1359,7 +1401,7 @@
       "discrete": false
     },
     {
-      "i": 97,
+      "i": 100,
       "id": "cloud4.scan",
       "name": "Scan",
       "min": -1.0,
@@ -1373,7 +1415,7 @@
       "discrete": false
     },
     {
-      "i": 98,
+      "i": 101,
       "id": "cloud4.pitch",
       "name": "Pitch",
       "min": -24.0,
@@ -1387,7 +1429,7 @@
       "discrete": false
     },
     {
-      "i": 99,
+      "i": 102,
       "id": "cloud4.pitchSpread",
       "name": "Detune",
       "min": 0.0,
@@ -1401,7 +1443,7 @@
       "discrete": false
     },
     {
-      "i": 100,
+      "i": 103,
       "id": "cloud4.harmonize",
       "name": "Harmonize",
       "min": 0.0,
@@ -1415,7 +1457,7 @@
       "discrete": false
     },
     {
-      "i": 101,
+      "i": 104,
       "id": "cloud4.reverse",
       "name": "Reverse",
       "min": 0.0,
@@ -1429,7 +1471,7 @@
       "discrete": false
     },
     {
-      "i": 102,
+      "i": 105,
       "id": "cloud4.shape",
       "name": "Envelope",
       "min": 0.0,
@@ -1443,7 +1485,7 @@
       "discrete": false
     },
     {
-      "i": 103,
+      "i": 106,
       "id": "cloud4.stereo",
       "name": "Stereo",
       "min": 0.0,
@@ -1457,7 +1499,7 @@
       "discrete": false
     },
     {
-      "i": 104,
+      "i": 107,
       "id": "cloud4.gravity",
       "name": "Gravity",
       "min": 0.0,
@@ -1471,7 +1513,7 @@
       "discrete": false
     },
     {
-      "i": 105,
+      "i": 108,
       "id": "cloud1.level",
       "name": "Level",
       "min": -60.0,
@@ -1485,7 +1527,7 @@
       "discrete": false
     },
     {
-      "i": 106,
+      "i": 109,
       "id": "cloud1.pan",
       "name": "Pan",
       "min": -1.0,
@@ -1499,7 +1541,7 @@
       "discrete": false
     },
     {
-      "i": 107,
+      "i": 110,
       "id": "cloud1.width",
       "name": "Width",
       "min": 0.0,
@@ -1513,7 +1555,7 @@
       "discrete": false
     },
     {
-      "i": 108,
+      "i": 111,
       "id": "cloud1.sendA",
       "name": "Reverb Send",
       "min": -60.0,
@@ -1527,7 +1569,7 @@
       "discrete": false
     },
     {
-      "i": 109,
+      "i": 112,
       "id": "cloud1.sendB",
       "name": "Delay Send",
       "min": -60.0,
@@ -1541,7 +1583,7 @@
       "discrete": false
     },
     {
-      "i": 110,
+      "i": 113,
       "id": "cloud2.level",
       "name": "Level",
       "min": -60.0,
@@ -1555,7 +1597,7 @@
       "discrete": false
     },
     {
-      "i": 111,
+      "i": 114,
       "id": "cloud2.pan",
       "name": "Pan",
       "min": -1.0,
@@ -1569,7 +1611,7 @@
       "discrete": false
     },
     {
-      "i": 112,
+      "i": 115,
       "id": "cloud2.width",
       "name": "Width",
       "min": 0.0,
@@ -1583,7 +1625,7 @@
       "discrete": false
     },
     {
-      "i": 113,
+      "i": 116,
       "id": "cloud2.sendA",
       "name": "Reverb Send",
       "min": -60.0,
@@ -1597,7 +1639,7 @@
       "discrete": false
     },
     {
-      "i": 114,
+      "i": 117,
       "id": "cloud2.sendB",
       "name": "Delay Send",
       "min": -60.0,
@@ -1611,7 +1653,7 @@
       "discrete": false
     },
     {
-      "i": 115,
+      "i": 118,
       "id": "cloud3.level",
       "name": "Level",
       "min": -60.0,
@@ -1625,7 +1667,7 @@
       "discrete": false
     },
     {
-      "i": 116,
+      "i": 119,
       "id": "cloud3.pan",
       "name": "Pan",
       "min": -1.0,
@@ -1639,7 +1681,7 @@
       "discrete": false
     },
     {
-      "i": 117,
+      "i": 120,
       "id": "cloud3.width",
       "name": "Width",
       "min": 0.0,
@@ -1653,7 +1695,7 @@
       "discrete": false
     },
     {
-      "i": 118,
+      "i": 121,
       "id": "cloud3.sendA",
       "name": "Reverb Send",
       "min": -60.0,
@@ -1667,7 +1709,7 @@
       "discrete": false
     },
     {
-      "i": 119,
+      "i": 122,
       "id": "cloud3.sendB",
       "name": "Delay Send",
       "min": -60.0,
@@ -1681,7 +1723,7 @@
       "discrete": false
     },
     {
-      "i": 120,
+      "i": 123,
       "id": "cloud4.level",
       "name": "Level",
       "min": -60.0,
@@ -1695,7 +1737,7 @@
       "discrete": false
     },
     {
-      "i": 121,
+      "i": 124,
       "id": "cloud4.pan",
       "name": "Pan",
       "min": -1.0,
@@ -1709,7 +1751,7 @@
       "discrete": false
     },
     {
-      "i": 122,
+      "i": 125,
       "id": "cloud4.width",
       "name": "Width",
       "min": 0.0,
@@ -1723,7 +1765,7 @@
       "discrete": false
     },
     {
-      "i": 123,
+      "i": 126,
       "id": "cloud4.sendA",
       "name": "Reverb Send",
       "min": -60.0,
@@ -1737,7 +1779,7 @@
       "discrete": false
     },
     {
-      "i": 124,
+      "i": 127,
       "id": "cloud4.sendB",
       "name": "Delay Send",
       "min": -60.0,
@@ -1751,7 +1793,7 @@
       "discrete": false
     },
     {
-      "i": 125,
+      "i": 128,
       "id": "res.root",
       "name": "Root Note",
       "min": 24.0,
@@ -1765,7 +1807,7 @@
       "discrete": false
     },
     {
-      "i": 126,
+      "i": 129,
       "id": "res.modes",
       "name": "Modes",
       "min": 1.0,
@@ -1779,7 +1821,7 @@
       "discrete": true
     },
     {
-      "i": 127,
+      "i": 130,
       "id": "res.structure",
       "name": "Structure",
       "min": 0.0,
@@ -1793,7 +1835,7 @@
       "discrete": false
     },
     {
-      "i": 128,
+      "i": 131,
       "id": "res.decay",
       "name": "Decay",
       "min": 0.100000001490116,
@@ -1807,7 +1849,7 @@
       "discrete": false
     },
     {
-      "i": 129,
+      "i": 132,
       "id": "res.brightness",
       "name": "Brightness",
       "min": 0.0,
@@ -1821,7 +1863,7 @@
       "discrete": false
     },
     {
-      "i": 130,
+      "i": 133,
       "id": "res.rain",
       "name": "Rain",
       "min": 0.0,
@@ -1835,7 +1877,7 @@
       "discrete": false
     },
     {
-      "i": 131,
+      "i": 134,
       "id": "res.rainColour",
       "name": "Rain Colour",
       "min": 0.0,
@@ -1849,7 +1891,7 @@
       "discrete": false
     },
     {
-      "i": 132,
+      "i": 135,
       "id": "res.spread",
       "name": "Spread",
       "min": 0.0,
@@ -1863,7 +1905,7 @@
       "discrete": false
     },
     {
-      "i": 133,
+      "i": 136,
       "id": "res.gravity",
       "name": "Gravity",
       "min": 0.0,
@@ -1877,7 +1919,7 @@
       "discrete": false
     },
     {
-      "i": 134,
+      "i": 137,
       "id": "res.exciteInput",
       "name": "From Input",
       "min": 0.0,
@@ -1891,7 +1933,7 @@
       "discrete": false
     },
     {
-      "i": 135,
+      "i": 138,
       "id": "res.exciteDrone",
       "name": "From Drone",
       "min": 0.0,
@@ -1905,7 +1947,7 @@
       "discrete": false
     },
     {
-      "i": 136,
+      "i": 139,
       "id": "res.exciteClouds",
       "name": "From Clouds",
       "min": 0.0,
@@ -1919,7 +1961,7 @@
       "discrete": false
     },
     {
-      "i": 137,
+      "i": 140,
       "id": "res.level",
       "name": "Level",
       "min": -60.0,
@@ -1933,7 +1975,7 @@
       "discrete": false
     },
     {
-      "i": 138,
+      "i": 141,
       "id": "res.pan",
       "name": "Pan",
       "min": -1.0,
@@ -1947,7 +1989,7 @@
       "discrete": false
     },
     {
-      "i": 139,
+      "i": 142,
       "id": "res.width",
       "name": "Width",
       "min": 0.0,
@@ -1961,7 +2003,7 @@
       "discrete": false
     },
     {
-      "i": 140,
+      "i": 143,
       "id": "res.sendA",
       "name": "Reverb Send",
       "min": -60.0,
@@ -1975,7 +2017,7 @@
       "discrete": false
     },
     {
-      "i": 141,
+      "i": 144,
       "id": "res.sendB",
       "name": "Delay Send",
       "min": -60.0,
@@ -1989,7 +2031,7 @@
       "discrete": false
     },
     {
-      "i": 142,
+      "i": 145,
       "id": "input.channel",
       "name": "Channel",
       "min": 0.0,
@@ -2003,7 +2045,7 @@
       "discrete": true
     },
     {
-      "i": 143,
+      "i": 146,
       "id": "input.gain",
       "name": "Input Gain",
       "min": -24.0,
@@ -2017,7 +2059,7 @@
       "discrete": false
     },
     {
-      "i": 144,
+      "i": 147,
       "id": "input.highPass",
       "name": "Low Cut",
       "min": 20.0,
@@ -2031,7 +2073,7 @@
       "discrete": false
     },
     {
-      "i": 145,
+      "i": 148,
       "id": "input.gate",
       "name": "Gate",
       "min": -90.0,
@@ -2045,7 +2087,7 @@
       "discrete": false
     },
     {
-      "i": 146,
+      "i": 149,
       "id": "input.armed",
       "name": "Monitor",
       "min": 0.0,
@@ -2059,7 +2101,7 @@
       "discrete": true
     },
     {
-      "i": 147,
+      "i": 150,
       "id": "input.level",
       "name": "Level",
       "min": -60.0,
@@ -2073,7 +2115,7 @@
       "discrete": false
     },
     {
-      "i": 148,
+      "i": 151,
       "id": "input.pan",
       "name": "Pan",
       "min": -1.0,
@@ -2087,7 +2129,7 @@
       "discrete": false
     },
     {
-      "i": 149,
+      "i": 152,
       "id": "input.width",
       "name": "Width",
       "min": 0.0,
@@ -2101,7 +2143,7 @@
       "discrete": false
     },
     {
-      "i": 150,
+      "i": 153,
       "id": "input.sendA",
       "name": "Reverb Send",
       "min": -60.0,
@@ -2115,7 +2157,7 @@
       "discrete": false
     },
     {
-      "i": 151,
+      "i": 154,
       "id": "input.sendB",
       "name": "Delay Send",
       "min": -60.0,
@@ -2129,7 +2171,7 @@
       "discrete": false
     },
     {
-      "i": 152,
+      "i": 155,
       "id": "input.freeze",
       "name": "Freeze",
       "min": 0.0,
@@ -2143,7 +2185,7 @@
       "discrete": true
     },
     {
-      "i": 153,
+      "i": 156,
       "id": "input.freezeLevel",
       "name": "Freeze Level",
       "min": -24.0,
@@ -2157,7 +2199,7 @@
       "discrete": false
     },
     {
-      "i": 154,
+      "i": 157,
       "id": "input.freezeDrift",
       "name": "Freeze Drift",
       "min": 0.0,
@@ -2171,7 +2213,7 @@
       "discrete": false
     },
     {
-      "i": 155,
+      "i": 158,
       "id": "bloom.transform",
       "name": "Transform",
       "min": 0.0,
@@ -2185,7 +2227,7 @@
       "discrete": true
     },
     {
-      "i": 156,
+      "i": 159,
       "id": "bloom.amount",
       "name": "Amount",
       "min": 0.0,
@@ -2199,7 +2241,7 @@
       "discrete": false
     },
     {
-      "i": 157,
+      "i": 160,
       "id": "bloom.length",
       "name": "Length",
       "min": 0.5,
@@ -2213,7 +2255,7 @@
       "discrete": false
     },
     {
-      "i": 158,
+      "i": 161,
       "id": "bloom.attack",
       "name": "Attack",
       "min": 0.004999999888241,
@@ -2227,7 +2269,7 @@
       "discrete": false
     },
     {
-      "i": 159,
+      "i": 162,
       "id": "bloom.release",
       "name": "Release",
       "min": 0.100000001490116,
@@ -2241,7 +2283,7 @@
       "discrete": false
     },
     {
-      "i": 160,
+      "i": 163,
       "id": "bloom.root",
       "name": "Sample Root",
       "min": 24.0,
@@ -2255,7 +2297,7 @@
       "discrete": true
     },
     {
-      "i": 161,
+      "i": 164,
       "id": "bloom.pitch",
       "name": "Pitch",
       "min": -24.0,
@@ -2269,7 +2311,7 @@
       "discrete": false
     },
     {
-      "i": 162,
+      "i": 165,
       "id": "bloom.tone",
       "name": "Tone",
       "min": 0.0,
@@ -2283,7 +2325,7 @@
       "discrete": false
     },
     {
-      "i": 163,
+      "i": 166,
       "id": "bloom.spread",
       "name": "Spread",
       "min": 0.0,
@@ -2297,7 +2339,7 @@
       "discrete": false
     },
     {
-      "i": 164,
+      "i": 167,
       "id": "bloom.random",
       "name": "Random",
       "min": 0.0,
@@ -2311,7 +2353,7 @@
       "discrete": false
     },
     {
-      "i": 165,
+      "i": 168,
       "id": "bloom.position",
       "name": "Position",
       "min": 0.0,
@@ -2325,7 +2367,7 @@
       "discrete": false
     },
     {
-      "i": 166,
+      "i": 169,
       "id": "bloom.gravity",
       "name": "Gravity",
       "min": 0.0,
@@ -2339,7 +2381,7 @@
       "discrete": false
     },
     {
-      "i": 167,
+      "i": 170,
       "id": "res.exciteBloom",
       "name": "From Bloom",
       "min": 0.0,
@@ -2353,7 +2395,7 @@
       "discrete": false
     },
     {
-      "i": 168,
+      "i": 171,
       "id": "bloom.level",
       "name": "Level",
       "min": -60.0,
@@ -2367,7 +2409,7 @@
       "discrete": false
     },
     {
-      "i": 169,
+      "i": 172,
       "id": "bloom.pan",
       "name": "Pan",
       "min": -1.0,
@@ -2381,7 +2423,7 @@
       "discrete": false
     },
     {
-      "i": 170,
+      "i": 173,
       "id": "bloom.width",
       "name": "Width",
       "min": 0.0,
@@ -2395,7 +2437,7 @@
       "discrete": false
     },
     {
-      "i": 171,
+      "i": 174,
       "id": "bloom.sendA",
       "name": "Reverb Send",
       "min": -60.0,
@@ -2409,7 +2451,7 @@
       "discrete": false
     },
     {
-      "i": 172,
+      "i": 175,
       "id": "bloom.sendB",
       "name": "Delay Send",
       "min": -60.0,
@@ -2423,7 +2465,7 @@
       "discrete": false
     },
     {
-      "i": 173,
+      "i": 176,
       "id": "loop.source",
       "name": "Source",
       "min": 0.0,
@@ -2437,7 +2479,7 @@
       "discrete": true
     },
     {
-      "i": 174,
+      "i": 177,
       "id": "loop.erosion",
       "name": "Erosion",
       "min": 0.0,
@@ -2451,7 +2493,7 @@
       "discrete": false
     },
     {
-      "i": 175,
+      "i": 178,
       "id": "loop.flakes",
       "name": "Flakes",
       "min": 0.0,
@@ -2465,7 +2507,7 @@
       "discrete": false
     },
     {
-      "i": 176,
+      "i": 179,
       "id": "loop.overdub",
       "name": "Overdub",
       "min": 0.0,
@@ -2479,7 +2521,7 @@
       "discrete": false
     },
     {
-      "i": 177,
+      "i": 180,
       "id": "loop.level",
       "name": "Level",
       "min": -60.0,
@@ -2493,7 +2535,7 @@
       "discrete": false
     },
     {
-      "i": 178,
+      "i": 181,
       "id": "loop.pan",
       "name": "Pan",
       "min": -1.0,
@@ -2507,7 +2549,7 @@
       "discrete": false
     },
     {
-      "i": 179,
+      "i": 182,
       "id": "loop.width",
       "name": "Width",
       "min": 0.0,
@@ -2521,7 +2563,7 @@
       "discrete": false
     },
     {
-      "i": 180,
+      "i": 183,
       "id": "loop.sendA",
       "name": "Reverb Send",
       "min": -60.0,
@@ -2535,7 +2577,7 @@
       "discrete": false
     },
     {
-      "i": 181,
+      "i": 184,
       "id": "loop.sendB",
       "name": "Delay Send",
       "min": -60.0,
@@ -2549,7 +2591,7 @@
       "discrete": false
     },
     {
-      "i": 182,
+      "i": 185,
       "id": "weather.wind",
       "name": "Wind",
       "min": 0.0,
@@ -2563,7 +2605,7 @@
       "discrete": false
     },
     {
-      "i": 183,
+      "i": 186,
       "id": "weather.rain",
       "name": "Rain",
       "min": 0.0,
@@ -2577,7 +2619,7 @@
       "discrete": false
     },
     {
-      "i": 184,
+      "i": 187,
       "id": "weather.surf",
       "name": "Surf",
       "min": 0.0,
@@ -2591,7 +2633,7 @@
       "discrete": false
     },
     {
-      "i": 185,
+      "i": 188,
       "id": "weather.gust",
       "name": "Gusts",
       "min": 0.0,
@@ -2605,7 +2647,7 @@
       "discrete": false
     },
     {
-      "i": 186,
+      "i": 189,
       "id": "weather.tone",
       "name": "Tone",
       "min": 0.0,
@@ -2619,7 +2661,7 @@
       "discrete": false
     },
     {
-      "i": 187,
+      "i": 190,
       "id": "weather.distance",
       "name": "Distance",
       "min": 0.0,
@@ -2633,7 +2675,7 @@
       "discrete": false
     },
     {
-      "i": 188,
+      "i": 191,
       "id": "weather.level",
       "name": "Level",
       "min": -60.0,
@@ -2647,7 +2689,7 @@
       "discrete": false
     },
     {
-      "i": 189,
+      "i": 192,
       "id": "weather.pan",
       "name": "Pan",
       "min": -1.0,
@@ -2661,7 +2703,7 @@
       "discrete": false
     },
     {
-      "i": 190,
+      "i": 193,
       "id": "weather.width",
       "name": "Width",
       "min": 0.0,
@@ -2675,7 +2717,7 @@
       "discrete": false
     },
     {
-      "i": 191,
+      "i": 194,
       "id": "weather.sendA",
       "name": "Reverb Send",
       "min": -60.0,
@@ -2689,7 +2731,7 @@
       "discrete": false
     },
     {
-      "i": 192,
+      "i": 195,
       "id": "weather.sendB",
       "name": "Delay Send",
       "min": -60.0,
@@ -2703,7 +2745,7 @@
       "discrete": false
     },
     {
-      "i": 193,
+      "i": 196,
       "id": "freeze.on",
       "name": "Freeze All",
       "min": 0.0,
@@ -2717,7 +2759,7 @@
       "discrete": true
     },
     {
-      "i": 194,
+      "i": 197,
       "id": "freeze.duck",
       "name": "Duck the Mix",
       "min": 0.0,
@@ -2731,7 +2773,7 @@
       "discrete": false
     },
     {
-      "i": 195,
+      "i": 198,
       "id": "freeze.texture",
       "name": "Texture",
       "min": 0.0,
@@ -2745,7 +2787,7 @@
       "discrete": false
     },
     {
-      "i": 196,
+      "i": 199,
       "id": "freeze.level",
       "name": "Level",
       "min": -60.0,
@@ -2759,7 +2801,7 @@
       "discrete": false
     },
     {
-      "i": 197,
+      "i": 200,
       "id": "freeze.pan",
       "name": "Pan",
       "min": -1.0,
@@ -2773,7 +2815,7 @@
       "discrete": false
     },
     {
-      "i": 198,
+      "i": 201,
       "id": "freeze.width",
       "name": "Width",
       "min": 0.0,
@@ -2787,7 +2829,7 @@
       "discrete": false
     },
     {
-      "i": 199,
+      "i": 202,
       "id": "freeze.sendA",
       "name": "Reverb Send",
       "min": -60.0,
@@ -2801,7 +2843,7 @@
       "discrete": false
     },
     {
-      "i": 200,
+      "i": 203,
       "id": "freeze.sendB",
       "name": "Delay Send",
       "min": -60.0,
@@ -2815,7 +2857,7 @@
       "discrete": false
     },
     {
-      "i": 201,
+      "i": 204,
       "id": "drone.fx1.p1",
       "name": "Control 1",
       "min": 0.0,
@@ -2829,7 +2871,7 @@
       "discrete": false
     },
     {
-      "i": 202,
+      "i": 205,
       "id": "drone.fx1.p2",
       "name": "Control 2",
       "min": 0.0,
@@ -2843,7 +2885,7 @@
       "discrete": false
     },
     {
-      "i": 203,
+      "i": 206,
       "id": "drone.fx1.p3",
       "name": "Control 3",
       "min": 0.0,
@@ -2857,7 +2899,7 @@
       "discrete": false
     },
     {
-      "i": 204,
+      "i": 207,
       "id": "drone.fx1.p4",
       "name": "Control 4",
       "min": 0.0,
@@ -2871,7 +2913,7 @@
       "discrete": false
     },
     {
-      "i": 205,
+      "i": 208,
       "id": "drone.fx1.p5",
       "name": "Control 5",
       "min": 0.0,
@@ -2885,7 +2927,7 @@
       "discrete": false
     },
     {
-      "i": 206,
+      "i": 209,
       "id": "drone.fx1.p6",
       "name": "Control 6",
       "min": 0.0,
@@ -2899,7 +2941,7 @@
       "discrete": false
     },
     {
-      "i": 207,
+      "i": 210,
       "id": "drone.fx1.mix",
       "name": "Mix",
       "min": 0.0,
@@ -2913,7 +2955,7 @@
       "discrete": false
     },
     {
-      "i": 208,
+      "i": 211,
       "id": "drone.fx2.p1",
       "name": "Control 1",
       "min": 0.0,
@@ -2927,7 +2969,7 @@
       "discrete": false
     },
     {
-      "i": 209,
+      "i": 212,
       "id": "drone.fx2.p2",
       "name": "Control 2",
       "min": 0.0,
@@ -2941,7 +2983,7 @@
       "discrete": false
     },
     {
-      "i": 210,
+      "i": 213,
       "id": "drone.fx2.p3",
       "name": "Control 3",
       "min": 0.0,
@@ -2955,7 +2997,7 @@
       "discrete": false
     },
     {
-      "i": 211,
+      "i": 214,
       "id": "drone.fx2.p4",
       "name": "Control 4",
       "min": 0.0,
@@ -2969,7 +3011,7 @@
       "discrete": false
     },
     {
-      "i": 212,
+      "i": 215,
       "id": "drone.fx2.p5",
       "name": "Control 5",
       "min": 0.0,
@@ -2983,7 +3025,7 @@
       "discrete": false
     },
     {
-      "i": 213,
+      "i": 216,
       "id": "drone.fx2.p6",
       "name": "Control 6",
       "min": 0.0,
@@ -2997,7 +3039,7 @@
       "discrete": false
     },
     {
-      "i": 214,
+      "i": 217,
       "id": "drone.fx2.mix",
       "name": "Mix",
       "min": 0.0,
@@ -3011,7 +3053,7 @@
       "discrete": false
     },
     {
-      "i": 215,
+      "i": 218,
       "id": "cloud1.fx1.p1",
       "name": "Control 1",
       "min": 0.0,
@@ -3025,7 +3067,7 @@
       "discrete": false
     },
     {
-      "i": 216,
+      "i": 219,
       "id": "cloud1.fx1.p2",
       "name": "Control 2",
       "min": 0.0,
@@ -3039,7 +3081,7 @@
       "discrete": false
     },
     {
-      "i": 217,
+      "i": 220,
       "id": "cloud1.fx1.p3",
       "name": "Control 3",
       "min": 0.0,
@@ -3053,7 +3095,7 @@
       "discrete": false
     },
     {
-      "i": 218,
+      "i": 221,
       "id": "cloud1.fx1.p4",
       "name": "Control 4",
       "min": 0.0,
@@ -3067,7 +3109,7 @@
       "discrete": false
     },
     {
-      "i": 219,
+      "i": 222,
       "id": "cloud1.fx1.p5",
       "name": "Control 5",
       "min": 0.0,
@@ -3081,7 +3123,7 @@
       "discrete": false
     },
     {
-      "i": 220,
+      "i": 223,
       "id": "cloud1.fx1.p6",
       "name": "Control 6",
       "min": 0.0,
@@ -3095,7 +3137,7 @@
       "discrete": false
     },
     {
-      "i": 221,
+      "i": 224,
       "id": "cloud1.fx1.mix",
       "name": "Mix",
       "min": 0.0,
@@ -3109,7 +3151,7 @@
       "discrete": false
     },
     {
-      "i": 222,
+      "i": 225,
       "id": "cloud1.fx2.p1",
       "name": "Control 1",
       "min": 0.0,
@@ -3123,7 +3165,7 @@
       "discrete": false
     },
     {
-      "i": 223,
+      "i": 226,
       "id": "cloud1.fx2.p2",
       "name": "Control 2",
       "min": 0.0,
@@ -3137,7 +3179,7 @@
       "discrete": false
     },
     {
-      "i": 224,
+      "i": 227,
       "id": "cloud1.fx2.p3",
       "name": "Control 3",
       "min": 0.0,
@@ -3151,7 +3193,7 @@
       "discrete": false
     },
     {
-      "i": 225,
+      "i": 228,
       "id": "cloud1.fx2.p4",
       "name": "Control 4",
       "min": 0.0,
@@ -3165,7 +3207,7 @@
       "discrete": false
     },
     {
-      "i": 226,
+      "i": 229,
       "id": "cloud1.fx2.p5",
       "name": "Control 5",
       "min": 0.0,
@@ -3179,7 +3221,7 @@
       "discrete": false
     },
     {
-      "i": 227,
+      "i": 230,
       "id": "cloud1.fx2.p6",
       "name": "Control 6",
       "min": 0.0,
@@ -3193,7 +3235,7 @@
       "discrete": false
     },
     {
-      "i": 228,
+      "i": 231,
       "id": "cloud1.fx2.mix",
       "name": "Mix",
       "min": 0.0,
@@ -3207,7 +3249,7 @@
       "discrete": false
     },
     {
-      "i": 229,
+      "i": 232,
       "id": "cloud2.fx1.p1",
       "name": "Control 1",
       "min": 0.0,
@@ -3221,7 +3263,7 @@
       "discrete": false
     },
     {
-      "i": 230,
+      "i": 233,
       "id": "cloud2.fx1.p2",
       "name": "Control 2",
       "min": 0.0,
@@ -3235,7 +3277,7 @@
       "discrete": false
     },
     {
-      "i": 231,
+      "i": 234,
       "id": "cloud2.fx1.p3",
       "name": "Control 3",
       "min": 0.0,
@@ -3249,7 +3291,7 @@
       "discrete": false
     },
     {
-      "i": 232,
+      "i": 235,
       "id": "cloud2.fx1.p4",
       "name": "Control 4",
       "min": 0.0,
@@ -3263,7 +3305,7 @@
       "discrete": false
     },
     {
-      "i": 233,
+      "i": 236,
       "id": "cloud2.fx1.p5",
       "name": "Control 5",
       "min": 0.0,
@@ -3277,7 +3319,7 @@
       "discrete": false
     },
     {
-      "i": 234,
+      "i": 237,
       "id": "cloud2.fx1.p6",
       "name": "Control 6",
       "min": 0.0,
@@ -3291,7 +3333,7 @@
       "discrete": false
     },
     {
-      "i": 235,
+      "i": 238,
       "id": "cloud2.fx1.mix",
       "name": "Mix",
       "min": 0.0,
@@ -3305,7 +3347,7 @@
       "discrete": false
     },
     {
-      "i": 236,
+      "i": 239,
       "id": "cloud2.fx2.p1",
       "name": "Control 1",
       "min": 0.0,
@@ -3319,7 +3361,7 @@
       "discrete": false
     },
     {
-      "i": 237,
+      "i": 240,
       "id": "cloud2.fx2.p2",
       "name": "Control 2",
       "min": 0.0,
@@ -3333,7 +3375,7 @@
       "discrete": false
     },
     {
-      "i": 238,
+      "i": 241,
       "id": "cloud2.fx2.p3",
       "name": "Control 3",
       "min": 0.0,
@@ -3347,7 +3389,7 @@
       "discrete": false
     },
     {
-      "i": 239,
+      "i": 242,
       "id": "cloud2.fx2.p4",
       "name": "Control 4",
       "min": 0.0,
@@ -3361,7 +3403,7 @@
       "discrete": false
     },
     {
-      "i": 240,
+      "i": 243,
       "id": "cloud2.fx2.p5",
       "name": "Control 5",
       "min": 0.0,
@@ -3375,7 +3417,7 @@
       "discrete": false
     },
     {
-      "i": 241,
+      "i": 244,
       "id": "cloud2.fx2.p6",
       "name": "Control 6",
       "min": 0.0,
@@ -3389,7 +3431,7 @@
       "discrete": false
     },
     {
-      "i": 242,
+      "i": 245,
       "id": "cloud2.fx2.mix",
       "name": "Mix",
       "min": 0.0,
@@ -3403,7 +3445,7 @@
       "discrete": false
     },
     {
-      "i": 243,
+      "i": 246,
       "id": "cloud3.fx1.p1",
       "name": "Control 1",
       "min": 0.0,
@@ -3417,7 +3459,7 @@
       "discrete": false
     },
     {
-      "i": 244,
+      "i": 247,
       "id": "cloud3.fx1.p2",
       "name": "Control 2",
       "min": 0.0,
@@ -3431,7 +3473,7 @@
       "discrete": false
     },
     {
-      "i": 245,
+      "i": 248,
       "id": "cloud3.fx1.p3",
       "name": "Control 3",
       "min": 0.0,
@@ -3445,7 +3487,7 @@
       "discrete": false
     },
     {
-      "i": 246,
+      "i": 249,
       "id": "cloud3.fx1.p4",
       "name": "Control 4",
       "min": 0.0,
@@ -3459,7 +3501,7 @@
       "discrete": false
     },
     {
-      "i": 247,
+      "i": 250,
       "id": "cloud3.fx1.p5",
       "name": "Control 5",
       "min": 0.0,
@@ -3473,7 +3515,7 @@
       "discrete": false
     },
     {
-      "i": 248,
+      "i": 251,
       "id": "cloud3.fx1.p6",
       "name": "Control 6",
       "min": 0.0,
@@ -3487,7 +3529,7 @@
       "discrete": false
     },
     {
-      "i": 249,
+      "i": 252,
       "id": "cloud3.fx1.mix",
       "name": "Mix",
       "min": 0.0,
@@ -3501,7 +3543,7 @@
       "discrete": false
     },
     {
-      "i": 250,
+      "i": 253,
       "id": "cloud3.fx2.p1",
       "name": "Control 1",
       "min": 0.0,
@@ -3515,7 +3557,7 @@
       "discrete": false
     },
     {
-      "i": 251,
+      "i": 254,
       "id": "cloud3.fx2.p2",
       "name": "Control 2",
       "min": 0.0,
@@ -3529,7 +3571,7 @@
       "discrete": false
     },
     {
-      "i": 252,
+      "i": 255,
       "id": "cloud3.fx2.p3",
       "name": "Control 3",
       "min": 0.0,
@@ -3543,7 +3585,7 @@
       "discrete": false
     },
     {
-      "i": 253,
+      "i": 256,
       "id": "cloud3.fx2.p4",
       "name": "Control 4",
       "min": 0.0,
@@ -3557,7 +3599,7 @@
       "discrete": false
     },
     {
-      "i": 254,
+      "i": 257,
       "id": "cloud3.fx2.p5",
       "name": "Control 5",
       "min": 0.0,
@@ -3571,7 +3613,7 @@
       "discrete": false
     },
     {
-      "i": 255,
+      "i": 258,
       "id": "cloud3.fx2.p6",
       "name": "Control 6",
       "min": 0.0,
@@ -3585,7 +3627,7 @@
       "discrete": false
     },
     {
-      "i": 256,
+      "i": 259,
       "id": "cloud3.fx2.mix",
       "name": "Mix",
       "min": 0.0,
@@ -3599,7 +3641,7 @@
       "discrete": false
     },
     {
-      "i": 257,
+      "i": 260,
       "id": "cloud4.fx1.p1",
       "name": "Control 1",
       "min": 0.0,
@@ -3613,7 +3655,7 @@
       "discrete": false
     },
     {
-      "i": 258,
+      "i": 261,
       "id": "cloud4.fx1.p2",
       "name": "Control 2",
       "min": 0.0,
@@ -3627,7 +3669,7 @@
       "discrete": false
     },
     {
-      "i": 259,
+      "i": 262,
       "id": "cloud4.fx1.p3",
       "name": "Control 3",
       "min": 0.0,
@@ -3641,7 +3683,7 @@
       "discrete": false
     },
     {
-      "i": 260,
+      "i": 263,
       "id": "cloud4.fx1.p4",
       "name": "Control 4",
       "min": 0.0,
@@ -3655,7 +3697,7 @@
       "discrete": false
     },
     {
-      "i": 261,
+      "i": 264,
       "id": "cloud4.fx1.p5",
       "name": "Control 5",
       "min": 0.0,
@@ -3669,7 +3711,7 @@
       "discrete": false
     },
     {
-      "i": 262,
+      "i": 265,
       "id": "cloud4.fx1.p6",
       "name": "Control 6",
       "min": 0.0,
@@ -3683,7 +3725,7 @@
       "discrete": false
     },
     {
-      "i": 263,
+      "i": 266,
       "id": "cloud4.fx1.mix",
       "name": "Mix",
       "min": 0.0,
@@ -3697,7 +3739,7 @@
       "discrete": false
     },
     {
-      "i": 264,
+      "i": 267,
       "id": "cloud4.fx2.p1",
       "name": "Control 1",
       "min": 0.0,
@@ -3711,7 +3753,7 @@
       "discrete": false
     },
     {
-      "i": 265,
+      "i": 268,
       "id": "cloud4.fx2.p2",
       "name": "Control 2",
       "min": 0.0,
@@ -3725,7 +3767,7 @@
       "discrete": false
     },
     {
-      "i": 266,
+      "i": 269,
       "id": "cloud4.fx2.p3",
       "name": "Control 3",
       "min": 0.0,
@@ -3739,7 +3781,7 @@
       "discrete": false
     },
     {
-      "i": 267,
+      "i": 270,
       "id": "cloud4.fx2.p4",
       "name": "Control 4",
       "min": 0.0,
@@ -3753,7 +3795,7 @@
       "discrete": false
     },
     {
-      "i": 268,
+      "i": 271,
       "id": "cloud4.fx2.p5",
       "name": "Control 5",
       "min": 0.0,
@@ -3767,7 +3809,7 @@
       "discrete": false
     },
     {
-      "i": 269,
+      "i": 272,
       "id": "cloud4.fx2.p6",
       "name": "Control 6",
       "min": 0.0,
@@ -3781,7 +3823,7 @@
       "discrete": false
     },
     {
-      "i": 270,
+      "i": 273,
       "id": "cloud4.fx2.mix",
       "name": "Mix",
       "min": 0.0,
@@ -3795,7 +3837,7 @@
       "discrete": false
     },
     {
-      "i": 271,
+      "i": 274,
       "id": "res.fx1.p1",
       "name": "Control 1",
       "min": 0.0,
@@ -3809,7 +3851,7 @@
       "discrete": false
     },
     {
-      "i": 272,
+      "i": 275,
       "id": "res.fx1.p2",
       "name": "Control 2",
       "min": 0.0,
@@ -3823,7 +3865,7 @@
       "discrete": false
     },
     {
-      "i": 273,
+      "i": 276,
       "id": "res.fx1.p3",
       "name": "Control 3",
       "min": 0.0,
@@ -3837,7 +3879,7 @@
       "discrete": false
     },
     {
-      "i": 274,
+      "i": 277,
       "id": "res.fx1.p4",
       "name": "Control 4",
       "min": 0.0,
@@ -3851,7 +3893,7 @@
       "discrete": false
     },
     {
-      "i": 275,
+      "i": 278,
       "id": "res.fx1.p5",
       "name": "Control 5",
       "min": 0.0,
@@ -3865,7 +3907,7 @@
       "discrete": false
     },
     {
-      "i": 276,
+      "i": 279,
       "id": "res.fx1.p6",
       "name": "Control 6",
       "min": 0.0,
@@ -3879,7 +3921,7 @@
       "discrete": false
     },
     {
-      "i": 277,
+      "i": 280,
       "id": "res.fx1.mix",
       "name": "Mix",
       "min": 0.0,
@@ -3893,7 +3935,7 @@
       "discrete": false
     },
     {
-      "i": 278,
+      "i": 281,
       "id": "res.fx2.p1",
       "name": "Control 1",
       "min": 0.0,
@@ -3907,7 +3949,7 @@
       "discrete": false
     },
     {
-      "i": 279,
+      "i": 282,
       "id": "res.fx2.p2",
       "name": "Control 2",
       "min": 0.0,
@@ -3921,7 +3963,7 @@
       "discrete": false
     },
     {
-      "i": 280,
+      "i": 283,
       "id": "res.fx2.p3",
       "name": "Control 3",
       "min": 0.0,
@@ -3935,7 +3977,7 @@
       "discrete": false
     },
     {
-      "i": 281,
+      "i": 284,
       "id": "res.fx2.p4",
       "name": "Control 4",
       "min": 0.0,
@@ -3949,7 +3991,7 @@
       "discrete": false
     },
     {
-      "i": 282,
+      "i": 285,
       "id": "res.fx2.p5",
       "name": "Control 5",
       "min": 0.0,
@@ -3963,7 +4005,7 @@
       "discrete": false
     },
     {
-      "i": 283,
+      "i": 286,
       "id": "res.fx2.p6",
       "name": "Control 6",
       "min": 0.0,
@@ -3977,7 +4019,7 @@
       "discrete": false
     },
     {
-      "i": 284,
+      "i": 287,
       "id": "res.fx2.mix",
       "name": "Mix",
       "min": 0.0,
@@ -3991,7 +4033,7 @@
       "discrete": false
     },
     {
-      "i": 285,
+      "i": 288,
       "id": "input.fx1.p1",
       "name": "Control 1",
       "min": 0.0,
@@ -4005,7 +4047,7 @@
       "discrete": false
     },
     {
-      "i": 286,
+      "i": 289,
       "id": "input.fx1.p2",
       "name": "Control 2",
       "min": 0.0,
@@ -4019,7 +4061,7 @@
       "discrete": false
     },
     {
-      "i": 287,
+      "i": 290,
       "id": "input.fx1.p3",
       "name": "Control 3",
       "min": 0.0,
@@ -4033,7 +4075,7 @@
       "discrete": false
     },
     {
-      "i": 288,
+      "i": 291,
       "id": "input.fx1.p4",
       "name": "Control 4",
       "min": 0.0,
@@ -4047,7 +4089,7 @@
       "discrete": false
     },
     {
-      "i": 289,
+      "i": 292,
       "id": "input.fx1.p5",
       "name": "Control 5",
       "min": 0.0,
@@ -4061,7 +4103,7 @@
       "discrete": false
     },
     {
-      "i": 290,
+      "i": 293,
       "id": "input.fx1.p6",
       "name": "Control 6",
       "min": 0.0,
@@ -4075,7 +4117,7 @@
       "discrete": false
     },
     {
-      "i": 291,
+      "i": 294,
       "id": "input.fx1.mix",
       "name": "Mix",
       "min": 0.0,
@@ -4089,7 +4131,7 @@
       "discrete": false
     },
     {
-      "i": 292,
+      "i": 295,
       "id": "input.fx2.p1",
       "name": "Control 1",
       "min": 0.0,
@@ -4103,7 +4145,7 @@
       "discrete": false
     },
     {
-      "i": 293,
+      "i": 296,
       "id": "input.fx2.p2",
       "name": "Control 2",
       "min": 0.0,
@@ -4117,7 +4159,7 @@
       "discrete": false
     },
     {
-      "i": 294,
+      "i": 297,
       "id": "input.fx2.p3",
       "name": "Control 3",
       "min": 0.0,
@@ -4131,7 +4173,7 @@
       "discrete": false
     },
     {
-      "i": 295,
+      "i": 298,
       "id": "input.fx2.p4",
       "name": "Control 4",
       "min": 0.0,
@@ -4145,7 +4187,7 @@
       "discrete": false
     },
     {
-      "i": 296,
+      "i": 299,
       "id": "input.fx2.p5",
       "name": "Control 5",
       "min": 0.0,
@@ -4159,7 +4201,7 @@
       "discrete": false
     },
     {
-      "i": 297,
+      "i": 300,
       "id": "input.fx2.p6",
       "name": "Control 6",
       "min": 0.0,
@@ -4173,7 +4215,7 @@
       "discrete": false
     },
     {
-      "i": 298,
+      "i": 301,
       "id": "input.fx2.mix",
       "name": "Mix",
       "min": 0.0,
@@ -4187,7 +4229,7 @@
       "discrete": false
     },
     {
-      "i": 299,
+      "i": 302,
       "id": "bloom.fx1.p1",
       "name": "Control 1",
       "min": 0.0,
@@ -4201,7 +4243,7 @@
       "discrete": false
     },
     {
-      "i": 300,
+      "i": 303,
       "id": "bloom.fx1.p2",
       "name": "Control 2",
       "min": 0.0,
@@ -4215,7 +4257,7 @@
       "discrete": false
     },
     {
-      "i": 301,
+      "i": 304,
       "id": "bloom.fx1.p3",
       "name": "Control 3",
       "min": 0.0,
@@ -4229,7 +4271,7 @@
       "discrete": false
     },
     {
-      "i": 302,
+      "i": 305,
       "id": "bloom.fx1.p4",
       "name": "Control 4",
       "min": 0.0,
@@ -4243,7 +4285,7 @@
       "discrete": false
     },
     {
-      "i": 303,
+      "i": 306,
       "id": "bloom.fx1.p5",
       "name": "Control 5",
       "min": 0.0,
@@ -4257,7 +4299,7 @@
       "discrete": false
     },
     {
-      "i": 304,
+      "i": 307,
       "id": "bloom.fx1.p6",
       "name": "Control 6",
       "min": 0.0,
@@ -4271,7 +4313,7 @@
       "discrete": false
     },
     {
-      "i": 305,
+      "i": 308,
       "id": "bloom.fx1.mix",
       "name": "Mix",
       "min": 0.0,
@@ -4285,7 +4327,7 @@
       "discrete": false
     },
     {
-      "i": 306,
+      "i": 309,
       "id": "bloom.fx2.p1",
       "name": "Control 1",
       "min": 0.0,
@@ -4299,7 +4341,7 @@
       "discrete": false
     },
     {
-      "i": 307,
+      "i": 310,
       "id": "bloom.fx2.p2",
       "name": "Control 2",
       "min": 0.0,
@@ -4313,7 +4355,7 @@
       "discrete": false
     },
     {
-      "i": 308,
+      "i": 311,
       "id": "bloom.fx2.p3",
       "name": "Control 3",
       "min": 0.0,
@@ -4327,7 +4369,7 @@
       "discrete": false
     },
     {
-      "i": 309,
+      "i": 312,
       "id": "bloom.fx2.p4",
       "name": "Control 4",
       "min": 0.0,
@@ -4341,7 +4383,7 @@
       "discrete": false
     },
     {
-      "i": 310,
+      "i": 313,
       "id": "bloom.fx2.p5",
       "name": "Control 5",
       "min": 0.0,
@@ -4355,7 +4397,7 @@
       "discrete": false
     },
     {
-      "i": 311,
+      "i": 314,
       "id": "bloom.fx2.p6",
       "name": "Control 6",
       "min": 0.0,
@@ -4369,7 +4411,7 @@
       "discrete": false
     },
     {
-      "i": 312,
+      "i": 315,
       "id": "bloom.fx2.mix",
       "name": "Mix",
       "min": 0.0,
@@ -4383,7 +4425,7 @@
       "discrete": false
     },
     {
-      "i": 313,
+      "i": 316,
       "id": "loop.fx1.p1",
       "name": "Control 1",
       "min": 0.0,
@@ -4397,7 +4439,7 @@
       "discrete": false
     },
     {
-      "i": 314,
+      "i": 317,
       "id": "loop.fx1.p2",
       "name": "Control 2",
       "min": 0.0,
@@ -4411,7 +4453,7 @@
       "discrete": false
     },
     {
-      "i": 315,
+      "i": 318,
       "id": "loop.fx1.p3",
       "name": "Control 3",
       "min": 0.0,
@@ -4425,7 +4467,7 @@
       "discrete": false
     },
     {
-      "i": 316,
+      "i": 319,
       "id": "loop.fx1.p4",
       "name": "Control 4",
       "min": 0.0,
@@ -4439,7 +4481,7 @@
       "discrete": false
     },
     {
-      "i": 317,
+      "i": 320,
       "id": "loop.fx1.p5",
       "name": "Control 5",
       "min": 0.0,
@@ -4453,7 +4495,7 @@
       "discrete": false
     },
     {
-      "i": 318,
+      "i": 321,
       "id": "loop.fx1.p6",
       "name": "Control 6",
       "min": 0.0,
@@ -4467,7 +4509,7 @@
       "discrete": false
     },
     {
-      "i": 319,
+      "i": 322,
       "id": "loop.fx1.mix",
       "name": "Mix",
       "min": 0.0,
@@ -4481,7 +4523,7 @@
       "discrete": false
     },
     {
-      "i": 320,
+      "i": 323,
       "id": "loop.fx2.p1",
       "name": "Control 1",
       "min": 0.0,
@@ -4495,7 +4537,7 @@
       "discrete": false
     },
     {
-      "i": 321,
+      "i": 324,
       "id": "loop.fx2.p2",
       "name": "Control 2",
       "min": 0.0,
@@ -4509,7 +4551,7 @@
       "discrete": false
     },
     {
-      "i": 322,
+      "i": 325,
       "id": "loop.fx2.p3",
       "name": "Control 3",
       "min": 0.0,
@@ -4523,7 +4565,7 @@
       "discrete": false
     },
     {
-      "i": 323,
+      "i": 326,
       "id": "loop.fx2.p4",
       "name": "Control 4",
       "min": 0.0,
@@ -4537,7 +4579,7 @@
       "discrete": false
     },
     {
-      "i": 324,
+      "i": 327,
       "id": "loop.fx2.p5",
       "name": "Control 5",
       "min": 0.0,
@@ -4551,7 +4593,7 @@
       "discrete": false
     },
     {
-      "i": 325,
+      "i": 328,
       "id": "loop.fx2.p6",
       "name": "Control 6",
       "min": 0.0,
@@ -4565,7 +4607,7 @@
       "discrete": false
     },
     {
-      "i": 326,
+      "i": 329,
       "id": "loop.fx2.mix",
       "name": "Mix",
       "min": 0.0,
@@ -4579,7 +4621,7 @@
       "discrete": false
     },
     {
-      "i": 327,
+      "i": 330,
       "id": "weather.fx1.p1",
       "name": "Control 1",
       "min": 0.0,
@@ -4593,7 +4635,7 @@
       "discrete": false
     },
     {
-      "i": 328,
+      "i": 331,
       "id": "weather.fx1.p2",
       "name": "Control 2",
       "min": 0.0,
@@ -4607,7 +4649,7 @@
       "discrete": false
     },
     {
-      "i": 329,
+      "i": 332,
       "id": "weather.fx1.p3",
       "name": "Control 3",
       "min": 0.0,
@@ -4621,7 +4663,7 @@
       "discrete": false
     },
     {
-      "i": 330,
+      "i": 333,
       "id": "weather.fx1.p4",
       "name": "Control 4",
       "min": 0.0,
@@ -4635,7 +4677,7 @@
       "discrete": false
     },
     {
-      "i": 331,
+      "i": 334,
       "id": "weather.fx1.p5",
       "name": "Control 5",
       "min": 0.0,
@@ -4649,7 +4691,7 @@
       "discrete": false
     },
     {
-      "i": 332,
+      "i": 335,
       "id": "weather.fx1.p6",
       "name": "Control 6",
       "min": 0.0,
@@ -4663,7 +4705,7 @@
       "discrete": false
     },
     {
-      "i": 333,
+      "i": 336,
       "id": "weather.fx1.mix",
       "name": "Mix",
       "min": 0.0,
@@ -4677,7 +4719,7 @@
       "discrete": false
     },
     {
-      "i": 334,
+      "i": 337,
       "id": "weather.fx2.p1",
       "name": "Control 1",
       "min": 0.0,
@@ -4691,7 +4733,7 @@
       "discrete": false
     },
     {
-      "i": 335,
+      "i": 338,
       "id": "weather.fx2.p2",
       "name": "Control 2",
       "min": 0.0,
@@ -4705,7 +4747,7 @@
       "discrete": false
     },
     {
-      "i": 336,
+      "i": 339,
       "id": "weather.fx2.p3",
       "name": "Control 3",
       "min": 0.0,
@@ -4719,7 +4761,7 @@
       "discrete": false
     },
     {
-      "i": 337,
+      "i": 340,
       "id": "weather.fx2.p4",
       "name": "Control 4",
       "min": 0.0,
@@ -4733,7 +4775,7 @@
       "discrete": false
     },
     {
-      "i": 338,
+      "i": 341,
       "id": "weather.fx2.p5",
       "name": "Control 5",
       "min": 0.0,
@@ -4747,7 +4789,7 @@
       "discrete": false
     },
     {
-      "i": 339,
+      "i": 342,
       "id": "weather.fx2.p6",
       "name": "Control 6",
       "min": 0.0,
@@ -4761,7 +4803,7 @@
       "discrete": false
     },
     {
-      "i": 340,
+      "i": 343,
       "id": "weather.fx2.mix",
       "name": "Mix",
       "min": 0.0,
@@ -4775,7 +4817,7 @@
       "discrete": false
     },
     {
-      "i": 341,
+      "i": 344,
       "id": "freeze.fx1.p1",
       "name": "Control 1",
       "min": 0.0,
@@ -4789,7 +4831,7 @@
       "discrete": false
     },
     {
-      "i": 342,
+      "i": 345,
       "id": "freeze.fx1.p2",
       "name": "Control 2",
       "min": 0.0,
@@ -4803,7 +4845,7 @@
       "discrete": false
     },
     {
-      "i": 343,
+      "i": 346,
       "id": "freeze.fx1.p3",
       "name": "Control 3",
       "min": 0.0,
@@ -4817,7 +4859,7 @@
       "discrete": false
     },
     {
-      "i": 344,
+      "i": 347,
       "id": "freeze.fx1.p4",
       "name": "Control 4",
       "min": 0.0,
@@ -4831,7 +4873,7 @@
       "discrete": false
     },
     {
-      "i": 345,
+      "i": 348,
       "id": "freeze.fx1.p5",
       "name": "Control 5",
       "min": 0.0,
@@ -4845,7 +4887,7 @@
       "discrete": false
     },
     {
-      "i": 346,
+      "i": 349,
       "id": "freeze.fx1.p6",
       "name": "Control 6",
       "min": 0.0,
@@ -4859,7 +4901,7 @@
       "discrete": false
     },
     {
-      "i": 347,
+      "i": 350,
       "id": "freeze.fx1.mix",
       "name": "Mix",
       "min": 0.0,
@@ -4873,7 +4915,7 @@
       "discrete": false
     },
     {
-      "i": 348,
+      "i": 351,
       "id": "freeze.fx2.p1",
       "name": "Control 1",
       "min": 0.0,
@@ -4887,7 +4929,7 @@
       "discrete": false
     },
     {
-      "i": 349,
+      "i": 352,
       "id": "freeze.fx2.p2",
       "name": "Control 2",
       "min": 0.0,
@@ -4901,7 +4943,7 @@
       "discrete": false
     },
     {
-      "i": 350,
+      "i": 353,
       "id": "freeze.fx2.p3",
       "name": "Control 3",
       "min": 0.0,
@@ -4915,7 +4957,7 @@
       "discrete": false
     },
     {
-      "i": 351,
+      "i": 354,
       "id": "freeze.fx2.p4",
       "name": "Control 4",
       "min": 0.0,
@@ -4929,7 +4971,7 @@
       "discrete": false
     },
     {
-      "i": 352,
+      "i": 355,
       "id": "freeze.fx2.p5",
       "name": "Control 5",
       "min": 0.0,
@@ -4943,7 +4985,7 @@
       "discrete": false
     },
     {
-      "i": 353,
+      "i": 356,
       "id": "freeze.fx2.p6",
       "name": "Control 6",
       "min": 0.0,
@@ -4957,7 +4999,7 @@
       "discrete": false
     },
     {
-      "i": 354,
+      "i": 357,
       "id": "freeze.fx2.mix",
       "name": "Mix",
       "min": 0.0,
@@ -4971,7 +5013,7 @@
       "discrete": false
     },
     {
-      "i": 355,
+      "i": 358,
       "id": "busA.fx1.p1",
       "name": "Control 1",
       "min": 0.0,
@@ -4985,7 +5027,7 @@
       "discrete": false
     },
     {
-      "i": 356,
+      "i": 359,
       "id": "busA.fx1.p2",
       "name": "Control 2",
       "min": 0.0,
@@ -4999,7 +5041,7 @@
       "discrete": false
     },
     {
-      "i": 357,
+      "i": 360,
       "id": "busA.fx1.p3",
       "name": "Control 3",
       "min": 0.0,
@@ -5013,7 +5055,7 @@
       "discrete": false
     },
     {
-      "i": 358,
+      "i": 361,
       "id": "busA.fx1.p4",
       "name": "Control 4",
       "min": 0.0,
@@ -5027,7 +5069,7 @@
       "discrete": false
     },
     {
-      "i": 359,
+      "i": 362,
       "id": "busA.fx1.p5",
       "name": "Control 5",
       "min": 0.0,
@@ -5041,7 +5083,7 @@
       "discrete": false
     },
     {
-      "i": 360,
+      "i": 363,
       "id": "busA.fx1.p6",
       "name": "Control 6",
       "min": 0.0,
@@ -5055,7 +5097,7 @@
       "discrete": false
     },
     {
-      "i": 361,
+      "i": 364,
       "id": "busA.fx1.mix",
       "name": "Mix",
       "min": 0.0,
@@ -5069,7 +5111,7 @@
       "discrete": false
     },
     {
-      "i": 362,
+      "i": 365,
       "id": "busA.fx2.p1",
       "name": "Control 1",
       "min": 0.0,
@@ -5083,7 +5125,7 @@
       "discrete": false
     },
     {
-      "i": 363,
+      "i": 366,
       "id": "busA.fx2.p2",
       "name": "Control 2",
       "min": 0.0,
@@ -5097,7 +5139,7 @@
       "discrete": false
     },
     {
-      "i": 364,
+      "i": 367,
       "id": "busA.fx2.p3",
       "name": "Control 3",
       "min": 0.0,
@@ -5111,7 +5153,7 @@
       "discrete": false
     },
     {
-      "i": 365,
+      "i": 368,
       "id": "busA.fx2.p4",
       "name": "Control 4",
       "min": 0.0,
@@ -5125,7 +5167,7 @@
       "discrete": false
     },
     {
-      "i": 366,
+      "i": 369,
       "id": "busA.fx2.p5",
       "name": "Control 5",
       "min": 0.0,
@@ -5139,7 +5181,7 @@
       "discrete": false
     },
     {
-      "i": 367,
+      "i": 370,
       "id": "busA.fx2.p6",
       "name": "Control 6",
       "min": 0.0,
@@ -5153,7 +5195,7 @@
       "discrete": false
     },
     {
-      "i": 368,
+      "i": 371,
       "id": "busA.fx2.mix",
       "name": "Mix",
       "min": 0.0,
@@ -5167,7 +5209,7 @@
       "discrete": false
     },
     {
-      "i": 369,
+      "i": 372,
       "id": "busB.fx1.p1",
       "name": "Control 1",
       "min": 0.0,
@@ -5181,7 +5223,7 @@
       "discrete": false
     },
     {
-      "i": 370,
+      "i": 373,
       "id": "busB.fx1.p2",
       "name": "Control 2",
       "min": 0.0,
@@ -5195,7 +5237,7 @@
       "discrete": false
     },
     {
-      "i": 371,
+      "i": 374,
       "id": "busB.fx1.p3",
       "name": "Control 3",
       "min": 0.0,
@@ -5209,7 +5251,7 @@
       "discrete": false
     },
     {
-      "i": 372,
+      "i": 375,
       "id": "busB.fx1.p4",
       "name": "Control 4",
       "min": 0.0,
@@ -5223,7 +5265,7 @@
       "discrete": false
     },
     {
-      "i": 373,
+      "i": 376,
       "id": "busB.fx1.p5",
       "name": "Control 5",
       "min": 0.0,
@@ -5237,7 +5279,7 @@
       "discrete": false
     },
     {
-      "i": 374,
+      "i": 377,
       "id": "busB.fx1.p6",
       "name": "Control 6",
       "min": 0.0,
@@ -5251,7 +5293,7 @@
       "discrete": false
     },
     {
-      "i": 375,
+      "i": 378,
       "id": "busB.fx1.mix",
       "name": "Mix",
       "min": 0.0,
@@ -5265,7 +5307,7 @@
       "discrete": false
     },
     {
-      "i": 376,
+      "i": 379,
       "id": "busB.fx2.p1",
       "name": "Control 1",
       "min": 0.0,
@@ -5279,7 +5321,7 @@
       "discrete": false
     },
     {
-      "i": 377,
+      "i": 380,
       "id": "busB.fx2.p2",
       "name": "Control 2",
       "min": 0.0,
@@ -5293,7 +5335,7 @@
       "discrete": false
     },
     {
-      "i": 378,
+      "i": 381,
       "id": "busB.fx2.p3",
       "name": "Control 3",
       "min": 0.0,
@@ -5307,7 +5349,7 @@
       "discrete": false
     },
     {
-      "i": 379,
+      "i": 382,
       "id": "busB.fx2.p4",
       "name": "Control 4",
       "min": 0.0,
@@ -5321,7 +5363,7 @@
       "discrete": false
     },
     {
-      "i": 380,
+      "i": 383,
       "id": "busB.fx2.p5",
       "name": "Control 5",
       "min": 0.0,
@@ -5335,7 +5377,7 @@
       "discrete": false
     },
     {
-      "i": 381,
+      "i": 384,
       "id": "busB.fx2.p6",
       "name": "Control 6",
       "min": 0.0,
@@ -5349,7 +5391,7 @@
       "discrete": false
     },
     {
-      "i": 382,
+      "i": 385,
       "id": "busB.fx2.mix",
       "name": "Mix",
       "min": 0.0,
@@ -5363,7 +5405,7 @@
       "discrete": false
     },
     {
-      "i": 383,
+      "i": 386,
       "id": "master.fx1.p1",
       "name": "Control 1",
       "min": 0.0,
@@ -5377,7 +5419,7 @@
       "discrete": false
     },
     {
-      "i": 384,
+      "i": 387,
       "id": "master.fx1.p2",
       "name": "Control 2",
       "min": 0.0,
@@ -5391,7 +5433,7 @@
       "discrete": false
     },
     {
-      "i": 385,
+      "i": 388,
       "id": "master.fx1.p3",
       "name": "Control 3",
       "min": 0.0,
@@ -5405,7 +5447,7 @@
       "discrete": false
     },
     {
-      "i": 386,
+      "i": 389,
       "id": "master.fx1.p4",
       "name": "Control 4",
       "min": 0.0,
@@ -5419,7 +5461,7 @@
       "discrete": false
     },
     {
-      "i": 387,
+      "i": 390,
       "id": "master.fx1.p5",
       "name": "Control 5",
       "min": 0.0,
@@ -5433,7 +5475,7 @@
       "discrete": false
     },
     {
-      "i": 388,
+      "i": 391,
       "id": "master.fx1.p6",
       "name": "Control 6",
       "min": 0.0,
@@ -5447,7 +5489,7 @@
       "discrete": false
     },
     {
-      "i": 389,
+      "i": 392,
       "id": "master.fx1.mix",
       "name": "Mix",
       "min": 0.0,
@@ -5461,7 +5503,7 @@
       "discrete": false
     },
     {
-      "i": 390,
+      "i": 393,
       "id": "master.fx2.p1",
       "name": "Control 1",
       "min": 0.0,
@@ -5475,7 +5517,7 @@
       "discrete": false
     },
     {
-      "i": 391,
+      "i": 394,
       "id": "master.fx2.p2",
       "name": "Control 2",
       "min": 0.0,
@@ -5489,7 +5531,7 @@
       "discrete": false
     },
     {
-      "i": 392,
+      "i": 395,
       "id": "master.fx2.p3",
       "name": "Control 3",
       "min": 0.0,
@@ -5503,7 +5545,7 @@
       "discrete": false
     },
     {
-      "i": 393,
+      "i": 396,
       "id": "master.fx2.p4",
       "name": "Control 4",
       "min": 0.0,
@@ -5517,7 +5559,7 @@
       "discrete": false
     },
     {
-      "i": 394,
+      "i": 397,
       "id": "master.fx2.p5",
       "name": "Control 5",
       "min": 0.0,
@@ -5531,7 +5573,7 @@
       "discrete": false
     },
     {
-      "i": 395,
+      "i": 398,
       "id": "master.fx2.p6",
       "name": "Control 6",
       "min": 0.0,
@@ -5545,7 +5587,7 @@
       "discrete": false
     },
     {
-      "i": 396,
+      "i": 399,
       "id": "master.fx2.mix",
       "name": "Mix",
       "min": 0.0,
@@ -5563,11 +5605,11 @@
     {
       "id": "drone",
       "name": "Drone",
-      "level": 52,
-      "pan": 53,
-      "width": 54,
-      "sendA": 55,
-      "sendB": 56,
+      "level": 55,
+      "pan": 56,
+      "width": 57,
+      "sendA": 58,
+      "sendB": 59,
       "fx": [
         0,
         1
@@ -5576,11 +5618,11 @@
     {
       "id": "cloud1",
       "name": "Cloud 1",
-      "level": 105,
-      "pan": 106,
-      "width": 107,
-      "sendA": 108,
-      "sendB": 109,
+      "level": 108,
+      "pan": 109,
+      "width": 110,
+      "sendA": 111,
+      "sendB": 112,
       "fx": [
         2,
         3
@@ -5589,11 +5631,11 @@
     {
       "id": "cloud2",
       "name": "Cloud 2",
-      "level": 110,
-      "pan": 111,
-      "width": 112,
-      "sendA": 113,
-      "sendB": 114,
+      "level": 113,
+      "pan": 114,
+      "width": 115,
+      "sendA": 116,
+      "sendB": 117,
       "fx": [
         4,
         5
@@ -5602,11 +5644,11 @@
     {
       "id": "cloud3",
       "name": "Cloud 3",
-      "level": 115,
-      "pan": 116,
-      "width": 117,
-      "sendA": 118,
-      "sendB": 119,
+      "level": 118,
+      "pan": 119,
+      "width": 120,
+      "sendA": 121,
+      "sendB": 122,
       "fx": [
         6,
         7
@@ -5615,11 +5657,11 @@
     {
       "id": "cloud4",
       "name": "Cloud 4",
-      "level": 120,
-      "pan": 121,
-      "width": 122,
-      "sendA": 123,
-      "sendB": 124,
+      "level": 123,
+      "pan": 124,
+      "width": 125,
+      "sendA": 126,
+      "sendB": 127,
       "fx": [
         8,
         9
@@ -5628,11 +5670,11 @@
     {
       "id": "res",
       "name": "Resonator",
-      "level": 137,
-      "pan": 138,
-      "width": 139,
-      "sendA": 140,
-      "sendB": 141,
+      "level": 140,
+      "pan": 141,
+      "width": 142,
+      "sendA": 143,
+      "sendB": 144,
       "fx": [
         10,
         11
@@ -5641,11 +5683,11 @@
     {
       "id": "input",
       "name": "Live Input",
-      "level": 147,
-      "pan": 148,
-      "width": 149,
-      "sendA": 150,
-      "sendB": 151,
+      "level": 150,
+      "pan": 151,
+      "width": 152,
+      "sendA": 153,
+      "sendB": 154,
       "fx": [
         12,
         13
@@ -5654,11 +5696,11 @@
     {
       "id": "bloom",
       "name": "Bloom",
-      "level": 168,
-      "pan": 169,
-      "width": 170,
-      "sendA": 171,
-      "sendB": 172,
+      "level": 171,
+      "pan": 172,
+      "width": 173,
+      "sendA": 174,
+      "sendB": 175,
       "fx": [
         14,
         15
@@ -5667,11 +5709,11 @@
     {
       "id": "loop",
       "name": "Loop",
-      "level": 177,
-      "pan": 178,
-      "width": 179,
-      "sendA": 180,
-      "sendB": 181,
+      "level": 180,
+      "pan": 181,
+      "width": 182,
+      "sendA": 183,
+      "sendB": 184,
       "fx": [
         16,
         17
@@ -5680,11 +5722,11 @@
     {
       "id": "weather",
       "name": "Weather",
-      "level": 188,
-      "pan": 189,
-      "width": 190,
-      "sendA": 191,
-      "sendB": 192,
+      "level": 191,
+      "pan": 192,
+      "width": 193,
+      "sendA": 194,
+      "sendB": 195,
       "fx": [
         18,
         19
@@ -5693,11 +5735,11 @@
     {
       "id": "freeze",
       "name": "Freeze",
-      "level": 196,
-      "pan": 197,
-      "width": 198,
-      "sendA": 199,
-      "sendB": 200,
+      "level": 199,
+      "pan": 200,
+      "width": 201,
+      "sendA": 202,
+      "sendB": 203,
       "fx": [
         20,
         21
@@ -5708,142 +5750,142 @@
     {
       "id": "drone.fx1",
       "name": "Drone insert 1",
-      "first": 201
+      "first": 204
     },
     {
       "id": "drone.fx2",
       "name": "Drone insert 2",
-      "first": 208
+      "first": 211
     },
     {
       "id": "cloud1.fx1",
       "name": "Cloud 1 insert 1",
-      "first": 215
+      "first": 218
     },
     {
       "id": "cloud1.fx2",
       "name": "Cloud 1 insert 2",
-      "first": 222
+      "first": 225
     },
     {
       "id": "cloud2.fx1",
       "name": "Cloud 2 insert 1",
-      "first": 229
+      "first": 232
     },
     {
       "id": "cloud2.fx2",
       "name": "Cloud 2 insert 2",
-      "first": 236
+      "first": 239
     },
     {
       "id": "cloud3.fx1",
       "name": "Cloud 3 insert 1",
-      "first": 243
+      "first": 246
     },
     {
       "id": "cloud3.fx2",
       "name": "Cloud 3 insert 2",
-      "first": 250
+      "first": 253
     },
     {
       "id": "cloud4.fx1",
       "name": "Cloud 4 insert 1",
-      "first": 257
+      "first": 260
     },
     {
       "id": "cloud4.fx2",
       "name": "Cloud 4 insert 2",
-      "first": 264
+      "first": 267
     },
     {
       "id": "res.fx1",
       "name": "Resonator insert 1",
-      "first": 271
+      "first": 274
     },
     {
       "id": "res.fx2",
       "name": "Resonator insert 2",
-      "first": 278
+      "first": 281
     },
     {
       "id": "input.fx1",
       "name": "Input insert 1",
-      "first": 285
+      "first": 288
     },
     {
       "id": "input.fx2",
       "name": "Input insert 2",
-      "first": 292
+      "first": 295
     },
     {
       "id": "bloom.fx1",
       "name": "Bloom insert 1",
-      "first": 299
+      "first": 302
     },
     {
       "id": "bloom.fx2",
       "name": "Bloom insert 2",
-      "first": 306
+      "first": 309
     },
     {
       "id": "loop.fx1",
       "name": "Loop insert 1",
-      "first": 313
+      "first": 316
     },
     {
       "id": "loop.fx2",
       "name": "Loop insert 2",
-      "first": 320
+      "first": 323
     },
     {
       "id": "weather.fx1",
       "name": "Weather insert 1",
-      "first": 327
+      "first": 330
     },
     {
       "id": "weather.fx2",
       "name": "Weather insert 2",
-      "first": 334
+      "first": 337
     },
     {
       "id": "freeze.fx1",
       "name": "Freeze insert 1",
-      "first": 341
+      "first": 344
     },
     {
       "id": "freeze.fx2",
       "name": "Freeze insert 2",
-      "first": 348
+      "first": 351
     },
     {
       "id": "busA.fx1",
       "name": "Reverb bus 1",
-      "first": 355
+      "first": 358
     },
     {
       "id": "busA.fx2",
       "name": "Reverb bus 2",
-      "first": 362
+      "first": 365
     },
     {
       "id": "busB.fx1",
       "name": "Delay bus 1",
-      "first": 369
+      "first": 372
     },
     {
       "id": "busB.fx2",
       "name": "Delay bus 2",
-      "first": 376
+      "first": 379
     },
     {
       "id": "master.fx1",
       "name": "Master insert 1",
-      "first": 383
+      "first": 386
     },
     {
       "id": "master.fx2",
       "name": "Master insert 2",
-      "first": 390
+      "first": 393
     }
   ],
   "busASlot": 22,
@@ -6431,10 +6473,10 @@
     }
   ],
   "cloudFirstParam": [
-    57,
-    69,
-    81,
-    93
+    60,
+    72,
+    84,
+    96
   ],
   "scales": [
     "Major",

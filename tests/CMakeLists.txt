@@ -8,6 +8,7 @@ add_executable(tidefield_tests
     dsp/DroneTests.cpp
     dsp/Phase3DspTests.cpp
     dsp/Phase8FxTests.cpp
+    dsp/AutoMasterTests.cpp
     engine/SpscQueueTests.cpp
     engine/ParamTests.cpp
     engine/MasterChainTests.cpp

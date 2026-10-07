@@ -78,10 +78,10 @@ function GlobalPage() {
         <Section title="Tide and key">
           {knobs(["tide.rate", "harmony.gravity", "harmony.morph"])}
           <div className="wide">
-            <Choice param={idx("harmony.root")} label="Key" columns={12} />
+            <Choice param={idx("harmony.root")} label="Key" columns={6} />
           </div>
           <div className="wide">
-            <Choice param={idx("harmony.scale")} label="Scale" columns={6} />
+            <Choice param={idx("harmony.scale")} label="Scale" columns={3} />
           </div>
         </Section>
         <Section title="Recording type">
@@ -90,6 +90,7 @@ function GlobalPage() {
           </div>
           {knobs(["medium.age", "medium.noise", "medium.wobble", "medium.drive", "medium.mix"])}
         </Section>
+        <AutoMasterSection />
         <Section title="Catch">
           {knobs(["catch.seconds"])}
           <div className="wide">
@@ -107,6 +108,52 @@ function GlobalPage() {
         </Section>
       </div>
     </Page>
+  );
+}
+
+function AutoMasterSection() {
+  useKey("telemetry");
+  const a = store.telemetry?.auto ?? [];
+  const on = (a[7] ?? 0) > 0;
+  const bar = (label: string, db: number) => (
+    <div className="am-band" key={label}>
+      <span>{label}</span>
+      <div className="am-track">
+        <div className="am-fill" style={{ left: db < 0 ? `${50 + (db / 12) * 100}%` : "50%", width: `${(Math.abs(db) / 12) * 100}%` }} />
+      </div>
+      <span className="am-num">
+        {db >= 0 ? "+" : ""}
+        {db.toFixed(1)} dB
+      </span>
+    </div>
+  );
+  return (
+    <Section title="Auto master">
+      <div className="wide">
+        <Choice param={idx("master.auto")} label="" />
+      </div>
+      <div className="wide">
+        <Choice param={idx("master.autoTarget")} label="Loudness target" />
+      </div>
+      {knobs(["master.autoAmount"])}
+      <div className="wide am-readout">
+        <div className="am-row">
+          <span className="am-pair">
+            In <span className="am-num">{on ? `${(a[0] ?? -70).toFixed(1)} LUFS` : "-"}</span>
+          </span>
+          <span className="am-pair">
+            Make-up <span className="am-num">{on ? `${(a[1] ?? 0).toFixed(1)} dB` : "-"}</span>
+          </span>
+          <span className="am-pair">
+            Glue <span className="am-num">{on ? `${(a[6] ?? 0).toFixed(1)} dB` : "-"}</span>
+          </span>
+        </div>
+        {bar("Lows", on ? (a[2] ?? 0) : 0)}
+        {bar("Mud", on ? (a[3] ?? 0) : 0)}
+        {bar("Air", on ? (a[4] ?? 0) : 0)}
+      </div>
+      <p className="note">Listens to the mix and eases its tone, glue, width and level toward a finished sound, over seconds, never chasing notes. It never lifts silence.</p>
+    </Section>
   );
 }
 

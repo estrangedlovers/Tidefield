@@ -46,6 +46,7 @@ void ResonatorBank::reset() noexcept
     samplesToBurst = 0.0;
     samplesUntilControl = 0;
     ringingModes = 0;
+    pendingStrike = 0.0f;
 }
 
 float ResonatorBank::modeTargetNote(int i) const noexcept
@@ -161,6 +162,13 @@ void ResonatorBank::process(const float* excite, float* left, float* right, int 
                     const double u = std::max(1.0e-6, static_cast<double>(rng.nextFloat()));
                     samplesToBurst = -std::log(u) * spec.sampleRate / rainRate;
                 }
+            }
+            if (pendingStrike > 0.0f)
+            {
+                strikeAmp = std::min(1.0f, pendingStrike);
+                strikeLength = strikeWidth;
+                strikePos = 0;
+                pendingStrike = 0.0f;
             }
             float strike = 0.0f;
             if (strikePos < strikeLength)

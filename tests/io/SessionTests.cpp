@@ -1,6 +1,7 @@
 #include <engine/Engine.h>
 #include <engine/midi/MidiManager.h>
 #include <engine/mix/FxManager.h>
+#include <engine/mod/SeasonManager.h>
 #include <engine/scene/SceneManager.h>
 #include <io/Session.h>
 
@@ -222,4 +223,43 @@ TEST_CASE("The default session resets everything")
     REQUIRE(rig.last.numScenes == 0);
     REQUIRE_FALSE(rig.last.cloudLoaded[0]);
     REQUIRE(rig.fx.getType(engine::kBusASlot) == "tf.reverb");
+}
+
+TEST_CASE("Seasons round-trip through a session and an empty list clears them", "[session][seasons]")
+{
+    engine::Engine e;
+    e.prepare(kFs, 256);
+    engine::SceneManager scenes(e);
+    engine::FxManager fx(e);
+    engine::SeasonManager seasons(e);
+    engine::Season s;
+    s.param = engine::idx(engine::P::DroneCutoff);
+    s.depth = -0.3f;
+    s.periodSeconds = 600.0f;
+    s.shape = engine::Season::Shape::Drift;
+    s.phase = 0.25f;
+    REQUIRE(seasons.set(0, s));
+
+    engine::TelemetryFrame frame;
+    auto data = io::captureSession(e, frame, scenes, fx, nullptr, &seasons);
+    juce::String error;
+    auto parsed = io::sessionFromJson(juce::JSON::parse(juce::JSON::toString(io::sessionToJson(data))), error);
+    REQUIRE(parsed.has_value());
+
+    engine::Engine e2;
+    e2.prepare(kFs, 256);
+    engine::SceneManager scenes2(e2);
+    engine::FxManager fx2(e2);
+    engine::SeasonManager seasons2(e2);
+    REQUIRE(io::applySession(*parsed, e2, scenes2, fx2, true, nullptr, &seasons2).empty());
+    REQUIRE(seasons2.getSeasons().size() == 1);
+    const auto& r = seasons2.getSeasons()[0];
+    CHECK(r.param == s.param);
+    CHECK(r.depth == Approx(-0.3f));
+    CHECK(r.periodSeconds == Approx(600.0f));
+    CHECK(r.shape == engine::Season::Shape::Drift);
+    CHECK(r.phase == Approx(0.25f));
+
+    io::applySession(io::defaultSession(e2), e2, scenes2, fx2, true, nullptr, &seasons2);
+    CHECK(seasons2.getSeasons().empty());
 }

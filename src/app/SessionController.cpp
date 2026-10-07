@@ -9,8 +9,9 @@ constexpr float kSwapFadeSeconds = 1.5f;
 const char* const kWildcard = "*.tidefield";
 } // namespace
 
-SessionController::SessionController(engine::Engine& e, engine::SceneManager& s, engine::FxManager& f, engine::MidiManager* m)
-    : engine(e), scenes(s), fx(f), midi(m)
+SessionController::SessionController(engine::Engine& e, engine::SceneManager& s, engine::FxManager& f, engine::MidiManager* m,
+                                     engine::SeasonManager* sm)
+    : engine(e), scenes(s), fx(f), midi(m), seasons(sm)
 {
 }
 
@@ -78,7 +79,7 @@ void SessionController::applyNow()
         return;
     const bool resume = waitingForFadeOut;
     waitingForFadeOut = false;
-    auto warnings = io::applySession(*pending, engine, scenes, fx, true, midi);
+    auto warnings = io::applySession(*pending, engine, scenes, fx, true, midi, seasons);
     const auto fadeIt = pending->params.find("master.fadeSeconds");
     const float sessionFade = fadeIt != pending->params.end() ? fadeIt->second
                                                               : engine.getRegistry().spec(engine::P::MasterFadeSecs).defaultValue;
@@ -133,7 +134,7 @@ void SessionController::saveTo(const juce::File& file)
     busy = true;
     // Capture on the message thread (cheap: values plus shared sample references),
     // encode and write on a worker.
-    auto data = std::make_shared<io::SessionData>(io::captureSession(engine, latest, scenes, fx, midi));
+    auto data = std::make_shared<io::SessionData>(io::captureSession(engine, latest, scenes, fx, midi, seasons));
     data->name = file.getFileNameWithoutExtension().toStdString();
     if (onStatus)
         onStatus("Saving " + file.getFileName() + "...");

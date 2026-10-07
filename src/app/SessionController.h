@@ -2,6 +2,7 @@
 
 #include <engine/Engine.h>
 #include <engine/midi/MidiManager.h>
+#include <engine/mod/SeasonManager.h>
 #include <engine/mix/FxManager.h>
 #include <engine/scene/SceneManager.h>
 #include <io/Session.h>
@@ -20,7 +21,8 @@ namespace tf::app {
 class SessionController
 {
 public:
-    SessionController(engine::Engine& engine, engine::SceneManager& scenes, engine::FxManager& fx, engine::MidiManager* midi);
+    SessionController(engine::Engine& engine, engine::SceneManager& scenes, engine::FxManager& fx, engine::MidiManager* midi,
+                      engine::SeasonManager* seasons = nullptr);
     ~SessionController();
 
     void newSession();
@@ -49,6 +51,7 @@ private:
     engine::SceneManager& scenes;
     engine::FxManager& fx;
     engine::MidiManager* midi;
+    engine::SeasonManager* seasons;
     engine::TelemetryFrame latest;
     juce::File current;
     std::unique_ptr<juce::FileChooser> chooser;

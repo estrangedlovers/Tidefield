@@ -50,6 +50,9 @@ public:
 
     void setParams(const Params& p) noexcept { params = p; }
     void setHarmony(const HarmonicGravity* h) noexcept { harmony = h; }
+    /** A mallet strike (0..1) at the next sample, like one drop of rain. */
+    void strike(float amplitude) noexcept { pendingStrike = amplitude; }
+
     void setModeLimit(int limit) noexcept { modeLimit = limit < 1 ? 1 : (limit > kMaxModes ? kMaxModes : limit); }
 
     /** excite: optional mono excitation (may be null). Writes stereo output. */
@@ -81,7 +84,8 @@ private:
     const HarmonicGravity* harmony = nullptr;
     std::array<Mode, kMaxModes> modes {};
     int modeLimit = kMaxModes;
-    int ringingModes = 0; // modes still processed: the active ones plus any dying out after a cut
+    int ringingModes = 0;
+    float pendingStrike = 0.0f; // modes still processed: the active ones plus any dying out after a cut
     // Rain strikes: raised-cosine pulses.
     int strikePos = 0, strikeLength = 0;
     float strikeAmp = 0.0f;

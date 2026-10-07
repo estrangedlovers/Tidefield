@@ -7,8 +7,8 @@
 namespace tf::app {
 
 AppCore::AppCore(AudioHost& h)
-    : host(h), engine(h.getEngine()), scenes(h.getEngine()), fx(h.getEngine()), catcher(h.getEngine()), midi(h.getEngine()),
-      midiInputs(h.getEngine(), h.getSettings()), session(h.getEngine(), scenes, fx, &midi), recorder(h.getEngine().getRecordTap())
+    : host(h), engine(h.getEngine()), scenes(h.getEngine()), fx(h.getEngine()), catcher(h.getEngine()), midi(h.getEngine()), seasons(h.getEngine()),
+      midiInputs(h.getEngine(), h.getSettings()), session(h.getEngine(), scenes, fx, &midi, &seasons), recorder(h.getEngine().getRecordTap())
 {
     engine.setGuardrailsEnabled(true);
     fx.loadDefaultLayout();
@@ -150,6 +150,7 @@ void AppCore::timerCallback()
     scenes.tick();
     fx.tick();
     midi.tick();
+    seasons.tick();
     engine.collectGarbage();
 
     engine::RawMidi monitored;

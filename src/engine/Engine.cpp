@@ -101,6 +101,10 @@ void Engine::prepare(double newSampleRate, int maxBlockSize)
     cursorX.reset(params.current(P::TerrainX));
     cursorY.reset(params.current(P::TerrainY));
     wander.setSeed(config.seed ^ 0x77616e64ull);
+    loopRng.setSeed(config.seed ^ 0x6c6f6f70ull);
+    loopPattern = -1;
+    swellEnv = 0.0f;
+    seasonVersion = 0;
 
     const auto n = static_cast<std::size_t>(maxBlock);
     for (int s = 0; s < kNumStrips; ++s)
@@ -268,6 +272,7 @@ int Engine::collectProcessors(int slot)
 void Engine::collectGarbage()
 {
     sceneChannel.collectGarbage();
+    seasonChannel.collectGarbage();
     midiMapChannel.collectGarbage();
     bloomBuffers.collectGarbage();
     for (auto& c : clouds)
@@ -297,6 +302,7 @@ bool Engine::postMidi(int port, const RawMidi& message) noexcept
 void Engine::drainControl() noexcept
 {
     sceneChannel.acquire();
+    seasonChannel.acquire();
     if (midiMapChannel.acquire())
     {
         // A new map: every binding must pick up again.
@@ -529,6 +535,7 @@ void Engine::resetFeedback() noexcept
     bloom.reset();
     looper.reset();
     weather.reset();
+    swellEnv = 0.0f;
     inputFreeze.reset();
     freezeCloud.reset();
     freezeGain = 0.0f;
@@ -702,6 +709,7 @@ void Engine::controlTick() noexcept
     if (tickCount++ % kTerrainDecimation == 0)
         updateTerrain(tickSeconds * kTerrainDecimation);
 
+    updateModulation(tickSeconds);
     params.advance(kControlInterval);
     tide = params.current(P::TideRate);
 
@@ -710,6 +718,7 @@ void Engine::controlTick() noexcept
     harmony.advance(tickSeconds * tide);
 
     updateSources(tide);
+    updateLoops(tickSeconds);
 
     for (int s = 0; s < kNumStrips; ++s)
     {
@@ -727,6 +736,122 @@ void Engine::controlTick() noexcept
     updateFx(tide);
     master.setFadeSeconds(params.current(P::MasterFadeSecs));
     master.setCeilingDb(params.current(P::MasterCeiling));
+}
+
+void Engine::updateModulation(float dt) noexcept
+{
+    params.clearModulation();
+
+    // Swell: a held gesture that blooms every send and opens the filters, rising over
+    // swell.attack and ebbing over swell.release (stretched or hurried by Tide).
+    const float hold = params.current(P::SwellHold);
+    const float time = hold > swellEnv ? params.current(P::SwellAttack) : params.current(P::SwellRelease) / std::max(0.05f, tide);
+    swellEnv += (hold - swellEnv) * (1.0f - std::exp(-3.0f * dt / std::max(0.01f, time)));
+    swellEnv = dsp::flushDenormal(swellEnv);
+    const float e = dsp::smoothstep(std::clamp(swellEnv, 0.0f, 1.0f)) * params.current(P::SwellDepth);
+    if (e > 1.0e-4f)
+    {
+        for (const auto& info : kStrips)
+        {
+            params.addModulation(idx(info.sendA), 0.35f * e);
+            params.addModulation(idx(info.sendB), 0.2f * e);
+        }
+        params.addModulation(idx(P::DroneCutoff), 0.3f * e);
+        params.addModulation(idx(P::ResBrightness), 0.3f * e);
+        params.addModulation(idx(P::BloomTone), 0.25f * e);
+        params.addModulation(idx(P::BusALevel), 0.05f * e);
+        for (auto first : kCloudFirstParam)
+            params.addModulation(idx(first), 0.15f * e); // density
+    }
+
+    // Seasons: minutes-long curves, scaled together by seasons.depth.
+    const auto* set = seasonChannel.current();
+    if (set == nullptr)
+        return;
+    if (set->version != seasonVersion)
+    {
+        seasonVersion = set->version;
+        for (int k = 0; k < set->count; ++k)
+        {
+            seasonPhase[static_cast<std::size_t>(k)] = set->seasons[static_cast<std::size_t>(k)].phase;
+            seasonDrift[static_cast<std::size_t>(k)].setSeed(config.seed * 31u + static_cast<std::uint64_t>(k));
+        }
+    }
+    const float depthAll = params.current(P::SeasonsDepth);
+    for (int k = 0; k < set->count; ++k)
+    {
+        const auto uk = static_cast<std::size_t>(k);
+        const auto& s = set->seasons[uk];
+        auto& ph = seasonPhase[uk];
+        ph += dt * tide / s.periodSeconds;
+        ph -= std::floor(ph);
+        float v = 0.0f;
+        switch (s.shape)
+        {
+            case Season::Shape::Sine: v = std::sin(dsp::kTwoPi * ph); break;
+            case Season::Shape::Triangle: v = 1.0f - 4.0f * std::fabs(ph - 0.5f); break;
+            case Season::Shape::Drift:
+                seasonDrift[uk].setRate(2.0f / s.periodSeconds);
+                v = seasonDrift[uk].advance(dt * tide);
+                break;
+        }
+        seasonValue[uk] = v;
+        params.addModulation(s.param, v * s.depth * depthAll);
+    }
+}
+
+void Engine::updateLoops(float dt) noexcept
+{
+    // Incommensurate loops (Music for Airports): each voice repeats one note on its
+    // own long, prime-ish period, so the combinations never line up the same way.
+    static constexpr std::array<float, kMaxLoops> kPeriods { 17.0f, 19.7f, 23.3f, 26.3f, 29.9f, 31.7f, 37.1f, 41.3f };
+
+    const int pattern = toInt(params.current(P::LoopsPattern));
+    if (pattern != loopPattern)
+    {
+        loopPattern = pattern;
+        dsp::Random r(0x100957ull + static_cast<std::uint64_t>(pattern) * 7919u);
+        for (int k = 0; k < kMaxLoops; ++k)
+        {
+            loopOffset[static_cast<std::size_t>(k)] = r.nextFloat();
+            loopPhase[static_cast<std::size_t>(k)] = r.nextFloat();
+        }
+    }
+
+    const bool on = params.current(P::LoopsOn) > 0.5f;
+    const int count = std::clamp(toInt(params.current(P::LoopsCount)), 1, kMaxLoops);
+    const float pace = params.current(P::LoopsRate) * tide;
+    const float density = params.current(P::LoopsDensity);
+    const float reg = params.current(P::LoopsRegister);
+    const float spread = params.current(P::LoopsSpread) * 12.0f;
+    const float velocity = params.current(P::LoopsVelocity);
+    const int target = std::clamp(toInt(params.current(P::LoopsTarget)), 0, 2);
+    const float flashDecay = std::exp(-dt / 0.4f);
+
+    for (int k = 0; k < kMaxLoops; ++k)
+    {
+        const auto uk = static_cast<std::size_t>(k);
+        loopFlash[uk] *= flashDecay;
+        loopNote[uk] = harmony.quantize(reg + loopOffset[uk] * spread, loopOffset[uk], 1.0f);
+        if (k >= count)
+            continue;
+        loopPhase[uk] += dt * pace / kPeriods[uk];
+        if (loopPhase[uk] < 1.0f)
+            continue;
+        loopPhase[uk] -= std::floor(loopPhase[uk]);
+        if (! on || ! loopRng.chance(density))
+            continue;
+        const float vel = velocity * (0.75f + 0.25f * loopRng.nextFloat());
+        const int note = std::clamp(toInt(loopNote[uk]), 0, 127);
+        if (target != 1)
+        {
+            bloom.noteOn(note, vel);
+            bloom.noteOff(note); // the note still lasts bloom.length
+        }
+        if (target != 0)
+            resonator.strike(vel);
+        loopFlash[uk] = 1.0f;
+    }
 }
 
 float Engine::mixRamp(P mixParam, int tickPos) const noexcept
@@ -1251,6 +1376,11 @@ void Engine::accumulateTelemetry(const float* l, const float* r, int n) noexcept
     f.weatherGust = weather.getGust();
     f.weatherWave = weather.getWave();
     f.freezeGain = freezeGain;
+    f.swell = swellEnv;
+    std::copy(seasonValue.begin(), seasonValue.end(), f.seasonValue.begin());
+    std::copy(loopPhase.begin(), loopPhase.end(), f.loopPhase.begin());
+    std::copy(loopNote.begin(), loopNote.end(), f.loopNote.begin());
+    std::copy(loopFlash.begin(), loopFlash.end(), f.loopFlash.begin());
 
     f.cursor = cursor;
     f.position = position;

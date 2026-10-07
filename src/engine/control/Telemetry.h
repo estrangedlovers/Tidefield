@@ -75,6 +75,13 @@ struct TelemetryFrame
     float weatherGust = 0.0f, weatherWave = 0.0f;
     float freezeGain = 0.0f;
 
+    // Performance layer.
+    float swell = 0.0f;                         // envelope 0..1
+    std::array<float, 8> seasonValue {};        // each season's curve, -1..1
+    std::array<float, 8> loopPhase {};          // incommensurate loops, 0..1
+    std::array<float, 8> loopNote {};
+    std::array<float, 8> loopFlash {};          // 1 when a loop just fired, decaying
+
     // Terrain.
     Point2 cursor {};          // performer's cursor after glide
     Point2 position {};        // effective position after wander

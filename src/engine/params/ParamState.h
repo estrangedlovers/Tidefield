@@ -4,6 +4,7 @@
 
 #include <dsp/core/Smoother.h>
 
+#include <array>
 #include <vector>
 
 namespace tf::engine {
@@ -30,6 +31,8 @@ public:
         smoothers.assign(n, {});
         prev.assign(n, 0.0f);
         cur.assign(n, 0.0f);
+        mod.assign(n, 0.0f);
+        numModded = 0;
 
         for (std::size_t i = 0; i < n; ++i)
         {
@@ -64,6 +67,34 @@ public:
         prev[i] = cur[i] = v;
     }
 
+    /** Modulation (swell, seasons): offsets in the normalised domain, added on top of
+        the smoothed value at the next advance() and never touching the target, so
+        scenes, MIDI pickup and saved values see the performer's setting. Rebuilt
+        every tick: clear, then add. Discrete parameters are never modulated. */
+    static constexpr int kMaxModulated = 96;
+
+    void clearModulation() noexcept
+    {
+        for (int k = 0; k < numModded; ++k)
+            mod[modded[static_cast<std::size_t>(k)]] = 0.0f;
+        numModded = 0;
+    }
+
+    void addModulation(ParamIndex i, float normalisedOffset) noexcept
+    {
+        if (i >= mod.size() || normalisedOffset == 0.0f || (specs->spec(i).flags & ParamFlag::kDiscrete) != 0)
+            return;
+        if (mod[i] == 0.0f)
+        {
+            if (numModded >= kMaxModulated)
+                return;
+            modded[static_cast<std::size_t>(numModded++)] = i;
+        }
+        mod[i] += normalisedOffset;
+        if (mod[i] == 0.0f)
+            mod[i] = 1.0e-9f; // stays registered so clearModulation() finds it
+    }
+
     /** Advances every parameter by one control tick of numSamples. */
     void advance(int numSamples) noexcept
     {
@@ -72,7 +103,16 @@ public:
             prev[i] = cur[i];
             cur[i] = smoothers[i].skip(numSamples);
         }
+        for (int k = 0; k < numModded; ++k)
+        {
+            const auto i = modded[static_cast<std::size_t>(k)];
+            const auto& s = specs->spec(i);
+            cur[i] = s.fromNormalised(s.toNormalised(cur[i]) + mod[i]);
+        }
     }
+
+    /** The value including modulation, for telemetry rings. */
+    float modulation(ParamIndex i) const noexcept { return mod[i]; }
 
     float current(P p) const noexcept { return cur[idx(p)]; }
     float previous(P p) const noexcept { return prev[idx(p)]; }
@@ -94,7 +134,9 @@ private:
 
     const ParamRegistry* specs = nullptr;
     std::vector<Smoother> smoothers;
-    std::vector<float> prev, cur;
+    std::vector<float> prev, cur, mod;
+    std::array<ParamIndex, kMaxModulated> modded {};
+    int numModded = 0;
 };
 
 } // namespace tf::engine

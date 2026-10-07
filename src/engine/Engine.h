@@ -10,6 +10,7 @@
 #include "mix/FxSlot.h"
 #include "midi/MidiTypes.h"
 #include "mix/Layout.h"
+#include "mod/Seasons.h"
 #include "params/ParamRegistry.h"
 #include "params/ParamState.h"
 #include "record/RecordTap.h"
@@ -21,6 +22,7 @@
 #include <dsp/core/Smoother.h>
 #include <dsp/fx/medium/Medium.h>
 #include <dsp/harmony/HarmonicGravity.h>
+#include <dsp/mod/Drift.h>
 #include <dsp/sources/bloom/BloomSampler.h>
 #include <dsp/sources/drone/DroneGenerator.h>
 #include <dsp/sources/granular/GranularCloud.h>
@@ -88,6 +90,7 @@ public:
     bool command(Command c) noexcept { return post(ControlEvent::makeCommand(c)); }
 
     bool publishScenes(std::unique_ptr<SceneSet> scenes) { return sceneChannel.publish(std::move(scenes)); }
+    bool publishSeasons(std::unique_ptr<SeasonSet> set) { return seasonChannel.publish(std::move(set)); }
 
     /** Hands a sample to a granular cloud (0..3); nullptr unloads it. The cloud fades
         out, swaps, fades back in. Returns false if too many swaps are queued (retry
@@ -162,6 +165,8 @@ private:
     void updateTerrain(float dtSeconds) noexcept;
     void updateSources(float tide) noexcept;
     void updateFx(float tide) noexcept;
+    void updateModulation(float dtSeconds) noexcept;
+    void updateLoops(float dtSeconds) noexcept;
     void updateCloudSwaps(int numSamples) noexcept;
     void resetFeedback() noexcept;
     void processChunk(const float* const* inputs, int numInputs, int inputOffset, int offset, int numSamples) noexcept;
@@ -185,6 +190,7 @@ private:
     SpscQueue<TelemetryFrame> telemetryQueue;
     SpscQueue<EngineNotice> noticeQueue;
     SnapshotChannel<SceneSet> sceneChannel;
+    SnapshotChannel<SeasonSet> seasonChannel { 4 };
 
     // MIDI.
     std::array<std::unique_ptr<SpscQueue<RawMidi>>, kMaxMidiPorts> midiQueues;
@@ -242,6 +248,17 @@ private:
     float freezeGain = 0.0f;
     void captureFreeze() noexcept;
     void processFreeze(int offset, int numSamples) noexcept;
+
+    // Swell and seasons (modulation), incommensurate loops (note generator).
+    float swellEnv = 0.0f;
+    std::array<float, kMaxSeasons> seasonPhase {}, seasonValue {};
+    std::array<dsp::Drift, kMaxSeasons> seasonDrift;
+    std::uint64_t seasonVersion = 0;
+    static constexpr int kMaxLoops = 8;
+    std::array<float, kMaxLoops> loopPhase {}, loopNote {}, loopFlash {};
+    std::array<float, kMaxLoops> loopOffset {};
+    int loopPattern = -1;
+    dsp::Random loopRng;
 
     std::array<ChannelStrip, kNumStrips> strips;
     std::array<FxSlot, kNumFxSlots> fxSlots;

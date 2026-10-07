@@ -82,6 +82,20 @@ inline constexpr unsigned kDiscrete = 1u << 4;      // integer choice; scenes pi
     X(CatchSeconds,     "catch.seconds",      "Catch Length",      5.0f,  30.0f,   20.0f, Linear,  Linear,         0.0f,  "s",  kMidiLearnable | kPerformance) \
     X(CatchSource,      "catch.source",       "Catch Source",      0.0f,   1.0f,    0.0f, Linear,  Linear,         0.0f,  "",   kMidiLearnable | kDiscrete) \
     X(CatchTarget,      "catch.target",       "Catch Into",        0.0f,   4.0f,    0.0f, Linear,  Linear,         0.0f,  "",   kMidiLearnable | kDiscrete) \
+    X(SwellHold,        "swell.hold",         "Swell",             0.0f,   1.0f,    0.0f, Linear,  Linear,         0.0f,  "",   kMidiLearnable | kDiscrete | kPerformance) \
+    X(SwellDepth,       "swell.depth",        "Swell Depth",       0.0f,   1.0f,    0.7f, Linear,  Exponential,    0.2f,  "",   TF_TB_ML) \
+    X(SwellAttack,      "swell.attack",       "Swell Rise",        0.2f,  20.0f,    3.0f, Log,     Linear,         0.0f,  "s",  kMidiLearnable) \
+    X(SwellRelease,     "swell.release",      "Swell Ebb",         0.5f,  60.0f,   10.0f, Log,     Linear,         0.0f,  "s",  kMidiLearnable) \
+    X(SeasonsDepth,     "seasons.depth",      "Seasons",           0.0f,   1.0f,    1.0f, Linear,  Exponential,    0.5f,  "",   kMidiLearnable | kPerformance) \
+    X(LoopsOn,          "loops.on",           "Loops",             0.0f,   1.0f,    0.0f, Linear,  Linear,         0.0f,  "",   kMidiLearnable | kDiscrete | kPerformance) \
+    X(LoopsCount,       "loops.count",        "Voices",            1.0f,   8.0f,    5.0f, Linear,  Linear,         0.0f,  "",   TF_TB_ML | kDiscrete) \
+    X(LoopsRate,        "loops.rate",         "Pace",              0.25f,  4.0f,    1.0f, Log,     LogExponential, 0.5f,  "x",  TF_TB_ML | kTideScaled) \
+    X(LoopsDensity,     "loops.density",      "Density",           0.0f,   1.0f,    0.85f, Linear, Exponential,    0.3f,  "",   TF_TB_ML) \
+    X(LoopsRegister,    "loops.register",     "Register",         36.0f,  84.0f,   60.0f, Linear,  Linear,         0.0f,  "st", TF_TB_ML) \
+    X(LoopsSpread,      "loops.spread",       "Spread",            0.0f,   3.0f,    1.5f, Linear,  Linear,         0.0f,  "oct", TF_TB_ML) \
+    X(LoopsVelocity,    "loops.velocity",     "Velocity",          0.0f,   1.0f,    0.6f, Linear,  Exponential,    0.2f,  "",   TF_TB_ML) \
+    X(LoopsTarget,      "loops.target",       "Play Into",         0.0f,   2.0f,    0.0f, Linear,  Linear,         0.0f,  "",   kMidiLearnable | kDiscrete) \
+    X(LoopsPattern,     "loops.pattern",      "Pattern",           0.0f,  99.0f,    0.0f, Linear,  Linear,         0.0f,  "",   TF_TB_ML | kDiscrete) \
     X(BusALevel,        "busA.level",         "Reverb Return",   -60.0f,   6.0f,    0.0f, Decibel, Linear,         0.05f, "dB", TF_TB_ML | kPerformance) \
     X(BusBLevel,        "busB.level",         "Delay Return",    -60.0f,   6.0f,    0.0f, Decibel, Linear,         0.05f, "dB", TF_TB_ML | kPerformance) \
     X(DroneRoot,        "drone.root",         "Root Note",        24.0f,  72.0f,   38.0f, Linear,  Exponential,    0.8f,  "st", TF_TB_ML) \

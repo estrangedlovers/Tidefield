@@ -1,10 +1,13 @@
 #include "Session.h"
 
+#include <engine/mod/SeasonManager.h>
+
 #include "AudioFileIO.h"
 
 #include <engine/Engine.h>
 #include <engine/midi/MidiManager.h>
 #include <engine/mix/FxManager.h>
+#include <engine/mod/SeasonManager.h>
 #include <engine/scene/SceneManager.h>
 
 namespace tf::io {
@@ -126,8 +129,50 @@ std::vector<std::string> applyMidiJson(const juce::var& json, engine::MidiManage
     return warnings;
 }
 
+juce::var seasonsToJson(const engine::SeasonManager& seasons, const engine::ParamRegistry& reg)
+{
+    juce::Array<juce::var> list;
+    for (const auto& s : seasons.getSeasons())
+    {
+        auto* o = new juce::DynamicObject();
+        o->setProperty("param", juce::String(reg.spec(s.param).id));
+        o->setProperty("depth", s.depth);
+        o->setProperty("period", s.periodSeconds);
+        o->setProperty("shape", static_cast<int>(s.shape));
+        o->setProperty("phase", s.phase);
+        list.add(juce::var(o));
+    }
+    return list;
+}
+
+std::vector<std::string> applySeasonsJson(const juce::var& json, engine::SeasonManager& seasons, const engine::ParamRegistry& reg)
+{
+    std::vector<std::string> warnings;
+    std::vector<engine::Season> list;
+    if (const auto* arr = json.getArray())
+        for (const auto& v : *arr)
+        {
+            const auto id = v.getProperty("param", "").toString().toStdString();
+            const auto index = reg.find(id);
+            if (! index)
+            {
+                warnings.push_back("Season on unknown parameter '" + id + "'");
+                continue;
+            }
+            engine::Season s;
+            s.param = *index;
+            s.depth = static_cast<float>(static_cast<double>(v.getProperty("depth", 0.2)));
+            s.periodSeconds = static_cast<float>(static_cast<double>(v.getProperty("period", 300.0)));
+            s.shape = static_cast<engine::Season::Shape>(std::clamp(static_cast<int>(v.getProperty("shape", 0)), 0, 2));
+            s.phase = static_cast<float>(static_cast<double>(v.getProperty("phase", 0.0)));
+            list.push_back(s);
+        }
+    seasons.replaceAll(std::move(list));
+    return warnings;
+}
+
 SessionData captureSession(const engine::Engine& engine, const engine::TelemetryFrame& latest, const engine::SceneManager& scenes,
-                           const engine::FxManager& fx, const engine::MidiManager* midi)
+                           const engine::FxManager& fx, const engine::MidiManager* midi, const engine::SeasonManager* seasons)
 {
     const auto& reg = engine.getRegistry();
     SessionData s;
@@ -157,6 +202,8 @@ SessionData captureSession(const engine::Engine& engine, const engine::Telemetry
         s.samples["bloom"] = b;
     if (midi != nullptr)
         s.midi = midiToJson(*midi, reg);
+    if (seasons != nullptr)
+        s.seasons = seasonsToJson(*seasons, reg);
     return s;
 }
 
@@ -175,7 +222,8 @@ SessionData defaultSession(const engine::Engine& engine)
 }
 
 std::vector<std::string> applySession(const SessionData& session, engine::Engine& engine, engine::SceneManager& scenes,
-                                      engine::FxManager& fx, bool snap, engine::MidiManager* midi)
+                                      engine::FxManager& fx, bool snap, engine::MidiManager* midi,
+                                      engine::SeasonManager* seasons)
 {
     const auto& reg = engine.getRegistry();
     std::vector<std::string> warnings = session.warnings;
@@ -236,6 +284,9 @@ std::vector<std::string> applySession(const SessionData& session, engine::Engine
     const auto bloom = session.samples.find("bloom");
     engine.loadBloomSample(bloom != session.samples.end() ? bloom->second : nullptr);
 
+    if (seasons != nullptr)
+        for (auto& w : applySeasonsJson(session.seasons, *seasons, reg))
+            warnings.push_back(std::move(w));
     if (midi != nullptr)
         for (auto& w : applyMidiJson(session.midi, *midi, reg))
             warnings.push_back(std::move(w));
@@ -273,6 +324,8 @@ juce::var sessionToJson(const SessionData& s)
     root->setProperty("fx", juce::var(fx));
 
     root->setProperty("midi", s.midi);
+    if (s.seasons.isArray())
+        root->setProperty("seasons", s.seasons);
 
     auto* samples = new juce::DynamicObject();
     for (const auto& [slot, buffer] : s.samples)
@@ -327,6 +380,7 @@ std::optional<SessionData> sessionFromJson(const juce::var& json, juce::String& 
         for (const auto& prop : fx->getProperties())
             s.fx[prop.name.toString().toStdString()] = prop.value.toString().toStdString();
     s.midi = root->getProperty("midi");
+    s.seasons = root->getProperty("seasons");
     return s;
 }
 

@@ -33,6 +33,7 @@ public:
     engine::FxManager fx;
     engine::CatchManager catcher;
     engine::MidiManager midi;
+    engine::SeasonManager seasons;
     MidiInputs midiInputs;
     SessionController session;
     io::Recorder recorder;

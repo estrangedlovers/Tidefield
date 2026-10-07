@@ -17,6 +17,7 @@ class Engine;
 class FxManager;
 class MidiManager;
 class SceneManager;
+class SeasonManager;
 } // namespace tf::engine
 
 namespace tf::io {
@@ -42,6 +43,7 @@ struct SessionData
     std::vector<std::string> pins;
     std::map<std::string, std::string> fx;   // slot id -> processor type ("" = empty)
     juce::var midi;                          // MIDI mappings (phase 5)
+    juce::var seasons;                       // slow macro curves (phase 8): array of objects
     std::map<std::string, std::shared_ptr<const dsp::SampleBuffer>> samples; // "cloud1".."cloud4", "bloom"
 
     /** Things recall could not apply (unknown IDs from a newer version, etc.). */
@@ -50,18 +52,25 @@ struct SessionData
 
 /** Message thread: snapshot the running state. `latest` provides parameter targets. */
 SessionData captureSession(const engine::Engine& engine, const engine::TelemetryFrame& latest, const engine::SceneManager& scenes,
-                           const engine::FxManager& fx, const engine::MidiManager* midi = nullptr);
+                           const engine::FxManager& fx, const engine::MidiManager* midi = nullptr,
+                           const engine::SeasonManager* seasons = nullptr);
 
 /** Message thread: apply a session. With `snap` true, parameters jump (use while the
     master is faded out); otherwise they glide through their smoothers. The live layer
     is released. Returns warnings. */
 std::vector<std::string> applySession(const SessionData& session, engine::Engine& engine, engine::SceneManager& scenes,
-                                      engine::FxManager& fx, bool snap, engine::MidiManager* midi = nullptr);
+                                      engine::FxManager& fx, bool snap, engine::MidiManager* midi = nullptr,
+                                      engine::SeasonManager* seasons = nullptr);
 
 /** MIDI mapping <-> JSON. A session without a "midi" object leaves the current mapping
     alone (a controller setup usually belongs to the rig, not the piece). */
 juce::var midiToJson(const engine::MidiManager& midi, const engine::ParamRegistry& registry);
 std::vector<std::string> applyMidiJson(const juce::var& json, engine::MidiManager& midi, const engine::ParamRegistry& registry);
+
+/** Seasons <-> JSON ([{param, depth, period, shape, phase}]). Applying replaces every
+    season (an absent or empty list clears them). */
+juce::var seasonsToJson(const engine::SeasonManager& seasons, const engine::ParamRegistry& registry);
+std::vector<std::string> applySeasonsJson(const juce::var& json, engine::SeasonManager& seasons, const engine::ParamRegistry& registry);
 
 /** The default state: every parameter at its default, no scenes, default FX, no samples. */
 SessionData defaultSession(const engine::Engine& engine);

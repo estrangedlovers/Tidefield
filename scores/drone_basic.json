@@ -1,0 +1,14 @@
+{
+  "duration": 40,
+  "sampleRate": 48000,
+  "blockSize": 256,
+  "seed": 1,
+  "events": [
+    { "t": 0,  "param": "master.fadeSeconds", "value": 6 },
+    { "t": 0,  "cmd": "fadeIn" },
+    { "t": 10, "param": "drone.cutoff", "value": 2500 },
+    { "t": 15, "param": "drone.density", "value": 5 },
+    { "t": 20, "param": "drone.root", "value": 33 },
+    { "t": 30, "cmd": "fadeOut" }
+  ]
+}

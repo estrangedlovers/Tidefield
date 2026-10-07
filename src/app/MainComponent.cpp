@@ -1,0 +1,196 @@
+#include "MainComponent.h"
+
+namespace tf::app {
+
+namespace {
+
+const juce::Colour kBackground { 0xff12151a };
+const juce::Colour kPanel { 0xff1b2028 };
+const juce::Colour kText { 0xffc9d1d9 };
+const juce::Colour kAccent { 0xff7fb4c9 };
+const juce::Colour kWarn { 0xffc97f7f };
+
+const char* fadeStateName(engine::FadeState s)
+{
+    switch (s)
+    {
+        case engine::FadeState::Silent: return "silent";
+        case engine::FadeState::FadingIn: return "fading in";
+        case engine::FadeState::Open: return "open";
+        case engine::FadeState::FadingOut: return "fading out";
+    }
+    return "";
+}
+
+} // namespace
+
+MainComponent::MainComponent(AudioHost& h) : host(h), engine(h.getEngine())
+{
+    for (auto* b : { &settingsButton, &fadeInButton, &fadeOutButton, &panicButton })
+        addAndMakeVisible(*b);
+
+    panicButton.setColour(juce::TextButton::buttonColourId, kWarn.darker(0.6f));
+    settingsButton.onClick = [this] { showDeviceSettings(); };
+    fadeInButton.onClick = [this] { engine.command(engine::Command::FadeIn); };
+    fadeOutButton.onClick = [this] { engine.command(engine::Command::FadeOut); };
+    panicButton.onClick = [this] {
+        engine.command(lastFrame.panicActive ? engine::Command::ResumeFromPanic : engine::Command::Panic);
+    };
+
+    statusLabel.setColour(juce::Label::textColourId, kText);
+    statusLabel.setJustificationType(juce::Justification::centredLeft);
+    addAndMakeVisible(statusLabel);
+
+    using engine::P;
+    for (auto p : { P::MasterLevel, P::MasterFadeSecs, P::DroneLevel, P::DroneRoot, P::DroneCutoff, P::DroneResonance,
+                    P::DroneDensity, P::DroneEvolve, P::DroneDriftDepth, P::DroneDriftRate, P::DroneDetune, P::DroneShape,
+                    P::DroneNoise, P::DroneSpread, P::DroneWidth })
+        addParamControl(p);
+
+    setSize(980, 560);
+    startTimerHz(30);
+}
+
+MainComponent::~MainComponent() { stopTimer(); }
+
+void MainComponent::addParamControl(engine::P param)
+{
+    const auto& spec = engine.getRegistry().spec(param);
+    auto c = std::make_unique<ParamControl>();
+    c->param = param;
+
+    auto& s = c->slider;
+    s.setSliderStyle(juce::Slider::RotaryHorizontalVerticalDrag);
+    s.setTextBoxStyle(juce::Slider::TextBoxBelow, false, 80, 18);
+    s.setRange(spec.minValue, spec.maxValue);
+    if (spec.taper == engine::Taper::Log)
+        s.setSkewFactorFromMidPoint(std::sqrt(spec.minValue * spec.maxValue));
+    s.setValue(spec.defaultValue, juce::dontSendNotification);
+    s.setDoubleClickReturnValue(true, spec.defaultValue);
+    s.setTextValueSuffix(spec.unit.empty() ? juce::String() : " " + juce::String(spec.unit));
+    s.setNumDecimalPlacesToDisplay(spec.maxValue - spec.minValue > 100.0f ? 0 : 2);
+    s.setColour(juce::Slider::rotarySliderFillColourId, kAccent);
+    s.setColour(juce::Slider::textBoxTextColourId, kText);
+    s.setColour(juce::Slider::textBoxOutlineColourId, juce::Colours::transparentBlack);
+    s.onValueChange = [this, param, &s] { engine.setParam(param, static_cast<float>(s.getValue())); };
+
+    c->label.setText(spec.name, juce::dontSendNotification);
+    c->label.setJustificationType(juce::Justification::centred);
+    c->label.setColour(juce::Label::textColourId, kText.withAlpha(0.7f));
+
+    addAndMakeVisible(s);
+    addAndMakeVisible(c->label);
+    controls.push_back(std::move(c));
+}
+
+void MainComponent::showDeviceSettings()
+{
+    auto selector = std::make_unique<juce::AudioDeviceSelectorComponent>(host.getDeviceManager(), 0, 2, 2, 2, false, false,
+                                                                           true, false);
+    selector->setSize(520, 420);
+
+    juce::DialogWindow::LaunchOptions options;
+    options.content.setOwned(selector.release());
+    options.dialogTitle = "Audio Settings";
+    options.dialogBackgroundColour = kPanel;
+    options.useNativeTitleBar = true;
+    options.resizable = false;
+    auto* window = options.launchAsync();
+    juce::ignoreUnused(window);
+}
+
+void MainComponent::timerCallback()
+{
+    engine::TelemetryFrame f;
+    bool got = false;
+    while (engine.popTelemetry(f))
+        got = true;
+    if (got)
+        lastFrame = f;
+
+    engine::EngineNotice notice;
+    while (engine.popNotice(notice))
+        if (notice.type == engine::EngineNotice::Type::GuardTripped)
+            juce::Logger::writeToLog("Safety guard tripped");
+
+    // Meters fall slowly so the motion stays calm.
+    meterL = std::max(lastFrame.peakL, meterL * 0.85f);
+    meterR = std::max(lastFrame.peakR, meterR * 0.85f);
+
+    panicButton.setButtonText(lastFrame.panicActive ? "Resume" : "PANIC");
+    statusLabel.setText(juce::String::formatted("CPU %4.1f%%   xruns %d   master %s   limiter %4.1f dB   guard trips %u",
+                                                host.getCpuLoad() * 100.0, host.getXrunCount(),
+                                                fadeStateName(lastFrame.fadeState),
+                                                juce::Decibels::gainToDecibels(lastFrame.limiterGain),
+                                                lastFrame.guardTrips),
+                        juce::dontSendNotification);
+    repaint(meterArea);
+    repaint(voicesArea);
+}
+
+void MainComponent::paint(juce::Graphics& g)
+{
+    g.fillAll(kBackground);
+
+    g.setColour(kText);
+    g.setFont(juce::FontOptions(22.0f));
+    g.drawText("Tidefield", 20, 14, 300, 30, juce::Justification::centredLeft);
+
+    // Peak meters.
+    g.setColour(kPanel);
+    g.fillRoundedRectangle(meterArea.toFloat(), 4.0f);
+    auto drawBar = [&](juce::Rectangle<int> r, float peak) {
+        const float db = juce::Decibels::gainToDecibels(peak, -60.0f);
+        const float h = juce::jmap(db, -60.0f, 0.0f, 0.0f, static_cast<float>(r.getHeight()));
+        g.setColour(db > -1.5f ? kWarn : kAccent);
+        g.fillRect(r.toFloat().removeFromBottom(h));
+    };
+    auto inner = meterArea.reduced(6);
+    drawBar(inner.removeFromLeft(inner.getWidth() / 2).reduced(2, 0), meterL);
+    drawBar(inner.reduced(2, 0), meterR);
+
+    // Drone voices: one dot per voice, brightness = level, height = interval.
+    const auto voices = voicesArea;
+    g.setColour(kPanel);
+    g.fillRoundedRectangle(voices.toFloat(), 6.0f);
+    for (int v = 0; v < 6; ++v)
+    {
+        const float level = lastFrame.droneVoiceLevel[static_cast<size_t>(v)];
+        const float interval = lastFrame.droneVoiceInterval[static_cast<size_t>(v)];
+        const float x = static_cast<float>(voices.getX()) + static_cast<float>(voices.getWidth()) * (static_cast<float>(v) + 0.5f) / 6.0f;
+        const float y = juce::jmap(interval, -12.0f, 24.0f, static_cast<float>(voices.getBottom()) - 12.0f, static_cast<float>(voices.getY()) + 12.0f);
+        const float r = 4.0f + 8.0f * level;
+        g.setColour(kAccent.withAlpha(0.15f + 0.85f * level));
+        g.fillEllipse(x - r, y - r, 2.0f * r, 2.0f * r);
+    }
+}
+
+void MainComponent::resized()
+{
+    auto area = getLocalBounds().reduced(20);
+    auto top = area.removeFromTop(40);
+    top.removeFromLeft(140);
+    settingsButton.setBounds(top.removeFromLeft(130).reduced(4));
+    fadeInButton.setBounds(top.removeFromLeft(100).reduced(4));
+    fadeOutButton.setBounds(top.removeFromLeft(100).reduced(4));
+    panicButton.setBounds(top.removeFromRight(120).reduced(4));
+
+    statusLabel.setBounds(area.removeFromTop(28));
+    voicesArea = getLocalBounds().removeFromBottom(90).reduced(20, 10);
+    area.removeFromBottom(90);
+    meterArea = area.removeFromRight(50).reduced(0, 10);
+
+    constexpr int kColumns = 8;
+    const int cellW = area.getWidth() / kColumns;
+    const int cellH = 150;
+    for (std::size_t i = 0; i < controls.size(); ++i)
+    {
+        const int col = static_cast<int>(i) % kColumns;
+        const int row = static_cast<int>(i) / kColumns;
+        juce::Rectangle<int> cell(area.getX() + col * cellW, area.getY() + row * cellH, cellW, cellH);
+        controls[i]->label.setBounds(cell.removeFromTop(20));
+        controls[i]->slider.setBounds(cell.reduced(6));
+    }
+}
+
+} // namespace tf::app

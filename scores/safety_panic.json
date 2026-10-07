@@ -1,0 +1,17 @@
+{
+  "duration": 12,
+  "sampleRate": 48000,
+  "blockSize": 128,
+  "randomBlockSizes": true,
+  "seed": 3,
+  "events": [
+    { "t": 0, "param": "master.fadeSeconds", "value": 0.5 },
+    { "t": 0, "param": "master.level", "value": 6 },
+    { "t": 0, "param": "drone.level", "value": 6 },
+    { "t": 0, "param": "drone.resonance", "value": 0.95 },
+    { "t": 0, "param": "drone.density", "value": 6 },
+    { "t": 0, "cmd": "fadeIn" },
+    { "t": 5, "cmd": "panic" },
+    { "t": 8, "cmd": "resume" }
+  ]
+}

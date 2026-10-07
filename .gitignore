@@ -1,0 +1,10 @@
+build/
+cmake-build-*/
+out/
+.idea/
+.vscode/
+.DS_Store
+node_modules/
+ui/dist/
+*.wav
+!resources/**/*.wav

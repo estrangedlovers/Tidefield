@@ -164,27 +164,51 @@ void GranularCloud::process(float* left, float* right, int n, float timeScale) n
         }
     }
 
+    const bool stereo = srcR != srcL;
     for (auto& g : grains)
     {
         if (! g.active)
             continue;
         const float invLength = 1.0f / static_cast<float>(g.length);
-        for (int i = 0; i < n; ++i)
+        // The window changes slowly against a chunk (<= 32 samples; grains are >= 10 ms),
+        // so it is evaluated at the chunk's ends and interpolated: two table blends per
+        // chunk instead of one per sample (error below -50 dB).
+        const int run = std::min(n, g.length - g.age);
+        const float w0 = windowAt(static_cast<float>(g.age) * invLength, g.windowMix) * norm;
+        const float w1 = windowAt(static_cast<float>(g.age + run) * invLength, g.windowMix) * norm;
+        const float wStep = run > 0 ? (w1 - w0) / static_cast<float>(run) : 0.0f;
+        float w = w0;
+        const float gl = g.gainL, gr = g.gainR;
+        double pos = g.readPos;
+        const double inc = g.increment;
+        for (int i = 0; i < run; ++i)
         {
-            if (g.age >= g.length)
+            float sl, sr;
+            const auto k = static_cast<std::size_t>(pos);
+            if (pos >= 1.0 && k + 2 < size)
             {
-                g.active = false;
-                --activeCount;
-                break;
+                // Interior: one index for both channels, no bounds checks.
+                const float t = static_cast<float>(pos - static_cast<double>(k));
+                sl = hermite(srcL[k - 1], srcL[k], srcL[k + 1], srcL[k + 2], t);
+                sr = stereo ? hermite(srcR[k - 1], srcR[k], srcR[k + 1], srcR[k + 2], t) : sl;
             }
-            const float w = windowAt(static_cast<float>(g.age) * invLength, g.windowMix) * norm;
-            const float sl = readHermite(srcL, size, g.readPos);
-            const float sr = srcR == srcL ? sl : readHermite(srcR, size, g.readPos);
+            else
+            {
+                sl = readHermite(srcL, size, pos);
+                sr = stereo ? readHermite(srcR, size, pos) : sl;
+            }
             // Pan a mono read in full; for stereo sources the pan narrows to a balance.
-            left[i] += sl * w * g.gainL;
-            right[i] += sr * w * g.gainR;
-            g.readPos += g.increment;
-            ++g.age;
+            left[i] += sl * w * gl;
+            right[i] += sr * w * gr;
+            pos += inc;
+            w += wStep;
+        }
+        g.readPos = pos;
+        g.age += run;
+        if (g.age >= g.length)
+        {
+            g.active = false;
+            --activeCount;
         }
     }
 }

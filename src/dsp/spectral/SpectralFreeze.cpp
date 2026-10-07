@@ -20,8 +20,8 @@ void SpectralFreeze::prepare(const ProcessSpec& s, std::uint64_t seed)
     work.assign(kSize, {});
     avgMag.assign(kBins, 0.0f);
     frozenMag.assign(kBins, 0.0f);
-    phaseL.assign(kBins, 0.0f);
-    phaseR.assign(kBins, 0.0f);
+    for (auto* v : { &rotLRe, &rotLIm, &rotRRe, &rotRIm })
+        v->assign(kBins, 0.0f);
     olaL.assign(kSize, 0.0f);
     olaR.assign(kSize, 0.0f);
     reset();
@@ -33,10 +33,14 @@ void SpectralFreeze::reset() noexcept
     std::fill(avgMag.begin(), avgMag.end(), 0.0f);
     std::fill(olaL.begin(), olaL.end(), 0.0f);
     std::fill(olaR.begin(), olaR.end(), 0.0f);
-    for (std::size_t k = 0; k < phaseL.size(); ++k)
+    for (std::size_t k = 0; k < rotLRe.size(); ++k)
     {
-        phaseL[k] = kTwoPi * rng.nextFloat();
-        phaseR[k] = kTwoPi * rng.nextFloat();
+        const float pl = kTwoPi * rng.nextFloat();
+        const float pr = kTwoPi * rng.nextFloat();
+        rotLRe[k] = std::cos(pl);
+        rotLIm[k] = std::sin(pl);
+        rotRRe[k] = std::cos(pr);
+        rotRIm[k] = std::sin(pr);
     }
     inPos = hopCount = olaPos = 0;
     frozen = haveSpectrum = false;
@@ -60,7 +64,8 @@ void SpectralFreeze::analyse() noexcept
     fft.forward(work.data());
     for (int k = 0; k < kBins; ++k)
     {
-        const float m = std::abs(work[static_cast<std::size_t>(k)]);
+        const auto& x = work[static_cast<std::size_t>(k)];
+        const float m = std::sqrt(x.real() * x.real() + x.imag() * x.imag());
         auto& a = avgMag[static_cast<std::size_t>(k)];
         a = flushDenormal(0.5f * a + 0.5f * m);
     }
@@ -74,16 +79,32 @@ void SpectralFreeze::synthesise() noexcept
     const float jitter = drift * kPi;
     for (int ch = 0; ch < 2; ++ch)
     {
-        auto& phase = ch == 0 ? phaseL : phaseR;
+        auto& rotRe = ch == 0 ? rotLRe : rotRRe;
+        auto& rotIm = ch == 0 ? rotLIm : rotRIm;
         auto& ola = ch == 0 ? olaL : olaR;
         for (int k = 0; k < kBins; ++k)
         {
-            auto& p = phase[static_cast<std::size_t>(k)];
-            // Centre-frequency advance per hop is 2*pi*k*hop/size = k*pi/2.
-            p += 0.5f * kPi * static_cast<float>(k & 3) + jitter * (rng.nextFloat() - 0.5f);
-            p -= kTwoPi * std::floor(p * (1.0f / kTwoPi));
-            const float m = frozenMag[static_cast<std::size_t>(k)];
-            work[static_cast<std::size_t>(k)] = { m * std::cos(p), m * std::sin(p) };
+            const auto uk = static_cast<std::size_t>(k);
+            float r = rotRe[uk], i = rotIm[uk];
+            // Centre-frequency advance per hop is 2*pi*k*hop/size = k*pi/2: an exact
+            // quarter-turn rotation, applied by swapping components.
+            switch (k & 3)
+            {
+                case 1: { const float t = r; r = -i; i = t; break; }
+                case 2: r = -r; i = -i; break;
+                case 3: { const float t = r; r = i; i = -t; break; }
+                default: break;
+            }
+            // Plus a small random turn (drift), renormalised.
+            const float a = jitter * (rng.nextFloat() - 0.5f);
+            const float c = 1.0f - 0.5f * a * a;
+            const float nr = r * c - i * a;
+            const float ni = r * a + i * c;
+            const float norm = 1.0f / std::sqrt(nr * nr + ni * ni);
+            rotRe[uk] = nr * norm;
+            rotIm[uk] = ni * norm;
+            const float m = frozenMag[uk];
+            work[uk] = { m * rotRe[uk], m * rotIm[uk] };
         }
         work[0] = { work[0].real(), 0.0f };
         work[kSize / 2] = { work[kSize / 2].real(), 0.0f };

@@ -39,7 +39,8 @@ void SpectralBlur::prepare(const ProcessSpec& spec)
         c.in.assign(kSize, 0.0f);
         c.ola.assign(kSize, 0.0f);
         c.mag.assign(kBins, 0.0f);
-        c.drift.assign(kBins, 0.0f);
+        c.rotRe.assign(kBins, 1.0f);
+        c.rotIm.assign(kBins, 0.0f);
         c.spectrum.assign(kSize, {});
     }
     appliedTone = -1.0f;
@@ -53,7 +54,8 @@ void SpectralBlur::reset() noexcept
         std::fill(c.in.begin(), c.in.end(), 0.0f);
         std::fill(c.ola.begin(), c.ola.end(), 0.0f);
         std::fill(c.mag.begin(), c.mag.end(), 0.0f);
-        std::fill(c.drift.begin(), c.drift.end(), 0.0f);
+        std::fill(c.rotRe.begin(), c.rotRe.end(), 1.0f);
+        std::fill(c.rotIm.begin(), c.rotIm.end(), 0.0f);
     }
     pos = hopCount = 0;
 }
@@ -94,7 +96,8 @@ void SpectralBlur::hop(Channel& ch) noexcept
     for (int k = 0; k < kBins; ++k)
     {
         auto& m = ch.mag[static_cast<std::size_t>(k)];
-        m = flushDenormal(m + follow * (std::abs(ch.spectrum[static_cast<std::size_t>(k)]) - m));
+        const auto& x = ch.spectrum[static_cast<std::size_t>(k)];
+        m = flushDenormal(m + follow * (std::sqrt(x.real() * x.real() + x.imag() * x.imag()) - m));
     }
 
     // Smear: a box average across up to +-16 bins (prefix sums).
@@ -121,12 +124,26 @@ void SpectralBlur::hop(Channel& ch) noexcept
             m += shimmer * 0.7f * mags[uk / 2];
         m *= tilt[uk];
 
-        // Phase: the input's own, plus a wandering offset that grows with Drift.
-        auto& d = ch.drift[uk];
-        d += jitter * (rng.nextFloat() - 0.5f);
-        d -= kTwoPi * std::floor(d * (1.0f / kTwoPi));
-        const float phase = std::arg(ch.spectrum[uk]) + d;
-        ch.spectrum[uk] = { m * std::cos(phase), m * std::sin(phase) };
+        // Phase: the input's own, turned by a rotor that random-walks with Drift. Small
+        // rotations (cos ~ 1 - a^2/2, sin ~ a) plus renormalising keep it trig-free.
+        float& rr = ch.rotRe[uk];
+        float& ri = ch.rotIm[uk];
+        if (jitter > 0.0f)
+        {
+            const float a = jitter * (rng.nextFloat() - 0.5f);
+            const float c = 1.0f - 0.5f * a * a;
+            const float nr = rr * c - ri * a;
+            const float ni = rr * a + ri * c;
+            const float norm = 1.0f / std::sqrt(nr * nr + ni * ni);
+            rr = nr * norm;
+            ri = ni * norm;
+        }
+        const auto x = ch.spectrum[uk];
+        const float xm = std::sqrt(x.real() * x.real() + x.imag() * x.imag());
+        // Unit phase of the input bin (or of the rotor alone where the bin is empty).
+        const float ur = xm > 1.0e-20f ? x.real() / xm : 1.0f;
+        const float ui = xm > 1.0e-20f ? x.imag() / xm : 0.0f;
+        ch.spectrum[uk] = { m * (ur * rr - ui * ri), m * (ur * ri + ui * rr) };
     }
     ch.spectrum[0] = { ch.spectrum[0].real(), 0.0f };
     ch.spectrum[kSize / 2] = { ch.spectrum[kSize / 2].real(), 0.0f };

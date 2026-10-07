@@ -53,7 +53,7 @@ private:
     std::vector<float> inRing;            // last kSize input samples
     std::vector<Fft::Complex> work;
     std::vector<float> avgMag, frozenMag;
-    std::vector<float> phaseL, phaseR;
+    std::vector<float> rotLRe, rotLIm, rotRRe, rotRIm; // per-bin unit phasors
     std::vector<float> olaL, olaR;        // overlap-add accumulators (kSize)
     int inPos = 0;                        // write position in inRing
     int hopCount = 0;

@@ -56,12 +56,19 @@ private:
             for (int start = 0; start < size; start += len)
                 for (int k = 0; k < half; ++k)
                 {
-                    auto w = twiddles[static_cast<std::size_t>(k * step)];
-                    if (inv)
-                        w = std::conj(w);
-                    const Complex t = w * x[start + k + half];
-                    x[start + k + half] = x[start + k] - t;
-                    x[start + k] += t;
+                    // Written out: std::complex's operator* takes the slow NaN-safe
+                    // library path unless built with fast-math.
+                    const auto& w = twiddles[static_cast<std::size_t>(k * step)];
+                    const float wr = w.real();
+                    const float wi = inv ? -w.imag() : w.imag();
+                    auto& a = x[start + k];
+                    auto& b = x[start + k + half];
+                    const float br = b.real(), bi = b.imag();
+                    const float tr = wr * br - wi * bi;
+                    const float ti = wr * bi + wi * br;
+                    const float ar = a.real(), ai = a.imag();
+                    b = { ar - tr, ai - ti };
+                    a = { ar + tr, ai + ti };
                 }
         }
     }

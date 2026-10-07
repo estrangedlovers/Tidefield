@@ -929,8 +929,15 @@ void Engine::processChunk(const float* const* inputs, int numInputs, int inputOf
         inputWritten.store(pos, std::memory_order_release);
     }
 
-    // 2. Drone.
-    drone.process(L(StripId::Drone), R(StripId::Drone), n, tide);
+    // 2. Drone (skipped while its strip is fully muted and nothing listens to it).
+    const bool droneHeard = ! strips[static_cast<std::size_t>(StripId::Drone)].isSilent() || params.current(P::ResExciteDrone) > 0.0f;
+    if (droneHeard)
+        drone.process(L(StripId::Drone), R(StripId::Drone), n, tide);
+    else
+    {
+        std::fill_n(L(StripId::Drone), n, 0.0f);
+        std::fill_n(R(StripId::Drone), n, 0.0f);
+    }
 
     // 3. Clouds, with fade-out / swap / fade-in when a new sample arrives.
     const float swapStep = 1.0f / static_cast<float>(kCloudSwapSeconds * sampleRate);
@@ -1012,7 +1019,13 @@ void Engine::processChunk(const float* const* inputs, int numInputs, int inputOf
         ex[i] = in[i] * exIn + 0.5f * (L(StripId::Drone)[i] + R(StripId::Drone)[i]) * exDrone + 0.25f * cloudsMono * exClouds
                 + 0.5f * (L(StripId::Bloom)[i] + R(StripId::Bloom)[i]) * exBloom;
     }
-    resonator.process(ex, L(StripId::Resonator), R(StripId::Resonator), n, tide);
+    if (! strips[static_cast<std::size_t>(StripId::Resonator)].isSilent())
+        resonator.process(ex, L(StripId::Resonator), R(StripId::Resonator), n, tide);
+    else
+    {
+        std::fill_n(L(StripId::Resonator), n, 0.0f);
+        std::fill_n(R(StripId::Resonator), n, 0.0f);
+    }
 
     // 6. The input strip: the live signal (gated by the monitor arm, ramped across the
     //    tick) plus the spectral freeze pad, which sounds whether or not it is armed.

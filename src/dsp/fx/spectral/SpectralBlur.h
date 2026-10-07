@@ -40,7 +40,7 @@ public:
 private:
     struct Channel
     {
-        std::vector<float> in, ola, mag, drift;
+        std::vector<float> in, ola, mag, rotRe, rotIm; // rotor: each bin's wandering phase offset
         std::vector<Fft::Complex> spectrum;
     };
     void hop(Channel& ch) noexcept;

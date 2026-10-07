@@ -8,11 +8,17 @@
 
 namespace tf::app {
 
-AppCore::AppCore(AudioHost& h)
+AppCore::AppCore(Host& h)
     : host(h), engine(h.getEngine()), scenes(h.getEngine()), fx(h.getEngine()), catcher(h.getEngine()), midi(h.getEngine()), seasons(h.getEngine()), paths(h.getEngine()),
-      midiInputs(h.getEngine(), h.getSettings()), session(h.getEngine(), scenes, fx, &midi, &seasons, &paths), recorder(h.getEngine().getRecordTap())
+      session(h.getEngine(), scenes, fx, &midi, &seasons, &paths), recorder(h.getEngine().getRecordTap())
 {
     engine.setGuardrailsEnabled(true);
+    const auto& registry = engine.getRegistry();
+    for (engine::ParamIndex i = 0; i < engine::kNumParams; ++i)
+        lastFrame.paramTargets[i] = registry.spec(i).defaultValue;
+    session.onApplied = [this](const io::SessionData& s) { seedTargets(s); };
+    if (h.getDeviceManager() != nullptr)
+        midiInputs = std::make_unique<MidiInputs>(engine, h.getSettings());
     fxjuce::registerUserEffects(); // before any slot or session asks for an FX type
     fx.loadDefaultLayout();
     loadRigMidi();
@@ -76,7 +82,7 @@ void AppCore::startRecording()
 {
     if (recorder.isActive())
         return;
-    if (host.getDeviceManager().getCurrentAudioDevice() == nullptr)
+    if (! host.isRunning())
     {
         status("No audio device is running, so there is nothing to record.", true);
         return;
@@ -124,6 +130,17 @@ void AppCore::loadFactoryContent()
     // loaded and a terrain of starter scenes.
     session.makeNewSession = [this] { return makeStarterSession(engine); };
     session.newSession();
+}
+
+void AppCore::seedTargets(const io::SessionData& s)
+{
+    const auto& registry = engine.getRegistry();
+    for (engine::ParamIndex i = 0; i < engine::kNumParams; ++i)
+    {
+        const auto it = s.params.find(registry.spec(i).id);
+        lastFrame.paramTargets[i] = it != s.params.end() ? registry.spec(i).clamp(it->second) : registry.spec(i).defaultValue;
+    }
+    lastFrame.live.fill(0);
 }
 
 void AppCore::loadRigMidi()

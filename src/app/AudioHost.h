@@ -1,5 +1,7 @@
 #pragma once
 
+#include "Host.h"
+
 #include <engine/Engine.h>
 
 #include <juce_audio_devices/juce_audio_devices.h>
@@ -11,21 +13,23 @@ namespace tf::app {
 /** Owns the audio device and the engine. The device callback forwards straight to
     Engine::process; everything else (settings, persistence) happens on the message
     thread. */
-class AudioHost final : private juce::AudioIODeviceCallback
+class AudioHost final : public Host, private juce::AudioIODeviceCallback
 {
 public:
     explicit AudioHost(juce::PropertiesFile& settings);
     ~AudioHost() override;
 
-    engine::Engine& getEngine() noexcept { return engine; }
-    juce::AudioDeviceManager& getDeviceManager() noexcept { return deviceManager; }
+    engine::Engine& getEngine() noexcept override { return engine; }
+    juce::AudioDeviceManager* getDeviceManager() noexcept override { return &deviceManager; }
 
     /** 0..1 share of the callback's time budget, smoothed by JUCE. */
-    double getCpuLoad() const { return loadMeasurer.getLoadAsProportion(); }
+    double getCpuLoad() const override { return loadMeasurer.getLoadAsProportion(); }
     int getXrunCount() const { return loadMeasurer.getXRunCount(); }
+    bool isRunning() const override { return deviceManager.getCurrentAudioDevice() != nullptr; }
+    juce::String describeOutput() const override;
 
     void saveDeviceState();
-    juce::PropertiesFile& getSettings() noexcept { return settings; }
+    juce::PropertiesFile& getSettings() noexcept override { return settings; }
 
 private:
     void audioDeviceIOCallbackWithContext(const float* const* inputs, int numInputs, float* const* outputs, int numOutputs,

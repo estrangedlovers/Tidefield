@@ -72,6 +72,7 @@ private:
     std::vector<std::uint8_t> touching;
     std::vector<float> local;
     std::vector<int> holdFrames; // frames to keep the local value after a set (telemetry lags)
+    std::vector<std::uint8_t> setHere;
 };
 
 } // namespace tf::app::gui

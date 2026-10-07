@@ -17,6 +17,7 @@ Model::Model(AppCore& c) : core(c), engine(c.engine), registry(c.engine.getRegis
     for (engine::ParamIndex i = 0; i < engine::kNumParams; ++i)
         local[i] = registry.spec(i).defaultValue;
     holdFrames.assign(engine::kNumParams, 0);
+    setHere.assign(engine::kNumParams, 0);
 }
 
 void Model::tick()
@@ -33,8 +34,8 @@ void Model::tick()
 float Model::value(P p) const noexcept
 {
     const auto i = engine::idx(p);
-    // Without telemetry (no audio device running) the last value set is the best guess.
-    if (touching[i] != 0 || holdFrames[i] > 0 || frame().sampleTime == 0)
+    // Without telemetry (no audio running) a value set here is the best guess.
+    if (touching[i] != 0 || holdFrames[i] > 0 || (frame().sampleTime == 0 && setHere[i] != 0))
         return local[i];
     return frame().paramTargets[i];
 }
@@ -50,6 +51,7 @@ void Model::set(P p, float v)
     const auto i = engine::idx(p);
     const float clamped = spec(p).clamp(v);
     local[i] = clamped;
+    setHere[i] = 1;
     holdFrames[i] = kHoldFrames;
     engine.post(engine::ControlEvent::setParam(i, clamped));
 }

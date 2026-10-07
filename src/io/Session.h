@@ -83,6 +83,10 @@ SessionData defaultSession(const engine::Engine& engine);
 bool saveSession(const SessionData& session, const juce::File& file, juce::String& error);
 std::optional<SessionData> loadSession(const juce::File& file, juce::String& error);
 
+/** The same format in memory (a plugin's state in a DAW project). */
+bool writeSession(const SessionData& session, juce::OutputStream& out, juce::String& error);
+std::optional<SessionData> readSession(const void* data, std::size_t size, juce::String& error);
+
 /** JSON form (no audio), exposed for tests and tooling. */
 juce::var sessionToJson(const SessionData& session);
 std::optional<SessionData> sessionFromJson(const juce::var& json, juce::String& error);

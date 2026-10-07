@@ -50,7 +50,7 @@ private:
     void glideToScene(int index, bool jump);
 
     AppCore& core;
-    LookAndFeel lookAndFeel;
+    juce::SharedResourcePointer<LookAndFeel> lookAndFeel; // one per process, shared by every open window
     Model model;
     std::unique_ptr<TopBar> topBar;
     std::unique_ptr<Browser> browser;

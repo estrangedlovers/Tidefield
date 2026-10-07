@@ -413,7 +413,7 @@ std::optional<SessionData> sessionFromJson(const juce::var& json, juce::String& 
     return s;
 }
 
-bool saveSession(const SessionData& s, const juce::File& file, juce::String& error)
+bool writeSession(const SessionData& s, juce::OutputStream& out, juce::String& error)
 {
     juce::ZipFile::Builder zip;
     const auto now = juce::Time::getCurrentTime();
@@ -430,7 +430,16 @@ bool saveSession(const SessionData& s, const juce::File& file, juce::String& err
         // FLAC is already compressed: store it.
         zip.addEntry(std::make_unique<juce::MemoryInputStream>(std::move(flac)), 0, "audio/" + juce::String(slot) + ".flac", now);
     }
+    if (! zip.writeToStream(out, nullptr))
+    {
+        error = "Writing the session failed";
+        return false;
+    }
+    return true;
+}
 
+bool saveSession(const SessionData& s, const juce::File& file, juce::String& error)
+{
     const auto temp = file.getSiblingFile(file.getFileName() + ".saving");
     {
         juce::FileOutputStream out(temp);
@@ -441,9 +450,9 @@ bool saveSession(const SessionData& s, const juce::File& file, juce::String& err
         }
         out.setPosition(0);
         out.truncate();
-        if (! zip.writeToStream(out, nullptr))
+        if (! writeSession(s, out, error))
         {
-            error = "Writing the session failed";
+            out.flush();
             temp.deleteFile();
             return false;
         }
@@ -457,13 +466,14 @@ bool saveSession(const SessionData& s, const juce::File& file, juce::String& err
     return true;
 }
 
-std::optional<SessionData> loadSession(const juce::File& file, juce::String& error)
+namespace {
+
+std::optional<SessionData> loadFromZip(juce::ZipFile& zip, const juce::String& what, juce::String& error)
 {
-    juce::ZipFile zip(file);
     const auto* entry = zip.getEntry(kJsonEntry);
     if (entry == nullptr)
     {
-        error = file.getFileName() + " is not a Tidefield session";
+        error = what + " is not a Tidefield session";
         return std::nullopt;
     }
     std::unique_ptr<juce::InputStream> jsonStream(zip.createStreamForEntry(*entry));
@@ -502,6 +512,21 @@ std::optional<SessionData> loadSession(const juce::File& file, juce::String& err
         }
     }
     return session;
+}
+
+} // namespace
+
+std::optional<SessionData> loadSession(const juce::File& file, juce::String& error)
+{
+    juce::ZipFile zip(file);
+    return loadFromZip(zip, file.getFileName(), error);
+}
+
+std::optional<SessionData> readSession(const void* data, std::size_t size, juce::String& error)
+{
+    juce::MemoryInputStream stream(data, size, false);
+    juce::ZipFile zip(stream);
+    return loadFromZip(zip, "The saved state", error);
 }
 
 } // namespace tf::io

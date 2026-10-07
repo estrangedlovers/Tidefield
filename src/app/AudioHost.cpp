@@ -24,6 +24,14 @@ AudioHost::~AudioHost()
     deviceManager.closeAudioDevice();
 }
 
+juce::String AudioHost::describeOutput() const
+{
+    auto* device = deviceManager.getCurrentAudioDevice();
+    if (device == nullptr)
+        return {};
+    return device->getName() + "  " + juce::String(device->getCurrentSampleRate() / 1000.0, 1) + " kHz";
+}
+
 void AudioHost::saveDeviceState()
 {
     if (const auto xml = deviceManager.createStateXml())

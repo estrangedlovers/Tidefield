@@ -80,6 +80,8 @@ void SessionController::applyNow()
     const bool resume = waitingForFadeOut;
     waitingForFadeOut = false;
     auto warnings = io::applySession(*pending, engine, scenes, fx, true, midi, seasons, path);
+    if (onApplied)
+        onApplied(*pending);
     const auto fadeIt = pending->params.find("master.fadeSeconds");
     const float sessionFade = fadeIt != pending->params.end() ? fadeIt->second
                                                               : engine.getRegistry().spec(engine::P::MasterFadeSecs).defaultValue;

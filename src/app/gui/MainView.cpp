@@ -6,6 +6,7 @@
 
 #include <juce_audio_utils/juce_audio_utils.h>
 
+#include <string_view>
 #include <thread>
 
 namespace tf::app::gui {
@@ -19,6 +20,7 @@ constexpr int kStatusH = 24;
 constexpr int kBrowserW = 214;
 constexpr int kMacroW = 244;
 constexpr int kPadsH = 78;
+int openViews = 0; // message thread only
 
 juce::String clock(double seconds)
 {
@@ -177,6 +179,7 @@ public:
         audio.onClick = [this] { view.showAudioSettings(); };
         for (auto* c : std::initializer_list<juce::Component*> { &sessionButton, &fade, &panic, &keys, &audio, &meter, &rec, &autoMaster })
             addAndMakeVisible(c);
+        audio.setVisible(model.core.host.getDeviceManager() != nullptr); // in a DAW, the DAW owns the device
     }
     ~TopBar() override { model.remove(this); }
 
@@ -242,12 +245,12 @@ public:
         g.drawText("Tidefield", mark.withTrimmedLeft(24.0f), juce::Justification::centredLeft);
 
         // Device and load.
-        auto* device = model.core.host.getDeviceManager().getCurrentAudioDevice();
         const auto& f = model.frame();
         const float load = f.dspLoad > 0.0f ? f.dspLoad : static_cast<float>(model.core.host.getCpuLoad());
         g.setFont(font(11.5f, 500));
         auto a = cpuArea.toFloat();
-        if (device == nullptr)
+        const auto output = model.core.host.describeOutput();
+        if (output.isEmpty())
         {
             g.setColour(colour::warn);
             g.drawText("No audio output", a, juce::Justification::centredRight);
@@ -258,8 +261,7 @@ public:
         const auto cpu = juce::String(pct) + "% CPU" + (f.guardLevel > 0 ? "  lite " + juce::String(f.guardLevel) : juce::String());
         g.drawText(cpu, a.removeFromRight(90.0f), juce::Justification::centredRight);
         g.setColour(colour::textFaint);
-        g.drawText(device->getName() + "  " + juce::String(juce::roundToInt(device->getCurrentSampleRate() / 100.0) / 10.0, 1) + " kHz", a,
-                   juce::Justification::centredRight, true);
+        g.drawText(output, a, juce::Justification::centredRight, true);
     }
 
 private:
@@ -731,7 +733,8 @@ private:
 
 MainView::MainView(AppCore& c) : core(c), model(c)
 {
-    juce::LookAndFeel::setDefaultLookAndFeel(&lookAndFeel);
+    ++openViews;
+    juce::LookAndFeel::setDefaultLookAndFeel(&lookAndFeel.get());
     setOpaque(true);
     setWantsKeyboardFocus(true);
 
@@ -774,7 +777,8 @@ MainView::~MainView()
     terrain.reset();
     browser.reset();
     topBar.reset();
-    juce::LookAndFeel::setDefaultLookAndFeel(nullptr);
+    if (--openViews == 0) // the last window (several plugin instances may be open)
+        juce::LookAndFeel::setDefaultLookAndFeel(nullptr);
 }
 
 void MainView::frame()
@@ -934,7 +938,8 @@ bool MainView::keyPressed(const juce::KeyPress& key)
         return true;
     }
 
-    if (key == juce::KeyPress::spaceKey)
+    // In a DAW, Space is the DAW's transport.
+    if (key == juce::KeyPress::spaceKey && ! core.host.isPlugin())
     {
         const auto st = model.frame().fadeState;
         core.engine.command(st == engine::FadeState::Silent || st == engine::FadeState::FadingOut ? engine::Command::FadeIn : engine::Command::FadeOut);
@@ -1014,7 +1019,9 @@ bool MainView::keyPressed(const juce::KeyPress& key)
             break;
         default: break;
     }
-    return true; // every key is ours: macOS never beeps at an unhandled key
+    // Standalone, every key is ours so macOS never beeps; in a DAW, unused keys go
+    // on to the host.
+    return ! core.host.isPlugin() || std::string_view("FIELKCRPSHTM").find(static_cast<char>(code)) != std::string_view::npos;
 }
 
 // --- Loading sounds -------------------------------------------------------------------
@@ -1081,7 +1088,10 @@ void MainView::loadFactory(int soundIndex, int slot)
 
 void MainView::showAudioSettings()
 {
-    auto selector = std::make_unique<juce::AudioDeviceSelectorComponent>(core.host.getDeviceManager(), 0, 2, 2, 2, false, false, true, false);
+    auto* devices = core.host.getDeviceManager();
+    if (devices == nullptr)
+        return;
+    auto selector = std::make_unique<juce::AudioDeviceSelectorComponent>(*devices, 0, 2, 2, 2, false, false, true, false);
     selector->setSize(540, 440);
     juce::DialogWindow::LaunchOptions options;
     options.content.setOwned(selector.release());

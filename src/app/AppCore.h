@@ -1,6 +1,6 @@
 #pragma once
 
-#include "AudioHost.h"
+#include "Host.h"
 #include "MidiInputs.h"
 #include "SessionController.h"
 
@@ -25,10 +25,10 @@ namespace tf::app {
 class AppCore final : private juce::Timer
 {
 public:
-    explicit AppCore(AudioHost& host);
+    explicit AppCore(Host& host);
     ~AppCore() override;
 
-    AudioHost& host;
+    Host& host;
     engine::Engine& engine;
     engine::SceneManager scenes;
     engine::FxManager fx;
@@ -36,7 +36,9 @@ public:
     engine::MidiManager midi;
     engine::SeasonManager seasons;
     engine::PathManager paths;
-    MidiInputs midiInputs;
+    /** Hardware MIDI inputs: the standalone app opens them itself; in a DAW, MIDI
+        arrives with the audio and this is null. */
+    std::unique_ptr<MidiInputs> midiInputs;
     SessionController session;
     io::Recorder recorder;
 
@@ -52,6 +54,11 @@ public:
     void status(const juce::String& message, bool warning = false);
     void captureSceneAtCursor();
     void loadFactoryContent();
+
+    /** Records a session's parameter values as the current targets. Telemetry is the
+        source of truth while audio runs; before it does (no device yet, or a DAW that
+        has not started processing) this keeps saving from writing stale values. */
+    void seedTargets(const io::SessionData& session);
 
     // Recording to disk (post-Medium master, optional stems).
     void startRecording();

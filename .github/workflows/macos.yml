@@ -67,10 +67,39 @@ jobs:
           mkdir -p dist
           ditto -c -k --keepParent "$APP" dist/Tidefield-macOS-arm64.zip
 
+      - name: Plugins (AU, VST3)
+        run: |
+          ART=build/release/src/app/TidefieldPlugin_artefacts/Release
+          VST3="$ART/VST3/Tidefield.vst3"
+          AU="$ART/AU/Tidefield.component"
+          test -d "$VST3" && test -d "$AU"
+          for P in "$VST3" "$AU"; do
+            codesign --force --deep --options runtime -s - "$P"
+            codesign --verify --deep --strict "$P"
+            lipo -info "$(find "$P/Contents/MacOS" -type f | head -1)"
+          done
+          # Host each one the way a DAW does: play, odd block sizes, three sample
+          # rates, state round-trip.
+          CHECK=$(find build/release -name tidefield_plugincheck -type f -perm -u+x | head -1)
+          "$CHECK" "$VST3"
+          "$CHECK" "$AU"
+          # Apple's own validator for the AU, from where hosts look for it.
+          mkdir -p ~/Library/Audio/Plug-Ins/Components
+          cp -R "$AU" ~/Library/Audio/Plug-Ins/Components/
+          killall -9 AudioComponentRegistrar 2>/dev/null || true
+          sleep 2
+          auval -v aumu Tdfl Tdfd
+          mkdir -p dist/plugins
+          cp -R "$VST3" "$AU" dist/plugins/
+          cp resources/plugins-README.txt dist/plugins/README.txt
+          (cd dist && ditto -c -k --keepParent plugins Tidefield-Plugins-macOS-arm64.zip)
+
       - uses: actions/upload-artifact@v4
         with:
           name: Tidefield-macOS-arm64
-          path: dist/Tidefield-macOS-arm64.zip
+          path: |
+            dist/Tidefield-macOS-arm64.zip
+            dist/Tidefield-Plugins-macOS-arm64.zip
           retention-days: 30
 
       - name: Publish release (version tag, or a manual run with release_tag)
@@ -81,10 +110,16 @@ jobs:
           target_commitish: ${{ github.sha }}
           name: Tidefield ${{ inputs.release_tag || github.ref_name }}
           make_latest: true
-          files: dist/Tidefield-macOS-arm64.zip
+          files: |
+            dist/Tidefield-macOS-arm64.zip
+            dist/Tidefield-Plugins-macOS-arm64.zip
           generate_release_notes: true
           body: |
             Tidefield for macOS 12+ on Apple Silicon.
 
             Unzip, move Tidefield.app to Applications, then right-click it and choose Open the first time
             (the app is signed ad hoc, not notarised). If macOS still refuses: `xattr -cr /Applications/Tidefield.app`.
+
+            Plugins: unzip Tidefield-Plugins, copy Tidefield.component to ~/Library/Audio/Plug-Ins/Components
+            and Tidefield.vst3 to ~/Library/Audio/Plug-Ins/VST3, then rescan in your DAW (Logic, Live, Bitwig,
+            Reaper...). If the DAW blocks them: `xattr -cr ~/Library/Audio/Plug-Ins/Components/Tidefield.component`.

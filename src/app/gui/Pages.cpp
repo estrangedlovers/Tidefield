@@ -494,8 +494,9 @@ public:
     {
         // Rebuild cheaply when anything visible changed.
         juce::String sig = juce::String(model.core.midi.getBindings().size()) + (model.core.midi.isLearning() ? "L" : "-");
-        for (const auto& d : model.core.midiInputs.getDevices())
-            sig << d.info.identifier << (d.enabled ? 1 : 0) << (d.open ? 1 : 0);
+        if (model.core.midiInputs != nullptr)
+            for (const auto& d : model.core.midiInputs->getDevices())
+                sig << d.info.identifier << (d.enabled ? 1 : 0) << (d.open ? 1 : 0);
         sig << model.core.midi.getNoteChannel() << (model.core.midi.getNotesToDrone() ? 1 : 0);
         if (sig != signature)
         {
@@ -575,14 +576,16 @@ private:
         for (auto& b : deviceButtons)
             removeChildComponent(b.get());
         deviceButtons.clear();
-        for (const auto& d : model.core.midiInputs.getDevices())
+        if (model.core.midiInputs == nullptr) // in a DAW, MIDI comes from the track
+            return resized();
+        for (const auto& d : model.core.midiInputs->getDevices())
         {
             auto b = std::make_unique<FlatButton>(d.info.name + (d.enabled && ! d.open ? " (unavailable)" : ""), colour::good);
             b->setToggleState(d.enabled, juce::dontSendNotification);
             b->setHelp(&model, "listen to this MIDI device");
             const auto id = d.info.identifier;
             const bool enabled = d.enabled;
-            b->onClick = [this, id, enabled] { juce::MessageManager::callAsync([this, id, enabled] { model.core.midiInputs.setEnabled(id, ! enabled); }); };
+            b->onClick = [this, id, enabled] { juce::MessageManager::callAsync([this, id, enabled] { if (model.core.midiInputs != nullptr) model.core.midiInputs->setEnabled(id, ! enabled); }); };
             addAndMakeVisible(*b);
             deviceButtons.push_back(std::move(b));
         }

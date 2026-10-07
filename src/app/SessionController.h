@@ -44,6 +44,8 @@ public:
     std::function<void()> onSessionChanged;
     /** What New starts from (the app's starter session); the plain defaults if unset. */
     std::function<io::SessionData()> makeNewSession;
+    /** After a session is applied (message thread), with what was applied. */
+    std::function<void(const io::SessionData&)> onApplied;
 
 private:
     void apply(std::shared_ptr<io::SessionData> data);

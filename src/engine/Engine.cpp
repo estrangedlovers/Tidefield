@@ -48,6 +48,7 @@ Engine::Engine(const Config& c)
 
 void Engine::prepare(double newSampleRate, int maxBlockSize)
 {
+    stopGesture(); // sample time restarts: a recording in progress ends here, playback stops
     sampleRate = newSampleRate;
     maxBlock = std::max(maxBlockSize, kControlInterval);
     sampleTime = 0;
@@ -278,6 +279,7 @@ void Engine::collectGarbage()
     sceneChannel.collectGarbage();
     seasonChannel.collectGarbage();
     pathChannel.collectGarbage();
+    gestureChannel.collectGarbage();
     midiMapChannel.collectGarbage();
     bloomBuffers.collectGarbage();
     for (auto& c : clouds)
@@ -309,6 +311,7 @@ void Engine::drainControl() noexcept
     sceneChannel.acquire();
     seasonChannel.acquire();
     pathChannel.acquire();
+    gestureChannel.acquire();
     if (midiMapChannel.acquire())
     {
         // A new map: every binding must pick up again.
@@ -467,8 +470,65 @@ void Engine::handleMidi(const RawMidi& m) noexcept
     }
 }
 
+void Engine::recordGesture(const ControlEvent& e) noexcept
+{
+    // Only what a performer does: terrain blending, scores and the take's own
+    // playback are not moves, and transport commands are not part of a gesture.
+    if (gestureState != GestureState::Recording || e.source == ControlSource::Terrain || e.source == ControlSource::Score)
+        return;
+    if (e.type == ControlEvent::Type::SnapParam)
+        return;
+    if (e.type == ControlEvent::Type::Command && e.command != Command::Catch && e.command != Command::LoopRecord && e.command != Command::LoopClear)
+        return;
+    gestureOut.push({ sampleTime - gestureStart, e }); // full queue: the move is dropped, never blocks
+}
+
+void Engine::stopGesture() noexcept
+{
+    if (gestureState == GestureState::Recording)
+        gestureOut.push({ sampleTime - gestureStart, ControlEvent::makeCommand(Command::None) }); // end marker: the take's length
+    gestureState = GestureState::Idle;
+}
+
+void Engine::updateGesture() noexcept
+{
+    if (gestureState != GestureState::Playing)
+        return;
+    const auto* take = gestureChannel.current();
+    if (take == nullptr || take->length == 0 || take->version != gesturePlayedVersion)
+    {
+        gestureState = GestureState::Idle; // the take was replaced or cleared
+        return;
+    }
+    // Times are scaled if the take was recorded at another sample rate.
+    const double scale = sampleRate / take->sampleRate;
+    const auto length = static_cast<std::uint64_t>(static_cast<double>(take->length) * scale);
+    auto pos = sampleTime - gestureStart;
+    while (true)
+    {
+        while (gestureIndex < take->events.size()
+               && static_cast<std::uint64_t>(static_cast<double>(take->events[gestureIndex].time) * scale) <= pos)
+        {
+            auto e = take->events[gestureIndex++].event;
+            e.source = ControlSource::Score;
+            applyEvent(e);
+        }
+        if (pos < length)
+            break;
+        if (! take->loop)
+        {
+            gestureState = GestureState::Idle;
+            break;
+        }
+        gestureStart += std::max<std::uint64_t>(1, length); // next pass
+        gestureIndex = 0;
+        pos = sampleTime - gestureStart;
+    }
+}
+
 void Engine::applyEvent(const ControlEvent& e) noexcept
 {
+    recordGesture(e);
     switch (e.type)
     {
         case ControlEvent::Type::SetParam:
@@ -527,6 +587,22 @@ void Engine::applyCommand(Command c) noexcept
         case Command::Catch: requestCatch(); break;
         case Command::LoopRecord: looper.record(); break;
         case Command::LoopClear: looper.clear(); break;
+        case Command::GestureRecord:
+            stopGesture();
+            gestureState = GestureState::Recording;
+            gestureStart = sampleTime;
+            break;
+        case Command::GesturePlay:
+            stopGesture();
+            if (const auto* take = gestureChannel.current(); take != nullptr && take->length > 0)
+            {
+                gestureState = GestureState::Playing;
+                gestureStart = sampleTime;
+                gestureIndex = 0;
+                gesturePlayedVersion = take->version;
+            }
+            break;
+        case Command::GestureStop: stopGesture(); break;
         case Command::None: break;
     }
 }
@@ -733,6 +809,7 @@ void Engine::controlTick() noexcept
     harmony.advance(tickSeconds * tide);
 
     updateSources(tide);
+    updateGesture();
     updateTempo(tickSeconds);
     updateLoops(tickSeconds);
 
@@ -1441,6 +1518,12 @@ void Engine::accumulateTelemetry(const float* l, const float* r, int n) noexcept
     f.fadeGain = master.getFadeGain();
     f.fadeState = master.getFadeState();
     f.bpm = bpm;
+    f.gestureState = gestureState;
+    f.gestureSeconds = gestureState == GestureState::Idle ? 0.0f : static_cast<float>(static_cast<double>(sampleTime - gestureStart) / sampleRate);
+    if (const auto* take = gestureChannel.current(); take != nullptr && take->sampleRate > 0.0)
+        f.gestureLength = static_cast<float>(static_cast<double>(take->length) / take->sampleRate);
+    else
+        f.gestureLength = 0.0f;
     f.beatPhase = static_cast<float>(beatPos - std::floor(beatPos));
     f.syncOn = syncOn;
     f.hostTempo = hostBpm > 0.0;

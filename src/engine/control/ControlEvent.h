@@ -22,6 +22,9 @@ enum class Command : std::uint8_t
     Catch,            // capture the last catch.seconds of catch.source into a cloud
     LoopRecord,       // looper pedal: record / close the loop / overdub on-off
     LoopClear,        // fade the loop out and empty it
+    GestureRecord,    // start recording the performer's moves (stops playback)
+    GesturePlay,      // play the published take from its start
+    GestureStop,      // stop recording or playing
 };
 
 /** The single path for every change into the engine. Trivially copyable so it can

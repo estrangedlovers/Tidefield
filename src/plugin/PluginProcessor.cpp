@@ -129,7 +129,7 @@ void TidefieldProcessor::getStateInformation(juce::MemoryBlock& dest)
     // managers belong to the message thread; some hosts ask for state from another
     // thread, so the capture runs there (writing the zip can happen here).
     std::optional<io::SessionData> session;
-    auto capture = [&] { session = io::captureSession(engine, core->latest(), core->scenes, core->fx, &core->midi, &core->seasons, &core->paths); };
+    auto capture = [&] { session = io::captureSession(engine, core->latest(), core->scenes, core->fx, &core->midi, &core->seasons, &core->paths, &core->gestures); };
     auto* mm = juce::MessageManager::getInstance();
     if (mm->isThisTheMessageThread() || mm->currentThreadHasLockedMessageManager())
         capture();
@@ -158,7 +158,7 @@ void TidefieldProcessor::setStateInformation(const void* data, int size)
         return;
     }
     auto apply = [this, s = std::make_shared<io::SessionData>(std::move(*session))] {
-        io::applySession(*s, engine, core->scenes, core->fx, true, &core->midi, &core->seasons, &core->paths);
+        io::applySession(*s, engine, core->scenes, core->fx, true, &core->midi, &core->seasons, &core->paths, &core->gestures);
         core->seedTargets(*s);
     };
     if (juce::MessageManager::getInstance()->isThisTheMessageThread())

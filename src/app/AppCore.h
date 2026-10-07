@@ -7,6 +7,7 @@
 #include <engine/capture/CatchManager.h>
 #include <engine/midi/MidiManager.h>
 #include <engine/mix/FxManager.h>
+#include <engine/perform/GestureManager.h>
 #include <engine/scene/PathManager.h>
 #include <engine/scene/SceneManager.h>
 #include <io/Recorder.h>
@@ -36,6 +37,7 @@ public:
     engine::MidiManager midi;
     engine::SeasonManager seasons;
     engine::PathManager paths;
+    engine::GestureManager gestures;
     /** Hardware MIDI inputs: the standalone app opens them itself; in a DAW, MIDI
         arrives with the audio and this is null. */
     std::unique_ptr<MidiInputs> midiInputs;

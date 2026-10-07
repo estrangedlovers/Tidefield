@@ -4,6 +4,7 @@
 #include <engine/midi/MidiManager.h>
 #include <engine/mod/SeasonManager.h>
 #include <engine/mix/FxManager.h>
+#include <engine/perform/GestureManager.h>
 #include <engine/scene/PathManager.h>
 #include <engine/scene/SceneManager.h>
 #include <io/Session.h>
@@ -23,7 +24,8 @@ class SessionController
 {
 public:
     SessionController(engine::Engine& engine, engine::SceneManager& scenes, engine::FxManager& fx, engine::MidiManager* midi,
-                      engine::SeasonManager* seasons = nullptr, engine::PathManager* path = nullptr);
+                      engine::SeasonManager* seasons = nullptr, engine::PathManager* path = nullptr,
+                      engine::GestureManager* gestures = nullptr);
     ~SessionController();
 
     void newSession();
@@ -58,6 +60,7 @@ private:
     engine::MidiManager* midi;
     engine::SeasonManager* seasons;
     engine::PathManager* path;
+    engine::GestureManager* gestures;
     engine::TelemetryFrame latest;
     juce::File current;
     std::unique_ptr<juce::FileChooser> chooser;

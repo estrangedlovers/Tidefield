@@ -16,6 +16,7 @@
 #include "record/RecordTap.h"
 #include "SampleHandle.h"
 #include "scene/SceneSet.h"
+#include "perform/Gesture.h"
 #include "scene/TerrainPath.h"
 #include "scene/Wander.h"
 
@@ -133,6 +134,11 @@ public:
     /** Message thread: every MIDI message the engine received, for learn and activity. */
     bool popMidiMonitor(RawMidi& out) noexcept { return midiMonitor.pop(out); }
 
+    /** Message thread: the performer's moves while recording a gesture (see
+        GestureManager), and the take to play back. */
+    bool popGesture(GestureEvent& out) noexcept { return gestureOut.pop(out); }
+    bool publishGesture(std::unique_ptr<GestureTake> take) { return gestureChannel.publish(std::move(take)); }
+
     /** FX slots are fed by FxManager; see there. */
     bool sendProcessor(int slot, dsp::ProcessorPtr processor);
     int collectProcessors(int slot);
@@ -211,6 +217,15 @@ private:
     // MIDI.
     std::array<std::unique_ptr<SpscQueue<RawMidi>>, kMaxMidiPorts> midiQueues;
     SpscQueue<RawMidi> midiMonitor { 512 };
+    SpscQueue<GestureEvent> gestureOut { 16384 };
+    SnapshotChannel<GestureTake> gestureChannel { 4 };
+    GestureState gestureState = GestureState::Idle;
+    std::uint64_t gestureStart = 0; // sampleTime the recording or the current pass began
+    std::size_t gestureIndex = 0;   // next event to play
+    std::uint64_t gesturePlayedVersion = 0;
+    void recordGesture(const ControlEvent& e) noexcept;
+    void stopGesture() noexcept;
+    void updateGesture() noexcept;
     SnapshotChannel<MidiMap> midiMapChannel { 4 };
     struct Pickup
     {

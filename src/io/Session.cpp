@@ -6,6 +6,7 @@
 #include <engine/midi/MidiManager.h>
 #include <engine/mix/FxManager.h>
 #include <engine/mod/SeasonManager.h>
+#include <engine/perform/GestureManager.h>
 #include <engine/scene/PathManager.h>
 #include <engine/scene/SceneManager.h>
 
@@ -170,9 +171,107 @@ std::vector<std::string> applySeasonsJson(const juce::var& json, engine::SeasonM
     return warnings;
 }
 
+juce::var gestureToJson(const engine::GestureTake& take, const engine::ParamRegistry& reg)
+{
+    using T = engine::ControlEvent::Type;
+    auto* o = new juce::DynamicObject();
+    const double fs = take.sampleRate > 0.0 ? take.sampleRate : 48000.0;
+    o->setProperty("seconds", static_cast<double>(take.length) / fs);
+    o->setProperty("loop", take.loop);
+    juce::Array<juce::var> events;
+    for (const auto& g : take.events)
+    {
+        const auto& e = g.event;
+        juce::Array<juce::var> row;
+        row.add(std::round(static_cast<double>(g.time) / fs * 100000.0) / 100000.0);
+        if (e.type == T::SetParam || e.type == T::ReleaseParam)
+        {
+            if (e.param >= reg.size())
+                continue;
+            row.add(e.type == T::SetParam ? "set" : "release");
+            row.add(juce::String(reg.spec(e.param).id));
+            row.add(e.value);
+        }
+        else if (e.type == T::Note)
+        {
+            row.add("note");
+            row.add(static_cast<int>(e.param));
+            row.add(e.value);
+        }
+        else if (e.type == T::Command)
+        {
+            const char* name = e.command == engine::Command::Catch ? "catch" : e.command == engine::Command::LoopRecord ? "loopRecord"
+                               : e.command == engine::Command::LoopClear                                    ? "loopClear"
+                                                                                                             : nullptr;
+            if (name == nullptr)
+                continue;
+            row.add(name);
+            row.add(0);
+            row.add(0);
+        }
+        else
+            continue;
+        events.add(row);
+    }
+    o->setProperty("events", events);
+    return juce::var(o);
+}
+
+std::vector<std::string> applyGestureJson(const juce::var& json, engine::GestureManager& gestures, const engine::ParamRegistry& reg)
+{
+    std::vector<std::string> warnings;
+    engine::GestureTake take;
+    if (! json.isObject())
+    {
+        gestures.setTake(take);
+        return warnings;
+    }
+    take.sampleRate = 48000.0;
+    take.length = static_cast<std::uint64_t>(std::max(0.0, static_cast<double>(json.getProperty("seconds", 0.0))) * take.sampleRate);
+    take.loop = static_cast<bool>(json.getProperty("loop", true));
+    int unknown = 0;
+    if (const auto* events = json.getProperty("events", {}).getArray())
+        for (const auto& row : *events)
+        {
+            const auto* r = row.getArray();
+            if (r == nullptr || r->size() < 4)
+                continue;
+            engine::GestureEvent g;
+            g.time = static_cast<std::uint64_t>(std::max(0.0, static_cast<double>((*r)[0])) * take.sampleRate);
+            const auto kind = (*r)[1].toString();
+            const float value = static_cast<float>(static_cast<double>((*r)[3]));
+            if (kind == "set" || kind == "release")
+            {
+                const auto index = reg.find((*r)[2].toString().toStdString());
+                if (! index)
+                {
+                    ++unknown;
+                    continue;
+                }
+                g.event = kind == "set" ? engine::ControlEvent::setParam(*index, value) : engine::ControlEvent::releaseParam(*index);
+            }
+            else if (kind == "note")
+                g.event = engine::ControlEvent::note(static_cast<int>((*r)[2]), value);
+            else if (kind == "catch")
+                g.event = engine::ControlEvent::makeCommand(engine::Command::Catch);
+            else if (kind == "loopRecord")
+                g.event = engine::ControlEvent::makeCommand(engine::Command::LoopRecord);
+            else if (kind == "loopClear")
+                g.event = engine::ControlEvent::makeCommand(engine::Command::LoopClear);
+            else
+                continue;
+            take.events.push_back(g);
+        }
+    std::stable_sort(take.events.begin(), take.events.end(), [](const auto& a, const auto& b) { return a.time < b.time; });
+    if (unknown > 0)
+        warnings.push_back("Gesture: " + std::to_string(unknown) + " moves on parameters this version does not have were skipped");
+    gestures.setTake(std::move(take));
+    return warnings;
+}
+
 SessionData captureSession(const engine::Engine& engine, const engine::TelemetryFrame& latest, const engine::SceneManager& scenes,
                            const engine::FxManager& fx, const engine::MidiManager* midi, const engine::SeasonManager* seasons,
-                           const engine::PathManager* path)
+                           const engine::PathManager* path, const engine::GestureManager* gestures)
 {
     const auto& reg = engine.getRegistry();
     SessionData s;
@@ -206,6 +305,8 @@ SessionData captureSession(const engine::Engine& engine, const engine::Telemetry
         s.seasons = seasonsToJson(*seasons, reg);
     if (path != nullptr)
         s.path = path->getStroke();
+    if (gestures != nullptr && gestures->hasTake())
+        s.gesture = gestureToJson(gestures->getTake(), reg);
     return s;
 }
 
@@ -225,7 +326,8 @@ SessionData defaultSession(const engine::Engine& engine)
 
 std::vector<std::string> applySession(const SessionData& session, engine::Engine& engine, engine::SceneManager& scenes,
                                       engine::FxManager& fx, bool snap, engine::MidiManager* midi,
-                                      engine::SeasonManager* seasons, engine::PathManager* path)
+                                      engine::SeasonManager* seasons, engine::PathManager* path,
+                                      engine::GestureManager* gestures)
 {
     const auto& reg = engine.getRegistry();
     std::vector<std::string> warnings = session.warnings;
@@ -306,6 +408,9 @@ std::vector<std::string> applySession(const SessionData& session, engine::Engine
             warnings.push_back(std::move(w));
     if (path != nullptr)
         path->set(session.path);
+    if (gestures != nullptr)
+        for (auto& w : applyGestureJson(session.gesture, *gestures, reg))
+            warnings.push_back(std::move(w));
     return warnings;
 }
 
@@ -352,6 +457,8 @@ juce::var sessionToJson(const SessionData& s)
         }
         root->setProperty("path", pts);
     }
+    if (s.gesture.isObject())
+        root->setProperty("gesture", s.gesture);
 
     auto* samples = new juce::DynamicObject();
     for (const auto& [slot, buffer] : s.samples)
@@ -407,6 +514,7 @@ std::optional<SessionData> sessionFromJson(const juce::var& json, juce::String& 
             s.fx[prop.name.toString().toStdString()] = prop.value.toString().toStdString();
     s.midi = root->getProperty("midi");
     s.seasons = root->getProperty("seasons");
+    s.gesture = root->getProperty("gesture");
     if (const auto* pts = root->getProperty("path").getArray())
         for (int i = 0; i + 1 < pts->size(); i += 2)
             s.path.push_back({ static_cast<float>(static_cast<double>((*pts)[i])), static_cast<float>(static_cast<double>((*pts)[i + 1])) });

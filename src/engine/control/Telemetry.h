@@ -2,6 +2,7 @@
 
 #include "../mix/Layout.h"
 #include "../params/ParamDefs.h"
+#include "../perform/Gesture.h"
 #include "../scene/SceneSet.h"
 
 #include <dsp/sources/bloom/BloomSampler.h>
@@ -80,6 +81,10 @@ struct TelemetryFrame
     float beatPhase = 0.0f; // 0..1 within the beat
     bool syncOn = false;
     bool hostTempo = false;
+
+    // Gesture recording: state, seconds into the recording or pass, the take's length.
+    GestureState gestureState = GestureState::Idle;
+    float gestureSeconds = 0.0f, gestureLength = 0.0f;
 
     // Auto master: loudness (LUFS), make-up dB, low/mud/high EQ dB, width, glue dB, mix.
     std::array<float, 8> autoMaster {};

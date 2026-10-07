@@ -366,7 +366,11 @@ void Pad::paint(juce::Graphics& g)
 void Pad::mouseDown(const juce::MouseEvent& e)
 {
     if (e.mods.isPopupMenu())
+    {
+        if (onMenu)
+            onMenu();
         return;
+    }
     pressed = true;
     repaint();
     if (onPress)

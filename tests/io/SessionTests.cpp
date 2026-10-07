@@ -2,6 +2,7 @@
 #include <engine/midi/MidiManager.h>
 #include <engine/mix/FxManager.h>
 #include <engine/mod/SeasonManager.h>
+#include <engine/perform/GestureManager.h>
 #include <engine/scene/PathManager.h>
 #include <engine/scene/SceneManager.h>
 #include <io/Session.h>
@@ -323,4 +324,46 @@ TEST_CASE("A drawn path round-trips through a session and a session without one 
 
     io::applySession(io::defaultSession(e2), e2, scenes2, fx2, true, nullptr, nullptr, &paths2);
     CHECK_FALSE(paths2.hasPath());
+}
+
+TEST_CASE("A gesture take round-trips through a session", "[session][gesture]")
+{
+    engine::Engine e;
+    e.prepare(kFs, 256);
+    engine::SceneManager scenes(e);
+    engine::FxManager fx(e);
+    engine::GestureManager gestures(e);
+    engine::GestureTake take;
+    take.sampleRate = kFs;
+    take.length = static_cast<std::uint64_t>(4.0 * kFs);
+    take.loop = false;
+    take.events.push_back({ static_cast<std::uint64_t>(0.25 * kFs), engine::ControlEvent::setParam(engine::idx(engine::P::TerrainX), 0.8f) });
+    take.events.push_back({ static_cast<std::uint64_t>(1.5 * kFs), engine::ControlEvent::note(67, 0.6f) });
+    take.events.push_back({ static_cast<std::uint64_t>(2.0 * kFs), engine::ControlEvent::makeCommand(engine::Command::Catch) });
+    gestures.setTake(take);
+
+    engine::TelemetryFrame frame;
+    auto data = io::captureSession(e, frame, scenes, fx, nullptr, nullptr, nullptr, &gestures);
+    juce::String error;
+    auto parsed = io::sessionFromJson(juce::JSON::parse(juce::JSON::toString(io::sessionToJson(data))), error);
+    REQUIRE(parsed.has_value());
+
+    engine::Engine e2;
+    e2.prepare(kFs, 256);
+    engine::SceneManager scenes2(e2);
+    engine::FxManager fx2(e2);
+    engine::GestureManager gestures2(e2);
+    REQUIRE(io::applySession(*parsed, e2, scenes2, fx2, true, nullptr, nullptr, nullptr, &gestures2).empty());
+    const auto& got = gestures2.getTake();
+    REQUIRE(got.events.size() == 3);
+    CHECK_FALSE(got.loop);
+    CHECK(static_cast<double>(got.length) / got.sampleRate == Approx(4.0));
+    CHECK(got.events[0].event.param == engine::idx(engine::P::TerrainX));
+    CHECK(got.events[0].event.value == Approx(0.8f));
+    CHECK(static_cast<double>(got.events[1].time) / got.sampleRate == Approx(1.5));
+    CHECK(got.events[1].event.type == engine::ControlEvent::Type::Note);
+    CHECK(got.events[2].event.command == engine::Command::Catch);
+
+    io::applySession(io::defaultSession(e2), e2, scenes2, fx2, true, nullptr, nullptr, nullptr, &gestures2);
+    CHECK_FALSE(gestures2.hasTake());
 }

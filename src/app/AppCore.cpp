@@ -9,8 +9,8 @@
 namespace tf::app {
 
 AppCore::AppCore(Host& h)
-    : host(h), engine(h.getEngine()), scenes(h.getEngine()), fx(h.getEngine()), catcher(h.getEngine()), midi(h.getEngine()), seasons(h.getEngine()), paths(h.getEngine()),
-      session(h.getEngine(), scenes, fx, &midi, &seasons, &paths), recorder(h.getEngine().getRecordTap())
+    : host(h), engine(h.getEngine()), scenes(h.getEngine()), fx(h.getEngine()), catcher(h.getEngine()), midi(h.getEngine()), seasons(h.getEngine()), paths(h.getEngine()), gestures(h.getEngine()),
+      session(h.getEngine(), scenes, fx, &midi, &seasons, &paths, &gestures), recorder(h.getEngine().getRecordTap())
 {
     engine.setGuardrailsEnabled(true);
     const auto& registry = engine.getRegistry();
@@ -26,6 +26,11 @@ AppCore::AppCore(Host& h)
 
     catcher.onCaught = [this](int cloud, const std::string& name) {
         status("Caught into Cloud " + juce::String(cloud + 1) + " (" + juce::String(name) + ")");
+    };
+    gestures.onTakeFinished = [this] {
+        const auto& t = gestures.getTake();
+        status("Gesture recorded: " + juce::String(static_cast<int>(t.events.size())) + " moves over "
+               + juce::String(static_cast<double>(t.length) / t.sampleRate, 1) + " s. Press G (or the pad) to play it.");
     };
     catcher.onRejected = [this](const std::string& reason) { status(reason, true); };
     midi.onLearned = [this](const std::string& d) { status("MIDI learned: " + juce::String(d)); };
@@ -167,6 +172,7 @@ void AppCore::timerCallback()
     midi.tick();
     seasons.tick();
     paths.tick();
+    gestures.tick();
     engine.collectGarbage();
 
     engine::RawMidi monitored;

@@ -22,6 +22,42 @@ constexpr int kMacroW = 244;
 constexpr int kPadsH = 78;
 int openViews = 0; // message thread only
 
+/** One button for gestures: record, stop, play, stop. Shift (or recordNew) always
+    records a new take. */
+void gestureToggle(AppCore& core, bool recordNew)
+{
+    const auto state = core.latest().gestureState;
+    if (state != engine::GestureState::Idle && ! recordNew)
+        core.gestures.stop();
+    else if (recordNew || ! core.gestures.hasTake())
+    {
+        core.gestures.record();
+        core.status("Recording a gesture: play, move, turn. Press G again to stop.");
+    }
+    else
+        core.gestures.play();
+}
+
+void showGestureMenu(AppCore& core)
+{
+    juce::PopupMenu m;
+    const auto state = core.latest().gestureState;
+    m.addSectionHeader("Gesture");
+    m.addItem(1, "Record a new take");
+    m.addItem(2, "Play", core.gestures.hasTake() && state == engine::GestureState::Idle);
+    m.addItem(3, "Stop", state != engine::GestureState::Idle);
+    m.addItem(4, "Loop", core.gestures.hasTake(), core.gestures.isLooping());
+    m.addSeparator();
+    m.addItem(5, "Clear the take", core.gestures.hasTake());
+    m.showMenuAsync(juce::PopupMenu::Options(), [&core, state](int r) {
+        if (r == 1) gestureToggle(core, true);
+        else if (r == 2) core.gestures.play();
+        else if (r == 3) core.gestures.stop();
+        else if (r == 4) core.gestures.setLoop(! core.gestures.isLooping(), state == engine::GestureState::Playing);
+        else if (r == 5) core.gestures.clear();
+    });
+}
+
 juce::String clock(double seconds)
 {
     const int s = std::max(0, static_cast<int>(seconds));
@@ -733,6 +769,27 @@ public:
             return m * 0.8f;
         });
 
+        auto gesture = std::make_unique<Pad>(model, "Gesture", "G", colour::learn,
+                                             "record your moves (knobs, terrain, notes) and play them back, looped; right-click for more");
+        gesture->onPress = [this] { gestureToggle(model.core, juce::ModifierKeys::currentModifiers.isShiftDown()); };
+        gesture->onMenu = [this] { showGestureMenu(model.core); };
+        gesture->level = [f] {
+            const auto& fr = f();
+            if (fr.gestureState == engine::GestureState::Playing && fr.gestureLength > 0.0f)
+                return std::fmod(fr.gestureSeconds, fr.gestureLength) / fr.gestureLength;
+            return fr.gestureState == engine::GestureState::Recording ? 1.0f : 0.0f;
+        };
+        gesture->lit = [f] { return f().gestureState != engine::GestureState::Idle; };
+        gesture->subText = [this, f] {
+            const auto& fr = f();
+            if (fr.gestureState == engine::GestureState::Recording)
+                return "recording " + juce::String(fr.gestureSeconds, 1) + " s";
+            if (fr.gestureState == engine::GestureState::Playing)
+                return "playing " + juce::String(std::fmod(fr.gestureSeconds, std::max(0.01f, fr.gestureLength)), 1) + " / " + juce::String(fr.gestureLength, 1) + " s";
+            return model.core.gestures.hasTake() ? "tap to play, G" : juce::String("tap to record, G");
+        };
+        pads.push_back(std::move(gesture));
+
         auto catchPad = std::make_unique<Pad>(model, "Catch", "last seconds, K", colour::live, "grab what just happened into a cloud, where it keeps playing");
         catchPad->onPress = [this] { model.engine.command(engine::Command::Catch); };
         pads.push_back(std::move(catchPad));
@@ -824,7 +881,7 @@ public:
         }
         g.setColour(colour::textDim);
         g.drawText(help.isNotEmpty() ? help
-                                     : juce::String("Space fade   Esc panic   drag the terrain to move   1-9 scenes   C capture   S/H/T hold gestures   P draw a path   M keys   Tab pages"),
+                                     : juce::String("Space fade   Esc panic   drag the terrain to move   1-9 scenes   C capture   S/H/T hold gestures   G record a gesture   P draw a path   M keys   Tab pages"),
                    r, juce::Justification::centredLeft, true);
     }
 
@@ -1114,6 +1171,7 @@ bool MainView::keyPressed(const juce::KeyPress& key)
         case 'E': model.toggle(P::LoopsOn); break;
         case 'L': core.engine.command(mods.isShiftDown() ? engine::Command::LoopClear : engine::Command::LoopRecord); break;
         case 'K': core.engine.command(engine::Command::Catch); break;
+        case 'G': gestureToggle(core, mods.isShiftDown()); break;
         case 'P': terrain->setDrawMode(! terrain->isDrawMode()); break;
         case 'C': core.captureSceneAtCursor(); break;
         case 'R':
@@ -1129,7 +1187,7 @@ bool MainView::keyPressed(const juce::KeyPress& key)
     }
     // Standalone, every key is ours so macOS never beeps; in a DAW, unused keys go
     // on to the host.
-    return ! core.host.isPlugin() || std::string_view("FIELKCRPSHTM").find(static_cast<char>(code)) != std::string_view::npos;
+    return ! core.host.isPlugin() || std::string_view("FIELKCRPSHTMG").find(static_cast<char>(code)) != std::string_view::npos;
 }
 
 // --- Loading sounds -------------------------------------------------------------------

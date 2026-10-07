@@ -63,6 +63,7 @@ add_library(tidefield_engine STATIC
     src/engine/midi/MidiManager.cpp
     src/engine/mod/SeasonManager.cpp
     src/engine/scene/PathManager.cpp
+    src/engine/perform/GestureManager.cpp
 )
 target_link_libraries(tidefield_engine PUBLIC tidefield_dsp)
 tf_set_warnings(tidefield_engine)

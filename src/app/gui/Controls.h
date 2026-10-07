@@ -113,6 +113,7 @@ public:
     ~Pad() override;
 
     std::function<void()> onPress, onRelease;   // press/release (hold gestures)
+    std::function<void()> onMenu;               // right-click
     std::function<float()> level;               // 0..1 glow
     std::function<bool()> lit;                  // latched on
     std::function<juce::String()> subText;      // live sub-line

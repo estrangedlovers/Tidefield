@@ -114,6 +114,16 @@ export function PerformView() {
             <Choice param={idx("harmony.scale")} label="" variant="pills" columns={2} />
           </div>
         </div>
+        <div className="weather-block">
+          <div className="caps weather-title" title="A procedural weather bed: wind with gusts, rain, surf. More in Edit, Weather.">
+            Weather
+          </div>
+          <div className="knob-row secondary">
+            <Knob param={idx("weather.wind")} label="Wind" size="sm" />
+            <Knob param={idx("weather.rain")} label="Rain" size="sm" />
+            <Knob param={idx("weather.surf")} label="Surf" size="sm" />
+          </div>
+        </div>
       </aside>
 
       <main className="perform-center">
@@ -146,6 +156,7 @@ export function PerformView() {
           <Knob param={idx("bloom.length")} size="sm" />
           <Knob param={idx("bloom.level")} label="Level" size="sm" />
         </div>
+
 
         <MasterBlock />
       </aside>

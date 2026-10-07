@@ -2,11 +2,18 @@
   display: flex;
   gap: 8px;
   overflow-x: auto;
-  scrollbar-width: none;
+  padding-bottom: 2px;
+  scrollbar-width: thin;
+  scrollbar-color: var(--line-strong) transparent;
 }
 
 .gestures::-webkit-scrollbar {
-  display: none;
+  height: 4px;
+}
+
+.gestures::-webkit-scrollbar-thumb {
+  border-radius: 999px;
+  background: var(--line-strong);
 }
 
 .gesture {
@@ -16,9 +23,9 @@
   justify-content: center;
   gap: 2px;
   flex: 0 0 auto;
-  min-width: 84px;
+  min-width: 76px;
   height: 84px;
-  padding: 0 14px;
+  padding: 0 12px;
   overflow: hidden;
   border: 1px solid var(--line);
   border-radius: 12px;
@@ -62,9 +69,67 @@
   transform: scaleY(0);
 }
 
-.gesture.swell:active {
+.gesture.hold:active {
   border-color: var(--accent);
   color: var(--text);
+}
+
+.gesture.hold.tone-sand .gesture-fill {
+  background: linear-gradient(to top, var(--sand-dim), transparent);
+}
+
+.gesture.hold.tone-sand:active {
+  border-color: var(--sand);
+}
+
+.gesture.hold {
+  min-width: 64px;
+}
+
+/* Shape pad */
+.gesture.shape-pad {
+  width: 84px;
+  min-width: 84px;
+  padding: 0;
+  cursor: crosshair;
+  touch-action: none;
+}
+
+.pad-cross {
+  position: absolute;
+  inset: 0;
+  background:
+    linear-gradient(to right, transparent calc(50% - 0.5px), var(--line) calc(50% - 0.5px), var(--line) calc(50% + 0.5px), transparent calc(50% + 0.5px)),
+    linear-gradient(to bottom, transparent calc(50% - 0.5px), var(--line) calc(50% - 0.5px), var(--line) calc(50% + 0.5px), transparent calc(50% + 0.5px));
+}
+
+.pad-axis {
+  position: absolute;
+  font-size: 9.5px;
+  color: var(--text-3);
+  pointer-events: none;
+}
+
+.pad-x {
+  right: 6px;
+  bottom: 4px;
+}
+
+.pad-y {
+  left: 6px;
+  top: 4px;
+}
+
+.pad-dot {
+  position: absolute;
+  width: 12px;
+  height: 12px;
+  margin: -6px 0 0 -6px;
+  border-radius: 50%;
+  background: var(--accent);
+  box-shadow: 0 0 10px var(--accent);
+  transition: left 120ms var(--ease), top 120ms var(--ease);
+  pointer-events: none;
 }
 
 .gesture-glow {
@@ -105,7 +170,7 @@
   display: flex;
   flex-direction: column;
   gap: 2px;
-  min-width: 86px;
+  min-width: 80px;
 }
 
 .looper-side {

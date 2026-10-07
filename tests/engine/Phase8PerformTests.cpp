@@ -1,10 +1,12 @@
 #include <engine/Engine.h>
 #include <engine/mod/SeasonManager.h>
+#include <engine/scene/Wander.h>
 
 #include <catch2/catch_approx.hpp>
 #include <catch2/catch_test_macros.hpp>
 
 #include <cmath>
+#include <iostream>
 #include <vector>
 
 using namespace tf::engine;
@@ -149,4 +151,59 @@ TEST_CASE("Incommensurate loops fire notes into Bloom on their own periods", "[l
     for (const auto& v : rig.f.bloomVoices)
         bloomSounding = bloomSounding || v.active;
     CHECK(bloomSounding);
+}
+
+TEST_CASE("Journey travels between scenes and dwells at them", "[wander][journey]")
+{
+    SceneSet set;
+    set.numScenes = 3;
+    set.positions[0] = { 0.1f, 0.1f };
+    set.positions[1] = { 0.9f, 0.2f };
+    set.positions[2] = { 0.5f, 0.9f };
+    Wander w;
+    w.setSeed(4);
+    const float rate = 0.1f; // a leg: 5 s travel + 5 s dwell
+    int visits[3] = { 0, 0, 0 };
+    int lastAt = -1;
+    Point2 prev = w.update({ 0.5f, 0.5f }, 1.0f, rate, Wander::Style::Journey, &set, 0.0f);
+    float maxStep = 0.0f;
+    for (int step = 0; step < 6000; ++step) // 120 s at 20 ms
+    {
+        const auto p = w.update({ 0.5f, 0.5f }, 1.0f, rate, Wander::Style::Journey, &set, 0.02f);
+        const float stepLen = std::hypot(p.x - prev.x, p.y - prev.y);
+        maxStep = std::max(maxStep, stepLen);
+        prev = p;
+        for (int s = 0; s < 3; ++s)
+            if (std::hypot(p.x - set.positions[static_cast<std::size_t>(s)].x, p.y - set.positions[static_cast<std::size_t>(s)].y) < 1.0e-4f && s != lastAt)
+            {
+                ++visits[s];
+                lastAt = s;
+            }
+    }
+    for (int s = 0; s < 3; ++s)
+        CHECK(visits[s] >= 1); // every scene visited
+    CHECK(visits[0] + visits[1] + visits[2] >= 8); // ~12 legs in 120 s
+    CHECK(maxStep < 0.02f);                         // eased, no jumps
+
+    // Wander 0 keeps the performer's cursor.
+    const auto still = w.update({ 0.3f, 0.6f }, 0.0f, rate, Wander::Style::Journey, &set, 0.02f);
+    CHECK(still.x == Approx(0.3f));
+    CHECK(still.y == Approx(0.6f));
+}
+
+TEST_CASE("Hush sinks the sources and slow time eases Tide down and back", "[hush][slow]")
+{
+    Rig rig;
+    rig.run(1.0);
+    rig.engine.setParam(P::HushHold, 1.0f);
+    rig.engine.setParam(P::SlowHold, 1.0f);
+    rig.run(4.0);
+    CHECK(rig.f.hush > 0.95f);
+    CHECK(rig.f.tide == Approx(0.25f).epsilon(0.05)); // a quarter of Tide 1
+    CHECK(rig.f.paramTargets[idx(P::TideRate)] == Approx(1.0f)); // the setting itself is untouched
+    rig.engine.setParam(P::HushHold, 0.0f);
+    rig.engine.setParam(P::SlowHold, 0.0f);
+    rig.run(8.0);
+    CHECK(rig.f.hush < 0.05f);
+    CHECK(rig.f.tide == Approx(1.0f).epsilon(0.03));
 }

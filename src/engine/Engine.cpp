@@ -104,7 +104,7 @@ void Engine::prepare(double newSampleRate, int maxBlockSize)
     wander.setSeed(config.seed ^ 0x77616e64ull);
     loopRng.setSeed(config.seed ^ 0x6c6f6f70ull);
     loopPattern = -1;
-    swellEnv = 0.0f;
+    swellEnv = hushEnv = slowEnv = 0.0f;
     seasonVersion = 0;
 
     const auto n = static_cast<std::size_t>(maxBlock);
@@ -536,7 +536,7 @@ void Engine::resetFeedback() noexcept
     bloom.reset();
     looper.reset();
     weather.reset();
-    swellEnv = 0.0f;
+    swellEnv = hushEnv = slowEnv = 0.0f;
     inputFreeze.reset();
     freezeCloud.reset();
     freezeGain = 0.0f;
@@ -558,7 +558,7 @@ void Engine::updateTerrain(float dt) noexcept
     cursor = { cursorX.next(), cursorY.next() };
 
     const auto* set = sceneChannel.current();
-    const auto style = static_cast<Wander::Style>(std::clamp(toInt(params.current(P::TerrainWanderStyle)), 0, 2));
+    const auto style = static_cast<Wander::Style>(std::clamp(toInt(params.current(P::TerrainWanderStyle)), 0, 3));
     position = wander.update(cursor, params.current(P::TerrainWander), params.current(P::TerrainWanderRate), style, set, dt * tide);
 
     if (set == nullptr || set->numScenes == 0)
@@ -771,6 +771,48 @@ void Engine::updateModulation(float dt) noexcept
         params.addModulation(idx(P::BusALevel), 0.05f * e);
         for (auto first : kCloudFirstParam)
             params.addModulation(idx(first), 0.15f * e); // density
+    }
+
+    // Shape pad: two macros. Colour darkens or brightens every source; Space pushes
+    // everything back into the reverb and widens it, or pulls it close and dry.
+    const float colour = params.current(P::PerformColour);
+    if (colour != 0.0f)
+    {
+        params.addModulation(idx(P::DroneCutoff), 0.25f * colour);
+        params.addModulation(idx(P::ResBrightness), 0.3f * colour);
+        params.addModulation(idx(P::BloomTone), 0.3f * colour);
+        params.addModulation(idx(P::WeatherTone), 0.3f * colour);
+        params.addModulation(idx(P::MediumAge), -0.2f * colour);
+    }
+    const float space = params.current(P::PerformSpace);
+    if (space != 0.0f)
+    {
+        for (const auto& info : kStrips)
+        {
+            params.addModulation(idx(info.sendA), 0.3f * space);
+            params.addModulation(idx(info.width), 0.15f * space);
+        }
+        params.addModulation(idx(P::BusALevel), 0.06f * space);
+        params.addModulation(idx(P::WeatherDistance), 0.4f * space);
+    }
+
+    // Hush: every source sinks (up to 30 dB) while the reverb and delay tails ring on.
+    {
+        const float hushHold = params.current(P::HushHold);
+        const float hushTime = hushHold > hushEnv ? 1.2f : 3.0f / std::max(0.05f, tide);
+        hushEnv = dsp::flushDenormal(hushEnv + (hushHold - hushEnv) * (1.0f - std::exp(-3.0f * dt / hushTime)));
+        const float h = dsp::smoothstep(std::clamp(hushEnv, 0.0f, 1.0f)) * params.current(P::HushDepth);
+        if (h > 1.0e-4f)
+            for (const auto& info : kStrips)
+                params.addModulation(idx(info.level), -0.45f * h);
+    }
+
+    // Slow time: Tide eases down to a quarter of its setting, and back.
+    {
+        const float slowHold = params.current(P::SlowHold);
+        slowEnv = dsp::flushDenormal(slowEnv + (slowHold - slowEnv) * (1.0f - std::exp(-3.0f * dt / 2.0f)));
+        if (slowEnv > 1.0e-4f)
+            params.addModulation(idx(P::TideRate), -0.273f * dsp::smoothstep(std::clamp(slowEnv, 0.0f, 1.0f)));
     }
 
     // Seasons: minutes-long curves, scaled together by seasons.depth.
@@ -1387,6 +1429,8 @@ void Engine::accumulateTelemetry(const float* l, const float* r, int n) noexcept
     f.weatherWave = weather.getWave();
     f.freezeGain = freezeGain;
     f.swell = swellEnv;
+    f.hush = hushEnv;
+    f.slow = slowEnv;
     {
         const auto& a = autoMaster.getState();
         f.autoMaster = { a.loudness, a.gainDb, a.lowDb, a.mudDb, a.highDb, a.width, a.reductionDb, a.mix };

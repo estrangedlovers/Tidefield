@@ -161,7 +161,7 @@ juce::var buildSchema(const engine::Engine& engine)
     root->setProperty("noteNames", notes);
     root->setProperty("mediumTypes", media);
     root->setProperty("bloomTransforms", transforms);
-    root->setProperty("wanderStyles", arr({ "Drift", "Orbit", "Tide pool" }));
+    root->setProperty("wanderStyles", arr({ "Drift", "Orbit", "Tide pool", "Journey" }));
 
     auto* limits = new juce::DynamicObject();
     limits->setProperty("scenes", kMaxScenes);
@@ -288,6 +288,8 @@ juce::var TelemetryEncoder::encode(const engine::TelemetryFrame& f)
     // Performance layer: swell, seasons, incommensurate loops, looper, weather, freeze.
     auto* perf = new juce::DynamicObject();
     perf->setProperty("swell", q(f.swell));
+    perf->setProperty("hush", q(f.hush));
+    perf->setProperty("slow", q(f.slow));
     perf->setProperty("freeze", q(f.freezeGain));
     juce::Array<juce::var> seasonValues, loopPhase, loopNote, loopFlash;
     for (std::size_t k = 0; k < f.seasonValue.size(); ++k)

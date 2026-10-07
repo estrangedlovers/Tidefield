@@ -1,6 +1,5 @@
 import { useEffect } from "react";
 import { store, useKey, useParam } from "../state/store";
-import { Knob } from "../components/Knob";
 import "./GestureBar.css";
 
 const idx = (id: string) => store.index(id);
@@ -13,27 +12,60 @@ function useToggle(id: string) {
   return [value > 0.5, () => store.setParam(i, value > 0.5 ? 0 : 1)] as const;
 }
 
-/** Hold to swell: every send blooms and the filters open; release ebbs back. */
-function Swell() {
-  const i = idx("swell.hold");
-  const level = store.telemetry?.perf.swell ?? 0;
-  const down = () => store.setParam(i, 1);
+/** A hold gesture: pressed while the pointer (or the key) is down. */
+function Hold({ id, title, sub, level, hint, tone = "accent" }: { id: string; title: string; sub: string; level: number; hint: string; tone?: string }) {
+  const i = idx(id);
   const up = () => store.setParam(i, 0);
   return (
     <button
-      className="gesture swell"
+      className={`gesture hold tone-${tone}`}
       onPointerDown={(e) => {
         (e.target as HTMLElement).setPointerCapture(e.pointerId);
-        down();
+        store.setParam(i, 1);
       }}
       onPointerUp={up}
       onPointerCancel={up}
-      title="Hold (or hold S): sends bloom and filters open. Release: it ebbs back over the Ebb time."
+      title={hint}
     >
       <span className="gesture-fill" style={{ transform: `scaleY(${level})` }} />
-      <span className="gesture-title">Swell</span>
-      <span className="gesture-sub">hold</span>
+      <span className="gesture-title">{title}</span>
+      <span className="gesture-sub">{sub}</span>
     </button>
+  );
+}
+
+/** Two macros on one pad: left-right darkens or brightens everything, down-up pulls
+ *  it close and dry or pushes it far into the reverb. Double-click recentres. */
+function ShapePad() {
+  const ci = idx("perform.colour");
+  const si = idx("perform.space");
+  const c = useParam(ci).value;
+  const s = useParam(si).value;
+  const set = (e: React.PointerEvent<HTMLDivElement>) => {
+    const r = e.currentTarget.getBoundingClientRect();
+    const x = Math.min(1, Math.max(0, (e.clientX - r.left) / r.width));
+    const y = Math.min(1, Math.max(0, (e.clientY - r.top) / r.height));
+    store.setParam(ci, x * 2 - 1);
+    store.setParam(si, 1 - y * 2);
+  };
+  return (
+    <div
+      className="gesture shape-pad"
+      onPointerDown={(e) => {
+        e.currentTarget.setPointerCapture(e.pointerId);
+        store.touching.add(ci).add(si);
+        set(e);
+      }}
+      onPointerMove={(e) => e.buttons && set(e)}
+      onPointerUp={() => (store.touching.delete(ci), store.touching.delete(si))}
+      onDoubleClick={() => (store.setParam(ci, 0), store.setParam(si, 0))}
+      title="Shape: left dark, right bright; down close and dry, up far and wet. Double-click to recentre."
+    >
+      <span className="pad-axis pad-x">colour</span>
+      <span className="pad-axis pad-y">space</span>
+      <span className="pad-cross" />
+      <span className="pad-dot" style={{ left: `${(c + 1) * 50}%`, top: `${(1 - s) * 50}%` }} />
+    </div>
   );
 }
 
@@ -99,17 +131,7 @@ function Loops() {
   );
 }
 
-function Weather() {
-  return (
-    <div className="gesture weather" title="A procedural weather bed: wind with gusts, rain, surf">
-      <Knob param={idx("weather.wind")} label="Wind" size="sm" />
-      <Knob param={idx("weather.rain")} label="Rain" size="sm" />
-      <Knob param={idx("weather.surf")} label="Surf" size="sm" />
-    </div>
-  );
-}
-
-/** Keyboard gestures: S (hold) swell, F freeze all, I hold input, L loop, Shift+L
+/** Keyboard gestures: S, H, T (hold) swell, hush, slow; F freeze all, I hold input, L loop, Shift+L
  *  clear loop, E loops. Ignored while typing. */
 function useGestureKeys() {
   useEffect(() => {
@@ -122,6 +144,8 @@ function useGestureKeys() {
       if (typing(e) || e.repeat) return;
       const k = e.key.toLowerCase();
       if (k === "s") store.setParamById("swell.hold", 1);
+      else if (k === "h") store.setParamById("hush.hold", 1);
+      else if (k === "t") store.setParamById("slow.hold", 1);
       else if (k === "f") flip("freeze.on");
       else if (k === "i") flip("input.freeze");
       else if (k === "e") flip("loops.on");
@@ -130,7 +154,10 @@ function useGestureKeys() {
       e.preventDefault();
     };
     const up = (e: KeyboardEvent) => {
-      if (e.key.toLowerCase() === "s") store.setParamById("swell.hold", 0);
+      const k = e.key.toLowerCase();
+      if (k === "s") store.setParamById("swell.hold", 0);
+      else if (k === "h") store.setParamById("hush.hold", 0);
+      else if (k === "t") store.setParamById("slow.hold", 0);
     };
     window.addEventListener("keydown", down);
     window.addEventListener("keyup", up);
@@ -147,12 +174,14 @@ export function GestureBar() {
   const perf = store.telemetry?.perf;
   return (
     <div className="gestures">
-      <Swell />
-      <Toggle id="freeze.on" title="Freeze all" sub="hold this moment" level={perf?.freeze ?? 0} hint="F: hold the last two seconds as a granular cloud while the rest steps back" />
+      <Hold id="swell.hold" title="Swell" sub="hold S" level={perf?.swell ?? 0} hint="Hold (or hold S): sends bloom and filters open. Release: it ebbs back over the Ebb time." />
+      <Hold id="hush.hold" title="Hush" sub="hold H" level={perf?.hush ?? 0} tone="sand" hint="Hold (or hold H): every source sinks while the reverb and delay ring on. Release: it comes back." />
+      <Hold id="slow.hold" title="Slow" sub="hold T" level={perf?.slow ?? 0} tone="sand" hint="Hold (or hold T): time slows to a quarter, every drift and cycle with it." />
+      <ShapePad />
+      <Toggle id="freeze.on" title="Freeze all" sub="the moment, F" level={perf?.freeze ?? 0} hint="F: hold the last two seconds as a granular cloud while the rest steps back" />
       <Looper />
-      <Toggle id="input.freeze" title="Hold input" sub="spectral" level={store.telemetry?.input[2] ?? 0} hint="I: hold the live input's sound forever as a spectral pad" />
+      <Toggle id="input.freeze" title="Hold input" sub="spectral, I" level={store.telemetry?.input[2] ?? 0} hint="I: hold the live input's sound forever as a spectral pad" />
       <Loops />
-      <Weather />
     </div>
   );
 }

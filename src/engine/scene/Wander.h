@@ -8,6 +8,7 @@
 #include <dsp/mod/Drift.h>
 
 #include <algorithm>
+#include <array>
 #include <cmath>
 
 namespace tf::engine {
@@ -20,11 +21,14 @@ namespace tf::engine {
                   performer's cursor, so it wanders without escaping.
       Orbit     - slow ellipse around the cursor with drifting radius and speed.
       TidePool  - drift that is attracted toward the nearest scene, so the sound tends
-                  to settle into scenes, linger, then get washed out again. */
+                  to settle into scenes, linger, then get washed out again.
+      Journey   - travels from scene to scene on its own (nearer scenes are likelier
+                  next stops), easing in and out of each and dwelling there; Wander
+                  sets how far it pulls away from the performer's cursor (1 = fully). */
 class Wander
 {
 public:
-    enum class Style : int { Drift = 0, Orbit = 1, TidePool = 2 };
+    enum class Style : int { Drift = 0, Orbit = 1, TidePool = 2, Journey = 3 };
 
     void setSeed(std::uint64_t seed) noexcept
     {
@@ -33,11 +37,13 @@ public:
         speedDrift.setSeed(seed + 2);
         offset = {};
         angle = 0.0f;
+        journeyTo = -1;
     }
 
     void reset() noexcept
     {
         offset = {};
+        journeyTo = -1;
     }
 
     /** Advances by dt seconds of (tide-scaled) time and returns the effective position. */
@@ -46,10 +52,26 @@ public:
         rateHz = std::max(rateHz, 0.0001f);
         const float reach = 0.45f * std::clamp(amount, 0.0f, 1.0f);
 
+        if (style == Style::Journey && scenes != nullptr && scenes->numScenes >= 2)
+        {
+            const Point2 here { cursor.x + offset.x * reach, cursor.y + offset.y * reach };
+            const Point2 at = stepJourney(here, rateHz, scenes, dt);
+            const float a = std::clamp(amount, 0.0f, 1.0f);
+            const Point2 pos { cursor.x + (at.x - cursor.x) * a, cursor.y + (at.y - cursor.y) * a };
+            // Keep the offset in step, so switching to another style continues from here.
+            if (reach > 0.0f)
+                offset = { std::clamp((pos.x - cursor.x) / reach, -1.5f, 1.5f), std::clamp((pos.y - cursor.y) / reach, -1.5f, 1.5f) };
+            return { std::clamp(pos.x, 0.0f, 1.0f), std::clamp(pos.y, 0.0f, 1.0f) };
+        }
+        journeyTo = -1; // any other style: the next journey starts afresh
+
         switch (style)
         {
             case Style::Drift: stepOu(rateHz, dt, Point2 { 0.0f, 0.0f }, 0.0f); break;
             case Style::Orbit: stepOrbit(rateHz, dt); break;
+            case Style::Journey: // fewer than two scenes: nowhere to travel, so drift
+                stepOu(rateHz, dt, Point2 { 0.0f, 0.0f }, 0.0f);
+                break;
             case Style::TidePool:
             {
                 Point2 pull { 0.0f, 0.0f };
@@ -93,6 +115,63 @@ private:
         offset.y = std::clamp(offset.y, -1.5f, 1.5f);
     }
 
+    /** One leg takes 0.5 / rate (Tide-scaled) seconds of travel plus as long again
+        dwelling at the scene. */
+    Point2 stepJourney(Point2 here, float rateHz, const SceneSet* scenes, float dt) noexcept
+    {
+        const int n = scenes->numScenes;
+        auto pos = [&](int i) { return scenes->positions[static_cast<std::size_t>(i)]; };
+        if (journeyTo < 0 || journeyTo >= n)
+        {
+            journeyFrom = here;
+            journeyTo = terrain::nearestScene(*scenes, here);
+            journeyPhase = 0.0f;
+            journeyDwell = 0.0f;
+        }
+        if (journeyDwell > 0.0f)
+        {
+            journeyDwell -= dt * rateHz * 2.0f;
+            return journeyFrom; // resting at the scene just reached (journeyTo is already the next stop)
+        }
+        journeyPhase += dt * rateHz * 2.0f;
+        if (journeyPhase >= 1.0f)
+        {
+            // Arrived: linger, then choose the next stop (nearer ones likelier).
+            const int at = journeyTo;
+            journeyFrom = pos(at);
+            float total = 0.0f;
+            std::array<float, kMaxScenes> w {};
+            for (int i = 0; i < n; ++i)
+            {
+                if (i == at)
+                    continue;
+                const float dx = pos(i).x - pos(at).x, dy = pos(i).y - pos(at).y;
+                w[static_cast<std::size_t>(i)] = 1.0f / (std::sqrt(dx * dx + dy * dy) + 0.15f);
+                total += w[static_cast<std::size_t>(i)];
+            }
+            float pick = rng.nextFloat() * total;
+            int next = at == 0 ? 1 : 0;
+            for (int i = 0; i < n; ++i)
+            {
+                if (i == at)
+                    continue;
+                pick -= w[static_cast<std::size_t>(i)];
+                if (pick <= 0.0f)
+                {
+                    next = i;
+                    break;
+                }
+            }
+            journeyTo = next;
+            journeyPhase = 0.0f;
+            journeyDwell = 1.0f;
+            return journeyFrom;
+        }
+        const float t = dsp::smoothstep(journeyPhase);
+        const Point2 to = pos(journeyTo);
+        return { journeyFrom.x + (to.x - journeyFrom.x) * t, journeyFrom.y + (to.y - journeyFrom.y) * t };
+    }
+
     void stepOrbit(float rateHz, float dt) noexcept
     {
         radiusDrift.setRate(rateHz * 0.5f);
@@ -112,6 +191,9 @@ private:
     dsp::Drift radiusDrift, speedDrift;
     Point2 offset { 0.0f, 0.0f };
     float angle = 0.0f;
+    Point2 journeyFrom { 0.5f, 0.5f };
+    int journeyTo = -1;
+    float journeyPhase = 0.0f, journeyDwell = 0.0f;
 };
 
 } // namespace tf::engine

@@ -499,6 +499,8 @@ class MockEngine {
         : [-22, 0, 0, 0, 0, 1, 0, 0],
       perf: {
         swell: this.swell,
+        hush: t[P("hush.hold")],
+        slow: t[P("slow.hold")],
         freeze: this.freeze,
         seasons: seasonValues,
         loops: [

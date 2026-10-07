@@ -280,3 +280,17 @@
   color: var(--text-3);
   font-variant-numeric: tabular-nums;
 }
+
+.weather-title {
+  margin-top: 2px;
+  color: var(--text-3);
+}
+
+.weather-block .knob-row {
+  display: flex;
+  justify-content: space-between;
+}
+
+.weather-block .knob-sm {
+  width: 64px;
+}

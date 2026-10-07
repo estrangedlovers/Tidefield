@@ -105,6 +105,8 @@ export type LooperState = 0 | 1 | 2 | 3 | 4;
 
 export interface PerfTelemetry {
   swell: number;
+  hush: number;
+  slow: number;
   freeze: number;
   seasons: number[];
   /** phases, notes, flashes (8 each) */

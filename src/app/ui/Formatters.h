@@ -24,8 +24,8 @@ inline juce::String medium(double v)
 
 inline juce::String wanderStyle(double v)
 {
-    static const char* names[] = { "Drift", "Orbit", "Tide pool" };
-    return names[std::clamp(static_cast<int>(std::lround(v)), 0, 2)];
+    static const char* names[] = { "Drift", "Orbit", "Tide pool", "Journey" };
+    return names[std::clamp(static_cast<int>(std::lround(v)), 0, 3)];
 }
 
 inline juce::String inputChannel(double v)

@@ -80,6 +80,7 @@ struct TelemetryFrame
 
     // Performance layer.
     float swell = 0.0f;                         // envelope 0..1
+    float hush = 0.0f, slow = 0.0f;             // envelopes 0..1
     std::array<float, 8> seasonValue {};        // each season's curve, -1..1
     std::array<float, 8> loopPhase {};          // incommensurate loops, 0..1
     std::array<float, 8> loopNote {};

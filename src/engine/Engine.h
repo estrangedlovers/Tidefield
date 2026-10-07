@@ -251,7 +251,7 @@ private:
     void processFreeze(int offset, int numSamples) noexcept;
 
     // Swell and seasons (modulation), incommensurate loops (note generator).
-    float swellEnv = 0.0f;
+    float swellEnv = 0.0f, hushEnv = 0.0f, slowEnv = 0.0f;
     std::array<float, kMaxSeasons> seasonPhase {}, seasonValue {};
     std::array<dsp::Drift, kMaxSeasons> seasonDrift;
     std::uint64_t seasonVersion = 0;

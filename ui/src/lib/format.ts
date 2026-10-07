@@ -45,6 +45,8 @@ export function choicesFor(spec: ParamSpec, schema: Schema): string[] | null {
     case "freeze.on":
     case "loops.on":
     case "swell.hold":
+    case "hush.hold":
+    case "slow.hold":
       return ["Off", "On"];
     case "master.auto":
       return ["Off", "On"];

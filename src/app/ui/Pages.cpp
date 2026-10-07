@@ -16,7 +16,9 @@ PerformPage::PerformPage(engine::Engine& e, engine::SceneManager& s) : engine(e)
     addAndMakeVisible(pad);
     addAndMakeVisible(captureButton);
     addAndMakeVisible(releaseButton);
-    addAndMakeVisible(controls);
+    controlsView.setViewedComponent(&controls, false);
+    controlsView.setScrollBarsShown(true, false);
+    addAndMakeVisible(controlsView);
     captureButton.setTooltip("C: store what you hear now as a scene at the cursor");
     releaseButton.setTooltip("R: hand every knob you have touched back to the terrain");
     captureButton.onClick = [this] { captureScene(); };
@@ -26,12 +28,33 @@ PerformPage::PerformPage(engine::Engine& e, engine::SceneManager& s) : engine(e)
     controls.addSection("Terrain", { P::TerrainGlide, P::TerrainFocus, P::TerrainWander, P::TerrainWanderRate, P::TerrainWanderStyle });
     controls.addSection("Tide and key", { P::TideRate, P::HarmonyRoot, P::HarmonyScale, P::HarmonyGravity, P::HarmonyMorph });
     controls.addSection("Medium", { P::MediumType, P::MediumAge, P::MediumNoise, P::MediumWobble, P::MediumDrive, P::MediumMix });
+    controls.addSection("Bloom keyboard", { P::BloomTransform, P::BloomAmount, P::BloomLength, P::BloomPitch, P::BloomLevel });
+    controls.addSection("Catch", { P::CatchSeconds, P::CatchSource, P::CatchTarget });
+    controls.findKnob(P::BloomTransform)->setDisplay("Transform", format::bloomTransform);
+    controls.findKnob(P::BloomLevel)->setDisplay("Level", [](double v) { return juce::String(v, 1) + " dB"; });
+    controls.findKnob(P::CatchSource)->setDisplay("Source", format::catchSource);
+    controls.findKnob(P::CatchTarget)->setDisplay("Into", format::catchTarget);
+
+    keyboard.setAvailableRange(24, 108);
+    keyboard.setLowestVisibleKey(48);
+    keyboard.setKeyWidth(22.0f);
+    keyboard.setColour(juce::MidiKeyboardComponent::keyDownOverlayColourId, theme::live.withAlpha(0.6f));
+    keyboard.setColour(juce::MidiKeyboardComponent::mouseOverKeyOverlayColourId, theme::accent.withAlpha(0.3f));
+    keyboard.setWantsKeyboardFocus(false);
+    keyboardState.addListener(this);
+    addAndMakeVisible(keyboard);
 
     controls.findKnob(P::TerrainWanderStyle)->setDisplay("Wander Style", format::wanderStyle);
     controls.findKnob(P::HarmonyRoot)->setDisplay("Key", format::note);
     controls.findKnob(P::HarmonyScale)->setDisplay("Scale", format::scale);
     controls.findKnob(P::MediumType)->setDisplay("Medium", format::medium);
 }
+
+PerformPage::~PerformPage() { keyboardState.removeListener(this); }
+
+void PerformPage::handleNoteOn(juce::MidiKeyboardState*, int, int note, float velocity) { engine.noteOn(note, velocity); }
+
+void PerformPage::handleNoteOff(juce::MidiKeyboardState*, int, int note, float) { engine.noteOff(note); }
 
 void PerformPage::update(const engine::TelemetryFrame& frame)
 {
@@ -47,13 +70,17 @@ void PerformPage::update(const engine::TelemetryFrame& frame)
 void PerformPage::resized()
 {
     auto b = getLocalBounds();
+    keyboard.setBounds(b.removeFromBottom(72).reduced(0, 4));
+    b.removeFromBottom(6);
     auto left = b.removeFromLeft(std::min(b.getHeight() - 40, b.getWidth() / 2));
     auto buttons = left.removeFromBottom(36);
     pad.setBounds(left.reduced(0, 4));
     captureButton.setBounds(buttons.removeFromLeft(buttons.getWidth() / 2).reduced(4));
     releaseButton.setBounds(buttons.reduced(4));
     b.removeFromLeft(12);
-    controls.setBounds(b);
+    controlsView.setBounds(b);
+    const int w = controlsView.getMaximumVisibleWidth();
+    controls.setSize(w, controls.layout(w, false));
 }
 
 // --- Sources -------------------------------------------------------------------------
@@ -81,9 +108,26 @@ SourcesPage::SourcesPage(engine::Engine& e) : ScrollingPanel(e), engine(e)
         panel.addHeaderComponent(s, l, 220);
     }
 
+    const int bloomSection = panel.addSection("Bloom", { P::BloomTransform, P::BloomAmount, P::BloomLength, P::BloomAttack, P::BloomRelease,
+                                                        P::BloomRoot, P::BloomPitch, P::BloomTone, P::BloomSpread, P::BloomRandom,
+                                                        P::BloomPosition, P::BloomGravity });
+    panel.findKnob(P::BloomTransform)->setDisplay("Transform", format::bloomTransform);
+    panel.findKnob(P::BloomRoot)->setDisplay("Sample Root", format::midiNote);
+    {
+        auto& b = loadButtons[engine::kNumClouds];
+        b.setButtonText("Load one-shot...");
+        b.onClick = [this] { chooseSample(engine::kNumClouds); };
+        auto& l = sampleNames[engine::kNumClouds];
+        l.setText("glass (built in)", juce::dontSendNotification);
+        l.setColour(juce::Label::textColourId, theme::textDim);
+        l.setJustificationType(juce::Justification::centredRight);
+        panel.addHeaderComponent(bloomSection, b, 130);
+        panel.addHeaderComponent(bloomSection, l, 220);
+    }
+
     panel.addSection("Resonator", { P::ResRoot, P::ResModes, P::ResStructure, P::ResDecay, P::ResBrightness, P::ResSpread, P::ResGravity });
     panel.findKnob(P::ResRoot)->setDisplay("Root", format::midiNote);
-    panel.addSection("Resonator: excitation", { P::ResRain, P::ResRainColour, P::ResExciteInput, P::ResExciteDrone, P::ResExciteClouds });
+    panel.addSection("Resonator: excitation", { P::ResRain, P::ResRainColour, P::ResExciteInput, P::ResExciteDrone, P::ResExciteClouds, P::ResExciteBloom });
     panel.addSection("Live input", { P::InputArmed, P::InputChannel, P::InputGain, P::InputHighPass, P::InputGate });
     panel.findKnob(P::InputArmed)->setDisplay("Monitor", format::onOff);
     panel.findKnob(P::InputChannel)->setDisplay("Channel", format::inputChannel);
@@ -91,8 +135,10 @@ SourcesPage::SourcesPage(engine::Engine& e) : ScrollingPanel(e), engine(e)
 
 void SourcesPage::chooseSample(int cloud)
 {
-    chooser = std::make_unique<juce::FileChooser>("Load a sample into Cloud " + juce::String(cloud + 1), juce::File(),
-                                                  "*.wav;*.aif;*.aiff;*.flac;*.ogg;*.mp3");
+    const bool isBloom = cloud == engine::kNumClouds;
+    chooser = std::make_unique<juce::FileChooser>(isBloom ? juce::String("Load a one-shot into Bloom")
+                                                          : "Load a sample into Cloud " + juce::String(cloud + 1),
+                                                  juce::File(), "*.wav;*.aif;*.aiff;*.flac;*.ogg;*.mp3");
     juce::Component::SafePointer<SourcesPage> safe(this);
     chooser->launchAsync(juce::FileBrowserComponent::openMode | juce::FileBrowserComponent::canSelectFiles,
                          [safe, cloud](const juce::FileChooser& fc) {
@@ -113,7 +159,10 @@ void SourcesPage::chooseSample(int cloud)
                                          return;
                                      }
                                      safe->sampleNames[static_cast<std::size_t>(cloud)].setText(buffer->name, juce::dontSendNotification);
-                                     safe->engine.loadCloudSample(cloud, std::make_unique<dsp::SampleBuffer>(std::move(*buffer)));
+                                     if (cloud == engine::kNumClouds)
+                                         safe->engine.loadBloomSample(buffer);
+                                     else
+                                         safe->engine.loadCloudSample(cloud, buffer);
                                  });
                              }).detach();
                          });
@@ -122,9 +171,15 @@ void SourcesPage::chooseSample(int cloud)
 void SourcesPage::update(const engine::TelemetryFrame& frame)
 {
     ScrollingPanel::update(frame);
+    // Names follow whatever is loaded (file, Catch, session recall).
     for (int k = 0; k < engine::kNumClouds; ++k)
-        if (! frame.cloudLoaded[static_cast<std::size_t>(k)])
-            sampleNames[static_cast<std::size_t>(k)].setText("empty", juce::dontSendNotification);
+    {
+        const auto sample = engine.getCloudSample(k);
+        sampleNames[static_cast<std::size_t>(k)].setText(sample != nullptr ? juce::String(sample->name) : juce::String("empty"),
+                                                         juce::dontSendNotification);
+    }
+    const auto bloom = engine.getBloomSample();
+    sampleNames[engine::kNumClouds].setText(bloom != nullptr ? juce::String(bloom->name) : juce::String("empty"), juce::dontSendNotification);
 }
 
 // --- Mixer ---------------------------------------------------------------------------

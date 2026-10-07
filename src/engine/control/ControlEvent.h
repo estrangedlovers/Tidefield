@@ -19,6 +19,7 @@ enum class Command : std::uint8_t
     ResumeFromPanic, // clear panic and fade in
     ResetFeedback,   // clear filters/delays/reverbs without changing gain
     ReleaseLiveLayer, // hand every overridden parameter back to the terrain
+    Catch,            // capture the last catch.seconds of catch.source into a cloud
 };
 
 /** The single path for every change into the engine. Trivially copyable so it can
@@ -28,7 +29,8 @@ struct ControlEvent
     /** SetParam on a terrain-bound parameter while scenes exist puts that parameter in
         the live layer (it overrides the terrain until released). ReleaseParam hands one
         parameter back. */
-    enum class Type : std::uint8_t { SetParam, ReleaseParam, Command };
+    /** SnapParam sets a value with no smoothing (session recall while faded out). */
+    enum class Type : std::uint8_t { SetParam, ReleaseParam, Command, Note, SnapParam };
 
     Type type = Type::SetParam;
     ControlSource source = ControlSource::UI;
@@ -46,12 +48,30 @@ struct ControlEvent
         return e;
     }
 
+    static ControlEvent snapParam(ParamIndex index, float plainValue, ControlSource src = ControlSource::UI) noexcept
+    {
+        ControlEvent e = setParam(index, plainValue, src);
+        e.type = Type::SnapParam;
+        return e;
+    }
+
     static ControlEvent releaseParam(ParamIndex index, ControlSource src = ControlSource::UI) noexcept
     {
         ControlEvent e;
         e.type = Type::ReleaseParam;
         e.source = src;
         e.param = index;
+        return e;
+    }
+
+    /** Note on (velocity > 0) or off (velocity 0). `param` carries the MIDI note. */
+    static ControlEvent note(int noteNumber, float velocity, ControlSource src = ControlSource::UI) noexcept
+    {
+        ControlEvent e;
+        e.type = Type::Note;
+        e.source = src;
+        e.param = static_cast<ParamIndex>(noteNumber & 127);
+        e.value = velocity;
         return e;
     }
 

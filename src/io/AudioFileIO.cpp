@@ -2,19 +2,19 @@
 
 namespace tf::io {
 
-std::unique_ptr<dsp::SampleBuffer> loadSample(const juce::File& file, juce::String& error, double maxSeconds)
+namespace {
+
+std::unique_ptr<dsp::SampleBuffer> readAll(std::unique_ptr<juce::AudioFormatReader> reader, const juce::String& name,
+                                           juce::String& error, double maxSeconds)
 {
-    juce::AudioFormatManager formats;
-    formats.registerBasicFormats();
-    std::unique_ptr<juce::AudioFormatReader> reader(formats.createReaderFor(file));
     if (reader == nullptr)
     {
-        error = "Could not read " + file.getFullPathName();
+        error = "Could not read " + name;
         return nullptr;
     }
     if (reader->sampleRate <= 0.0 || reader->lengthInSamples <= 0)
     {
-        error = "Empty or invalid audio file: " + file.getFileName();
+        error = "Empty or invalid audio: " + name;
         return nullptr;
     }
 
@@ -27,11 +27,52 @@ std::unique_ptr<dsp::SampleBuffer> loadSample(const juce::File& file, juce::Stri
 
     auto buffer = std::make_unique<dsp::SampleBuffer>();
     buffer->sampleRate = reader->sampleRate;
-    buffer->name = file.getFileNameWithoutExtension().toStdString();
+    buffer->name = name.toStdString();
     buffer->left.assign(temp.getReadPointer(0), temp.getReadPointer(0) + length);
     if (channels > 1)
         buffer->right.assign(temp.getReadPointer(1), temp.getReadPointer(1) + length);
     return buffer;
+}
+
+} // namespace
+
+std::unique_ptr<dsp::SampleBuffer> loadSample(const juce::File& file, juce::String& error, double maxSeconds)
+{
+    juce::AudioFormatManager formats;
+    formats.registerBasicFormats();
+    return readAll(std::unique_ptr<juce::AudioFormatReader>(formats.createReaderFor(file)), file.getFileNameWithoutExtension(), error,
+                   maxSeconds);
+}
+
+std::unique_ptr<dsp::SampleBuffer> loadSample(std::unique_ptr<juce::InputStream> stream, const juce::String& name, juce::String& error,
+                                              double maxSeconds)
+{
+    juce::AudioFormatManager formats;
+    formats.registerBasicFormats();
+    return readAll(std::unique_ptr<juce::AudioFormatReader>(formats.createReaderFor(std::move(stream))), name, error, maxSeconds);
+}
+
+bool encodeFlac(const dsp::SampleBuffer& buffer, juce::MemoryBlock& out, juce::String& error)
+{
+    out.reset();
+    std::unique_ptr<juce::OutputStream> stream = std::make_unique<juce::MemoryOutputStream>(out, false);
+    juce::FlacAudioFormat flac;
+    const int channels = buffer.isStereo() ? 2 : 1;
+    const auto options = juce::AudioFormatWriterOptions {}.withSampleRate(buffer.sampleRate).withNumChannels(channels).withBitsPerSample(24);
+    auto writer = flac.createWriterFor(stream, options);
+    if (writer == nullptr)
+    {
+        error = "FLAC encoder unavailable for this sample rate";
+        return false;
+    }
+    const float* ptrs[2] = { buffer.left.data(), buffer.isStereo() ? buffer.right.data() : buffer.left.data() };
+    if (! writer->writeFromFloatArrays(ptrs, channels, static_cast<int>(buffer.size())))
+    {
+        error = "FLAC encoding failed";
+        return false;
+    }
+    writer.reset(); // flushes into `out`
+    return true;
 }
 
 bool writeSample(const dsp::SampleBuffer& buffer, const juce::File& file, juce::String& error)

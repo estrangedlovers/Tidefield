@@ -4,6 +4,8 @@
 
 #include "../TerrainPad.h"
 
+#include <juce_audio_utils/juce_audio_utils.h>
+
 #include <engine/mix/FxManager.h>
 #include <engine/scene/SceneManager.h>
 
@@ -43,10 +45,11 @@ protected:
     KnobPanel panel;
 };
 
-class PerformPage final : public Page
+class PerformPage final : public Page, private juce::MidiKeyboardState::Listener
 {
 public:
     PerformPage(engine::Engine& engine, engine::SceneManager& scenes);
+    ~PerformPage() override;
     void update(const engine::TelemetryFrame& frame) override;
     void resized() override;
     void captureScene() { scenes.captureScene({}, last.cursor, last); }
@@ -58,7 +61,13 @@ private:
     TerrainPad pad;
     juce::TextButton captureButton { "Capture Scene" }, releaseButton { "Release Live" };
     KnobPanel controls;
+    juce::Viewport controlsView;
     engine::TelemetryFrame last;
+    juce::MidiKeyboardState keyboardState;
+    juce::MidiKeyboardComponent keyboard { keyboardState, juce::MidiKeyboardComponent::horizontalKeyboard };
+
+    void handleNoteOn(juce::MidiKeyboardState*, int channel, int note, float velocity) override;
+    void handleNoteOff(juce::MidiKeyboardState*, int channel, int note, float velocity) override;
 };
 
 class SourcesPage final : public ScrollingPanel
@@ -68,11 +77,12 @@ public:
     void update(const engine::TelemetryFrame& frame) override;
 
 private:
-    void chooseSample(int cloud);
+    /** slot 0-3 = clouds, 4 = Bloom. */
+    void chooseSample(int slot);
 
     engine::Engine& engine;
-    std::array<juce::TextButton, engine::kNumClouds> loadButtons;
-    std::array<juce::Label, engine::kNumClouds> sampleNames;
+    std::array<juce::TextButton, engine::kNumClouds + 1> loadButtons;
+    std::array<juce::Label, engine::kNumClouds + 1> sampleNames;
     std::unique_ptr<juce::FileChooser> chooser;
 };
 

@@ -79,6 +79,9 @@ inline constexpr unsigned kDiscrete = 1u << 4;      // integer choice; scenes pi
     X(MediumWobble,     "medium.wobble",      "Wobble",            0.0f,   1.0f,    0.3f, Linear,  Exponential,    0.3f,  "",   TF_TB_ML) \
     X(MediumDrive,      "medium.drive",       "Drive",             0.0f,   1.0f,    0.3f, Linear,  Exponential,    0.3f,  "",   TF_TB_ML) \
     X(MediumMix,        "medium.mix",         "Medium Mix",        0.0f,   1.0f,    1.0f, Linear,  Linear,         0.05f, "",   TF_TB_ML) \
+    X(CatchSeconds,     "catch.seconds",      "Catch Length",      5.0f,  30.0f,   20.0f, Linear,  Linear,         0.0f,  "s",  kMidiLearnable | kPerformance) \
+    X(CatchSource,      "catch.source",       "Catch Source",      0.0f,   1.0f,    0.0f, Linear,  Linear,         0.0f,  "",   kMidiLearnable | kDiscrete) \
+    X(CatchTarget,      "catch.target",       "Catch Into",        0.0f,   4.0f,    0.0f, Linear,  Linear,         0.0f,  "",   kMidiLearnable | kDiscrete) \
     X(BusALevel,        "busA.level",         "Reverb Return",   -60.0f,   6.0f,    0.0f, Decibel, Linear,         0.05f, "dB", TF_TB_ML | kPerformance) \
     X(BusBLevel,        "busB.level",         "Delay Return",    -60.0f,   6.0f,    0.0f, Decibel, Linear,         0.05f, "dB", TF_TB_ML | kPerformance) \
     X(DroneRoot,        "drone.root",         "Root Note",        24.0f,  72.0f,   38.0f, Linear,  Exponential,    0.8f,  "st", TF_TB_ML) \
@@ -121,6 +124,19 @@ inline constexpr unsigned kDiscrete = 1u << 4;      // integer choice; scenes pi
     X(InputGate,        "input.gate",         "Gate",            -90.0f, -20.0f,  -70.0f, Linear,  Linear,         0.05f, "dB", kMidiLearnable) \
     X(InputArmed,       "input.armed",        "Monitor",           0.0f,   1.0f,    0.0f, Linear,  Linear,         0.03f, "",   kMidiLearnable | kDiscrete | kPerformance) \
     TF_STRIP(X, Input,     "input",     0.0f, -14.0f, -18.0f) \
+    X(BloomTransform,   "bloom.transform",    "Transform",         0.0f,   5.0f,    0.0f, Linear,  Linear,         0.0f,  "",   TF_TB_ML | kDiscrete | kPerformance) \
+    X(BloomAmount,      "bloom.amount",       "Amount",            0.0f,   1.0f,    0.5f, Linear,  Exponential,    0.2f,  "",   TF_TB_ML | kPerformance) \
+    X(BloomLength,      "bloom.length",       "Length",            0.5f,  30.0f,    8.0f, Log,     LogExponential, 0.2f,  "s",  TF_TB_ML) \
+    X(BloomAttack,      "bloom.attack",       "Attack",            0.005f, 4.0f,    0.05f, Log,    LogExponential, 0.1f,  "s",  TF_TB_ML) \
+    X(BloomRelease,     "bloom.release",      "Release",           0.1f,  12.0f,    2.5f, Log,     LogExponential, 0.1f,  "s",  TF_TB_ML) \
+    X(BloomRoot,        "bloom.root",         "Sample Root",      24.0f,  96.0f,   60.0f, Linear,  Linear,         0.0f,  "",   kMidiLearnable | kDiscrete) \
+    X(BloomPitch,       "bloom.pitch",        "Pitch",           -24.0f,  24.0f,    0.0f, Linear,  Exponential,    0.1f,  "st", TF_TB_ML) \
+    X(BloomTone,        "bloom.tone",         "Tone",              0.0f,   1.0f,    0.7f, Linear,  Exponential,    0.1f,  "",   TF_TB_ML) \
+    X(BloomSpread,      "bloom.spread",       "Spread",            0.0f,   1.0f,    0.6f, Linear,  Exponential,    0.1f,  "",   TF_TB_ML) \
+    X(BloomRandom,      "bloom.random",       "Random",            0.0f,   1.0f,    0.3f, Linear,  Exponential,    0.1f,  "",   TF_TB_ML) \
+    X(BloomPosition,    "bloom.position",     "Position",          0.0f,   1.0f,    0.3f, Linear,  Exponential,    0.2f,  "",   TF_TB_ML) \
+    X(BloomGravity,     "bloom.gravity",      "Gravity",           0.0f,   1.0f,    1.0f, Linear,  Exponential,    0.2f,  "",   TF_TB_ML) \
+    X(ResExciteBloom,   "res.exciteBloom",    "From Bloom",        0.0f,   1.0f,    0.0f, Linear,  Exponential,    0.1f,  "",   TF_TB_ML) \
     TF_STRIP(X, Bloom,     "bloom",     0.0f,  -6.0f, -14.0f) \
     TF_FX_SLOT(X, DroneFx1,  "drone.fx1")  TF_FX_SLOT(X, DroneFx2,  "drone.fx2")  \
     TF_FX_SLOT(X, Cloud1Fx1, "cloud1.fx1") TF_FX_SLOT(X, Cloud1Fx2, "cloud1.fx2") \

@@ -1,0 +1,13 @@
+{
+  "duration": 20,
+  "sampleRate": 48000,
+  "blockSize": 512,
+  "seed": 22,
+  "session": "out/bloom_catch.tidefield",
+  "events": [
+    { "t": 0, "param": "master.fadeSeconds", "value": 2 },
+    { "t": 0, "cmd": "fadeIn" },
+    { "t": 3, "note": 69, "velocity": 0.8 },
+    { "t": 15, "cmd": "fadeOut" }
+  ]
+}

@@ -1,5 +1,8 @@
 #include "MainComponent.h"
 
+#include <BinaryData.h>
+#include <io/AudioFileIO.h>
+
 namespace tf::app {
 
 namespace {
@@ -18,15 +21,28 @@ const char* fadeStateName(engine::FadeState s)
 
 } // namespace
 
-MainComponent::MainComponent(AudioHost& h) : host(h), engine(h.getEngine()), scenes(h.getEngine()), fx(h.getEngine())
+MainComponent::MainComponent(AudioHost& h)
+    : host(h), engine(h.getEngine()), scenes(h.getEngine()), fx(h.getEngine()), catcher(h.getEngine()), session(h.getEngine(), scenes, fx)
 {
     // Default (not per-component) so every child copies the palette when it is built.
     juce::LookAndFeel::setDefaultLookAndFeel(&lookAndFeel);
     fx.loadDefaultLayout();
 
-    for (auto* b : { &settingsButton, &fadeInButton, &fadeOutButton, &panicButton })
+    for (auto* b : { &settingsButton, &fadeInButton, &fadeOutButton, &panicButton, &sessionButton, &catchButton })
         addAndMakeVisible(*b);
     panicButton.setColour(juce::TextButton::buttonColourId, theme::warn.darker(0.6f));
+    catchButton.setColour(juce::TextButton::buttonColourId, theme::accent.darker(0.55f));
+    catchButton.setTooltip("K: capture the last few seconds of the output into a granular cloud");
+    catchButton.onClick = [this] { engine.command(engine::Command::Catch); };
+    sessionButton.onClick = [this] { showSessionMenu(); };
+    sessionButton.setTooltip("New, open and save sessions (Cmd+N, Cmd+O, Cmd+S)");
+
+    catcher.onCaught = [this](int cloud, const std::string& name) {
+        showStatus("Caught into Cloud " + juce::String(cloud + 1) + " (" + juce::String(name) + ")");
+    };
+    catcher.onRejected = [this](const std::string& reason) { showStatus(reason, true); };
+    session.onStatus = [this](const juce::String& m) { showStatus(m); };
+    session.onSessionChanged = [this] { updateTitle(); };
 
     settingsButton.onClick = [this] { showDeviceSettings(); };
     fadeInButton.onClick = [this] { engine.command(engine::Command::FadeIn); };
@@ -52,8 +68,55 @@ MainComponent::MainComponent(AudioHost& h) : host(h), engine(h.getEngine()), sce
     addAndMakeVisible(tabs);
 
     setWantsKeyboardFocus(true);
-    setSize(1380, 860);
+    setSize(1380, 900);
+    loadFactoryContent();
     startTimerHz(30);
+}
+
+void MainComponent::loadFactoryContent()
+{
+    // A first launch should make sound: Bloom gets the glass one-shot, Cloud 1 a pad.
+    auto decode = [](const void* data, int size, const char* name) -> std::shared_ptr<const dsp::SampleBuffer> {
+        juce::String error;
+        auto b = io::loadSample(std::make_unique<juce::MemoryInputStream>(data, static_cast<size_t>(size), false), name, error);
+        return std::shared_ptr<const dsp::SampleBuffer>(std::move(b));
+    };
+    engine.loadBloomSample(decode(BinaryData::glass_wav, BinaryData::glass_wavSize, "glass"));
+    engine.loadCloudSample(0, decode(BinaryData::chord_wav, BinaryData::chord_wavSize, "chord"));
+    engine.setParam(engine::P::BloomRoot, 81.0f); // glass.wav rings at A5
+}
+
+void MainComponent::showStatus(const juce::String& message, bool warning)
+{
+    statusMessage = message;
+    statusIsWarning = warning;
+    statusUntil = juce::Time::getMillisecondCounter() + 4000;
+}
+
+void MainComponent::updateTitle()
+{
+    if (auto* window = findParentComponentOfClass<juce::DocumentWindow>())
+        window->setName("Tidefield - " + session.getName());
+}
+
+void MainComponent::showSessionMenu()
+{
+    juce::PopupMenu menu;
+    menu.addItem(1, "New session");
+    menu.addItem(2, "Open...");
+    menu.addSeparator();
+    menu.addItem(3, "Save");
+    menu.addItem(4, "Save as...");
+    menu.showMenuAsync(juce::PopupMenu::Options().withTargetComponent(&sessionButton), [this](int r) {
+        switch (r)
+        {
+            case 1: session.newSession(); break;
+            case 2: session.open(); break;
+            case 3: session.save(); break;
+            case 4: session.saveAs(); break;
+            default: break;
+        }
+    });
 }
 
 MainComponent::~MainComponent()
@@ -66,7 +129,22 @@ MainComponent::~MainComponent()
 bool MainComponent::keyPressed(const juce::KeyPress& key)
 {
     const auto c = juce::CharacterFunctions::toLowerCase(key.getTextCharacter());
-    if (key == juce::KeyPress::spaceKey)
+    if (key.getModifiers().isCommandDown())
+    {
+        const auto code = juce::CharacterFunctions::toLowerCase(static_cast<juce::juce_wchar>(key.getKeyCode()));
+        if (code == 's')
+            key.getModifiers().isShiftDown() ? session.saveAs() : session.save();
+        else if (code == 'o')
+            session.open();
+        else if (code == 'n')
+            session.newSession();
+        else
+            return false;
+        return true;
+    }
+    if (c == 'k')
+        engine.command(engine::Command::Catch);
+    else if (key == juce::KeyPress::spaceKey)
         toggleFade();
     else if (key == juce::KeyPress::escapeKey)
         togglePanic();
@@ -114,8 +192,14 @@ void MainComponent::updateHeader()
         settingsButton.setColour(juce::TextButton::buttonColourId, theme::warn.darker(0.5f));
         return;
     }
-    statusLabel.setColour(juce::Label::textColourId, theme::textDim);
     settingsButton.setColour(juce::TextButton::buttonColourId, theme::button);
+    if (juce::Time::getMillisecondCounter() < statusUntil)
+    {
+        statusLabel.setColour(juce::Label::textColourId, statusIsWarning ? theme::warn : theme::live);
+        statusLabel.setText(statusMessage, juce::dontSendNotification);
+        return;
+    }
+    statusLabel.setColour(juce::Label::textColourId, theme::textDim);
 
     const int liveCount = static_cast<int>(std::count_if(lastFrame.live.begin(), lastFrame.live.end(), [](auto v) { return v != 0; }));
     statusLabel.setText(juce::String::formatted("CPU %4.1f%%   xruns %d   master %s   limiter %4.1f dB   tide %.2fx   scenes %d   live %d   guard %u",
@@ -158,10 +242,15 @@ void MainComponent::timerCallback()
                 p->update(lastFrame);
     }
 
+    session.setLatest(lastFrame);
     engine::EngineNotice notice;
     while (engine.popNotice(notice))
+    {
         if (notice.type == engine::EngineNotice::Type::GuardTripped)
-            juce::Logger::writeToLog("Safety guard tripped");
+            showStatus("Safety guard tripped: a non-finite sample was caught and the engine reset.", true);
+        catcher.handle(notice);
+        session.handleNotice(notice);
+    }
 
     meterL = std::max(lastFrame.peakL, meterL * 0.85f);
     meterR = std::max(lastFrame.peakR, meterR * 0.85f);
@@ -194,10 +283,13 @@ void MainComponent::resized()
     auto area = getLocalBounds().reduced(16, 10);
     auto top = area.removeFromTop(36);
     top.removeFromLeft(150);
+    sessionButton.setBounds(top.removeFromLeft(96).reduced(3));
     settingsButton.setBounds(top.removeFromLeft(130).reduced(3));
     fadeInButton.setBounds(top.removeFromLeft(96).reduced(3));
     fadeOutButton.setBounds(top.removeFromLeft(96).reduced(3));
     panicButton.setBounds(top.removeFromRight(110).reduced(3));
+    top.removeFromRight(10);
+    catchButton.setBounds(top.removeFromRight(110).reduced(3));
     top.removeFromRight(10);
     meterArea = top.removeFromRight(200).reduced(0, 8);
 

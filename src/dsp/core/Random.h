@@ -8,7 +8,8 @@ namespace tf::dsp {
 class Random
 {
 public:
-    explicit Random(std::uint64_t seed = 0x7469646566696c64ull) noexcept { setSeed(seed); }
+    Random() noexcept : Random(0x7469646566696c64ull) {}
+    explicit Random(std::uint64_t seed) noexcept { setSeed(seed); }
 
     void setSeed(std::uint64_t seed) noexcept
     {

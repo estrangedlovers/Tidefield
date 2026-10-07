@@ -17,4 +17,10 @@ std::unique_ptr<dsp::SampleBuffer> loadSample(const juce::File& file, juce::Stri
 /** Writes a SampleBuffer as 32-bit float WAV (or FLAC when the extension is .flac). */
 bool writeSample(const dsp::SampleBuffer& buffer, const juce::File& file, juce::String& error);
 
+/** Stream variants (used for audio stored inside session files). */
+std::unique_ptr<dsp::SampleBuffer> loadSample(std::unique_ptr<juce::InputStream> stream, const juce::String& name, juce::String& error,
+                                              double maxSeconds = 600.0);
+/** Encodes as 24-bit FLAC into memory. */
+bool encodeFlac(const dsp::SampleBuffer& buffer, juce::MemoryBlock& out, juce::String& error);
+
 } // namespace tf::io

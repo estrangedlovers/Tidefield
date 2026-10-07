@@ -21,8 +21,12 @@ namespace tf::dsp {
       1    inharmonic, bell-like ratios
     with smooth blending in between. Mode frequencies glide when the key changes.
 
-    Each mode is normalised to unity gain at resonance and its pole radius is strictly
-    below 1 for every setting, so the bank cannot run away. */
+    Excitation is scaled per mode by sin(w), so an impulse of a given area rings every
+    mode at about the same level whatever its pitch or decay. Rain strikes are short
+    raised-cosine "mallet" pulses whose width sets their brightness. Sustained,
+    in-tune excitation (a drone in the same key) would otherwise build up without
+    bound at long decays, so an output follower ducks the excitation above ~-10 dBFS.
+    Pole radii are strictly below 1 for every setting. */
 class ResonatorBank
 {
 public:
@@ -59,7 +63,7 @@ private:
     {
         float note = 60.0f;        // current (gliding) MIDI note
         float targetNote = 60.0f;
-        float b1 = 0.0f, b2 = 0.0f, inGain = 0.0f; // y = in*g + b1*y1 - b2*y2 (with zeros at +-1)
+        float b1 = 0.0f, b2 = 0.0f, inGain = 0.0f; // y = g*(x - x2) + b1*y1 - b2*y2
         float y1 = 0.0f, y2 = 0.0f, x1 = 0.0f, x2 = 0.0f;
         float gainL = 0.0f, gainR = 0.0f;
         float level = 0.0f;        // envelope follower for telemetry
@@ -77,10 +81,13 @@ private:
     const HarmonicGravity* harmony = nullptr;
     std::array<Mode, kMaxModes> modes {};
     int modeLimit = kMaxModes;
-    OnePole rainFilter;
-    float burstEnv = 0.0f;
-    float burstDecay = 0.0f;
+    // Rain strikes: raised-cosine pulses.
+    int strikePos = 0, strikeLength = 0;
+    float strikeAmp = 0.0f;
     double samplesToBurst = 0.0;
+    // Excitation ducking.
+    float outputLevel = 0.0f;
+    float followAttack = 0.0f, followRelease = 0.0f;
     int samplesUntilControl = 0;
     bool snapNextUpdate = true; // first tuning after prepare jumps instead of gliding
 };

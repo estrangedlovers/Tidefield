@@ -87,8 +87,10 @@ performance view surfaces the performance macros, the edit view exposes the rest
 
 ## 4. Scenes and terrain (phase 2)
 
-A `Scene` is a sparse map param-index -> value (only what differs from defaults, so
-new parameters never break old scenes). `Terrain` places scenes at 2D points.
+A `Scene` is a sparse map param-index -> value. A scene that does not mention a
+parameter has no opinion on it: that parameter blends only among the scenes that
+define it, and parameters no scene defines are left alone by the terrain. Captured
+scenes store every terrain-bound parameter. New parameters never break old scenes. `Terrain` places scenes at 2D points.
 Interpolation is inverse-distance weighting with a smooth falloff kernel and optional
 nearest-k limit, computed on the audio thread at control rate (cheap, deterministic).
 Wander is a seeded, tide-scaled Ornstein-Uhlenbeck walk blended with the performer's
@@ -223,9 +225,13 @@ them can be added without changing the core.
 
 ## 11. Catch, sessions, recording
 
-- **Catch**: preallocated 40 s stereo master ring buffer; Catch length up to 30 s,
-  leaving >= 10 s before the write head can overrun the copy. Worker copies, fades,
-  normalises and publishes a `SampleBuffer` to the next granular slot.
+- **Catch**: preallocated 40 s stereo master ring (and a mono live-input ring);
+  Catch length up to 30 s, leaving >= 10 s before the write head can overrun the
+  copy. The engine answers the command with a `CatchReady` notice; the message thread
+  copies the region (the notice queue orders the writes before the read), detects a
+  lapped region, fades, normalises and loads the target cloud.
+- **Samples** travel inside `SampleHandle`s (a `shared_ptr` the audio thread only
+  reads through a raw pointer); the message thread keeps references for saving.
 - **Session**: one `.tidefield` zip (`session.json` + `audio/*.flac`), schema version
   plus a migration per version step. Loads on the worker; swap is crossfaded via the
   master fade.
@@ -274,10 +280,10 @@ JUCE placeholder panel that talks to the engine through exactly the same contrac
 ## 16. Phase plan
 
 1. Skeleton, device settings, safety chain, drone, render harness. **(done)**
-2. Scene system and terrain interpolation (placeholder UI).
+2. Scene system and terrain interpolation (placeholder UI). **(done)**
 3. Granular, resonator, live input; mixer and send buses; Tide; harmonic gravity;
-   **Medium stage**.
-4. Catch, **sample import + Bloom keyboard**, session save/recall.
+   **Medium stage**. **(done)**
+4. Catch, **sample import + Bloom keyboard**, session save/recall. **(done)**
 5. MIDI learn, soft takeover, note input.
 6. React WebView UI: performance view, then edit view.
 7. Recording to disk, CPU guardrails, polish.

@@ -18,6 +18,7 @@ engine::Command parseCommand(const juce::String& name)
     if (name == "resume") return Command::ResumeFromPanic;
     if (name == "resetFeedback") return Command::ResetFeedback;
     if (name == "releaseLive") return Command::ReleaseLiveLayer;
+    if (name == "catch") return Command::Catch;
     throw std::runtime_error("Unknown command: " + name.toStdString());
 }
 
@@ -55,6 +56,15 @@ Score Score::load(const juce::File& file, const engine::ParamRegistry& registry)
             {
                 te.event = engine::ControlEvent::makeCommand(parseCommand(ev["cmd"].toString()), engine::ControlSource::Score);
             }
+            else if (ev.hasProperty("note"))
+            {
+                te.event = engine::ControlEvent::note(static_cast<int>(ev["note"]), static_cast<float>(static_cast<double>(ev.getProperty("velocity", 0.8))),
+                                                      engine::ControlSource::Score);
+            }
+            else if (ev.hasProperty("noteOff"))
+            {
+                te.event = engine::ControlEvent::note(static_cast<int>(ev["noteOff"]), 0.0f, engine::ControlSource::Score);
+            }
             else if (ev.hasProperty("param"))
             {
                 const auto id = ev["param"].toString().toStdString();
@@ -66,7 +76,7 @@ Score Score::load(const juce::File& file, const engine::ParamRegistry& registry)
             }
             else
             {
-                throw std::runtime_error("Score event needs 'cmd' or 'param'");
+                throw std::runtime_error("Score event needs 'cmd', 'param', 'note' or 'noteOff'");
             }
             s.events.push_back(te);
         }
@@ -121,6 +131,10 @@ Score Score::load(const juce::File& file, const engine::ParamRegistry& registry)
     s.defaultFx = static_cast<bool>(root.getProperty("defaultFx", true));
     if (root.hasProperty("input"))
         s.input = resolve(root["input"].toString());
+    if (root.hasProperty("bloomSample"))
+        s.bloomSample = resolve(root["bloomSample"].toString());
+    if (root.hasProperty("session"))
+        s.session = resolve(root["session"].toString());
 
     if (const auto* pins = root.getProperty("pins", juce::var()).getArray())
         for (const auto& id : *pins)

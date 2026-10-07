@@ -36,9 +36,19 @@ struct SceneSet
         weighted sum interpolates evenly in pitch/frequency. */
     std::vector<float> values;
 
+    /** Same shape as values: 1 where the scene defines that parameter. A scene that
+        does not mention a parameter has no opinion on it; only parameters at least one
+        scene defines become columns at all. */
+    std::vector<std::uint8_t> defined;
+
     float value(int scene, std::size_t column) const noexcept
     {
         return values[static_cast<std::size_t>(scene) * columns.size() + column];
+    }
+
+    bool isDefined(int scene, std::size_t column) const noexcept
+    {
+        return defined.empty() || defined[static_cast<std::size_t>(scene) * columns.size() + column] != 0;
     }
 };
 

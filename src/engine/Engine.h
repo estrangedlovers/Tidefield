@@ -10,6 +10,7 @@
 #include "mix/Layout.h"
 #include "params/ParamRegistry.h"
 #include "params/ParamState.h"
+#include "SampleHandle.h"
 #include "scene/SceneSet.h"
 #include "scene/Wander.h"
 
@@ -17,12 +18,14 @@
 #include <dsp/core/Smoother.h>
 #include <dsp/fx/medium/Medium.h>
 #include <dsp/harmony/HarmonicGravity.h>
+#include <dsp/sources/bloom/BloomSampler.h>
 #include <dsp/sources/drone/DroneGenerator.h>
 #include <dsp/sources/granular/GranularCloud.h>
 #include <dsp/sources/input/LiveInput.h>
 #include <dsp/sources/resonator/ResonatorBank.h>
 
 #include <array>
+#include <atomic>
 #include <cstdint>
 #include <memory>
 #include <vector>
@@ -80,9 +83,25 @@ public:
 
     bool publishScenes(std::unique_ptr<SceneSet> scenes) { return sceneChannel.publish(std::move(scenes)); }
 
-    /** Hands a sample to a granular cloud (0..3). The cloud fades out, swaps, fades
-        back in. Returns false if too many swaps are queued (retry after collect). */
-    bool loadCloudSample(int cloud, std::unique_ptr<dsp::SampleBuffer> buffer);
+    /** Hands a sample to a granular cloud (0..3); nullptr unloads it. The cloud fades
+        out, swaps, fades back in. Returns false if too many swaps are queued (retry
+        after collectGarbage). */
+    bool loadCloudSample(int cloud, std::shared_ptr<const dsp::SampleBuffer> buffer);
+
+    /** The sample most recently sent to a cloud (message thread; for saving). */
+    std::shared_ptr<const dsp::SampleBuffer> getCloudSample(int cloud) const;
+
+    /** The one-shot Bloom plays (nullptr unloads). Sounding voices fade quickly first. */
+    bool loadBloomSample(std::shared_ptr<const dsp::SampleBuffer> buffer);
+    std::shared_ptr<const dsp::SampleBuffer> getBloomSample() const { return bloomMirror; }
+
+    bool noteOn(int note, float velocity) noexcept { return post(ControlEvent::note(note, velocity)); }
+    bool noteOff(int note) noexcept { return post(ControlEvent::note(note, 0.0f)); }
+
+    /** Copies a caught region (from an EngineNotice::CatchReady) out of the capture
+        ring. Message thread. Returns false if the region has already been
+        overwritten (the notice was handled more than ~10 s late). */
+    bool copyCatch(const EngineNotice& notice, dsp::SampleBuffer& out) const;
 
     /** FX slots are fed by FxManager; see there. */
     bool sendProcessor(int slot, dsp::ProcessorPtr processor);
@@ -107,7 +126,8 @@ private:
     struct CloudSlot
     {
         dsp::GranularCloud cloud;
-        SnapshotChannel<dsp::SampleBuffer> buffers { 4 };
+        SnapshotChannel<SampleHandle> buffers { 4 };
+        std::shared_ptr<const dsp::SampleBuffer> mirror; // message thread only
         enum class Swap { Idle, FadingOut, FadingIn } swap = Swap::Idle;
         float swapGain = 1.0f;
     };
@@ -157,6 +177,10 @@ private:
     dsp::DroneGenerator drone;
     std::array<CloudSlot, kNumClouds> clouds;
     dsp::ResonatorBank resonator;
+    dsp::BloomSampler bloom;
+    SnapshotChannel<SampleHandle> bloomBuffers { 4 };
+    std::shared_ptr<const dsp::SampleBuffer> bloomMirror; // message thread only
+    bool bloomSwapping = false;
     std::array<ChannelStrip, kNumStrips> strips;
     std::array<FxSlot, kNumFxSlots> fxSlots;
     dsp::Medium medium;
@@ -166,6 +190,17 @@ private:
     std::array<std::vector<float>, kNumStrips> stripL, stripR;
     std::vector<float> busAL, busAR, busBL, busBR, masterL, masterR;
     std::vector<float> inputMono, excite, scratchDryL, scratchDryR, scratchAltL, scratchAltR;
+
+    // Catch: rings of recent master output and live input. Written on the audio thread;
+    // regions are read by copyCatch() after the CatchReady notice (whose queue release
+    // orders those writes before the read) while the writer is >= 10 s away.
+    static constexpr double kCatchRingSeconds = 40.0;
+    std::vector<float> catchL, catchR, catchIn;
+    std::size_t catchCapacity = 0;
+    std::atomic<std::uint64_t> catchWritten { 0 }; // master frames ever written
+    std::atomic<std::uint64_t> inputWritten { 0 };
+    void writeCatch(const float* l, const float* r, int n) noexcept;
+    void requestCatch() noexcept;
 
     // Telemetry accumulation.
     int telemetryInterval = 800;

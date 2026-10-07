@@ -126,6 +126,33 @@ void SceneManager::clear()
     publish();
 }
 
+void SceneManager::replaceAll(std::vector<Scene> newScenes, const std::vector<ParamIndex>& newPins)
+{
+    if (newScenes.size() > static_cast<std::size_t>(kMaxScenes))
+        newScenes.resize(static_cast<std::size_t>(kMaxScenes));
+    for (auto& sc : newScenes)
+    {
+        sc.position = { std::clamp(sc.position.x, 0.0f, 1.0f), std::clamp(sc.position.y, 0.0f, 1.0f) };
+        for (auto& [param, value] : sc.values)
+            value = registry.spec(param).clamp(value);
+    }
+    scenes = std::move(newScenes);
+    std::fill(pinned.begin(), pinned.end(), false);
+    for (auto p : newPins)
+        if (p < pinned.size())
+            pinned[p] = true;
+    publish();
+}
+
+std::vector<ParamIndex> SceneManager::getPins() const
+{
+    std::vector<ParamIndex> out;
+    for (std::size_t i = 0; i < pinned.size(); ++i)
+        if (pinned[i])
+            out.push_back(static_cast<ParamIndex>(i));
+    return out;
+}
+
 std::unique_ptr<SceneSet> SceneManager::build() const
 {
     auto set = std::make_unique<SceneSet>();
@@ -137,8 +164,12 @@ std::unique_ptr<SceneSet> SceneManager::build() const
         const auto& spec = registry.spec(static_cast<ParamIndex>(i));
         if ((spec.flags & ParamFlag::kTerrainBound) == 0 || pinned[i])
             continue;
+        const auto param = static_cast<ParamIndex>(i);
+        const bool anyScene = std::any_of(scenes.begin(), scenes.end(), [&](const Scene& sc) { return sc.values.count(param) > 0; });
+        if (! anyScene)
+            continue; // no scene has an opinion: the terrain leaves it alone
         SceneSet::Column c;
-        c.param = static_cast<ParamIndex>(i);
+        c.param = param;
         if ((spec.flags & ParamFlag::kDiscrete) != 0)
             c.blend = SceneSet::Blend::Discrete;
         else if (spec.taper == Taper::Log && spec.minValue > 0.0f)
@@ -147,14 +178,17 @@ std::unique_ptr<SceneSet> SceneManager::build() const
     }
 
     set->values.reserve(scenes.size() * set->columns.size());
+    set->defined.reserve(scenes.size() * set->columns.size());
     for (std::size_t s = 0; s < scenes.size(); ++s)
     {
         set->positions[s] = scenes[s].position;
         for (const auto& c : set->columns)
         {
             const auto it = scenes[s].values.find(c.param);
-            const float v = it != scenes[s].values.end() ? it->second : registry.spec(c.param).defaultValue;
+            const bool has = it != scenes[s].values.end();
+            const float v = has ? it->second : registry.spec(c.param).defaultValue;
             set->values.push_back(c.blend == SceneSet::Blend::Log ? std::log(v) : v);
+            set->defined.push_back(has ? 1 : 0);
         }
     }
     return set;

@@ -20,7 +20,8 @@ void ResonatorBank::prepare(const ProcessSpec& newSpec, std::uint64_t seed)
     rng.setSeed(seed);
     tuningDrift.setSeed(seed + 5);
     tuningDrift.setRate(0.02f);
-    rainFilter.prepare(spec.sampleRate);
+    followAttack = onePoleCoefficient(0.005f, spec.sampleRate);
+    followRelease = onePoleCoefficient(0.3f, spec.sampleRate);
     for (int i = 0; i < kMaxModes; ++i)
     {
         auto& m = modes[static_cast<size_t>(i)];
@@ -39,7 +40,9 @@ void ResonatorBank::reset() noexcept
 {
     for (auto& m : modes)
         m.y1 = m.y2 = m.x1 = m.x2 = m.level = 0.0f;
-    burstEnv = 0.0f;
+    strikePos = strikeLength = 0;
+    strikeAmp = 0.0f;
+    outputLevel = 0.0f;
     samplesToBurst = 0.0;
     samplesUntilControl = 0;
 }
@@ -101,8 +104,10 @@ void ResonatorBank::updateModes(float dt) noexcept
         const float r = std::exp(-6.9078f / (t60 * fs));
         m.b1 = 2.0f * r * std::cos(w);
         m.b2 = r * r;
-        // Zeros at +-1 and (1 - r^2)/2 give unity gain at resonance.
-        m.inGain = 0.5f * (1.0f - r * r) * m.amp;
+        // Impulse-normalised: ring amplitude ~ kExcite * impulse area for every mode.
+        // Divided by sqrt(active modes) so the bank's total stays similar as modes change.
+        constexpr float kExcite = 2.4f;
+        m.inGain = std::sin(w) * kExcite * m.amp / std::sqrt(static_cast<float>(active));
     }
 }
 
@@ -113,8 +118,10 @@ void ResonatorBank::process(const float* excite, float* left, float* right, int 
 
     const int active = std::min(params.modes, modeLimit);
     const float rainRate = 8.0f * std::clamp(params.rain, 0.0f, 1.0f) * std::max(timeScale, 0.0f);
-    rainFilter.setCutoff(200.0f * std::exp2(6.0f * params.rainColour));
-    burstDecay = std::exp(-1.0f / (0.004f * static_cast<float>(spec.sampleRate)));
+    // Strike width 3 ms (soft felt) to 0.3 ms (hard glass): narrower is brighter.
+    const int strikeWidth = std::max(4, static_cast<int>(lerp(0.003f, 0.0003f, std::clamp(params.rainColour, 0.0f, 1.0f))
+                                                         * static_cast<float>(spec.sampleRate)));
+    constexpr float kDuckThreshold = 0.3f;
 
     int i = 0;
     while (i < n)
@@ -128,21 +135,32 @@ void ResonatorBank::process(const float* excite, float* left, float* right, int 
 
         for (int s = 0; s < chunk; ++s)
         {
-            // Rain: sparse noise bursts, each a few ms long, random loudness.
+            // Rain: sparse mallet strikes with random loudness (Poisson timing).
             if (rainRate > 0.0f)
             {
                 samplesToBurst -= 1.0;
                 if (samplesToBurst <= 0.0)
                 {
-                    burstEnv = 0.2f + 0.8f * rng.nextFloat();
+                    strikeAmp = 0.25f + 0.75f * rng.nextFloat();
+                    strikeLength = strikeWidth;
+                    strikePos = 0;
                     const double u = std::max(1.0e-6, static_cast<double>(rng.nextFloat()));
                     samplesToBurst = -std::log(u) * spec.sampleRate / rainRate;
                 }
             }
-            const float burst = rainFilter.processLow(rng.nextBipolar() * burstEnv);
-            burstEnv = flushDenormal(burstEnv * burstDecay);
+            float strike = 0.0f;
+            if (strikePos < strikeLength)
+            {
+                // Raised cosine with unit area per unit amplitude.
+                const float phase = static_cast<float>(strikePos) / static_cast<float>(strikeLength);
+                strike = strikeAmp * (2.0f / static_cast<float>(strikeLength)) * (0.5f - 0.5f * std::cos(kTwoPi * phase));
+                ++strikePos;
+            }
 
-            const float x = burst + (excite != nullptr ? excite[i + s] : 0.0f);
+            // Duck all excitation when the bank is already loud.
+            const float ratio = outputLevel / kDuckThreshold;
+            const float duck = 1.0f / (1.0f + ratio * ratio);
+            const float x = (strike + (excite != nullptr ? excite[i + s] * 0.05f : 0.0f)) * duck;
             float outL = 0.0f, outR = 0.0f;
             for (int k = 0; k < active; ++k)
             {
@@ -157,6 +175,8 @@ void ResonatorBank::process(const float* excite, float* left, float* right, int 
             }
             left[i + s] = outL;
             right[i + s] = outR;
+            const float level = 0.5f * (std::fabs(outL) + std::fabs(outR));
+            outputLevel = flushDenormal(outputLevel + (level > outputLevel ? followAttack : followRelease) * (level - outputLevel));
         }
 
         // Per-chunk level estimate for visuals, plus a floor: two-pole float

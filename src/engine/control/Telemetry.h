@@ -4,6 +4,7 @@
 #include "../params/ParamDefs.h"
 #include "../scene/SceneSet.h"
 
+#include <dsp/sources/bloom/BloomSampler.h>
 #include <dsp/sources/granular/GranularCloud.h>
 #include <dsp/sources/resonator/ResonatorBank.h>
 
@@ -52,6 +53,10 @@ struct TelemetryFrame
     std::array<float, dsp::ResonatorBank::kMaxModes> modeLevel {};
     std::array<float, dsp::ResonatorBank::kMaxModes> modeNote {};
 
+    // Bloom.
+    bool bloomLoaded = false;
+    std::array<dsp::BloomSampler::VoiceView, dsp::BloomSampler::kMaxVoices> bloomVoices {};
+
     // Live input.
     float inputLevel = 0.0f;
     bool inputGateOpen = false;
@@ -72,9 +77,17 @@ struct TelemetryFrame
 /** Discrete things the UI should hear about once. */
 struct EngineNotice
 {
-    enum class Type : std::uint8_t { FadeInComplete, FadeOutComplete, PanicSilent, GuardTripped, ControlQueueOverflow };
+    enum class Type : std::uint8_t { FadeInComplete, FadeOutComplete, PanicSilent, GuardTripped, ControlQueueOverflow, CatchReady };
     Type type = Type::FadeInComplete;
     std::uint64_t sampleTime = 0;
+
+    // CatchReady: absolute ring frame where the region starts, its length in frames,
+    // the source (0 = master output, 1 = live input) and the requested cloud
+    // (0 = auto, 1-4), all as they were when the command ran.
+    std::uint64_t start = 0;
+    std::uint32_t length = 0;
+    std::uint8_t source = 0;
+    std::uint8_t target = 0;
 };
 
 } // namespace tf::engine

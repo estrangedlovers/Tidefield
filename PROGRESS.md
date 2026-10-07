@@ -2,7 +2,7 @@
 
 Read `CLAUDE.md` (rules) and `docs/ARCHITECTURE.md` (design) first.
 
-## Status: phase 3 complete, phase 4 next
+## Status: phase 4 complete, phase 5 next
 
 ### Phase 1: skeleton, device settings, safety chain, drone, render harness
 
@@ -160,10 +160,66 @@ ecosystem renders 90 s in 4.4 s on one container core.
 **Untested (needs the Mac)**: CPU on the M1 Pro with everything running; real
 instrument input; how Medium types, reverb hold and the key morph *sound*.
 
-## Next: phase 4
-Catch (40 s master ring buffer, capture to a cloud slot via the worker), sample
-import UI path, the Bloom one-shot keyboard (six transforms), session save/recall
-(`.tidefield` zip with JSON + FLAC, schema version, migrations).
+### Phase 4: Catch, sample import, Bloom, sessions
+
+**Built**
+- `SampleHandle`: samples travel to the audio thread inside a handle that holds a
+  `shared_ptr`; the message thread keeps its own reference (for saving), so the audio
+  thread never touches a reference count. Engine keeps message-side mirrors
+  (`getCloudSample`, `getBloomSample`).
+- Catch: 40 s stereo master ring and mono input ring, written on the audio thread.
+  `Command::Catch` answers with a `CatchReady` notice (start, length, source, target);
+  `copyCatch` reads the region on the message thread (ordered by the notice queue's
+  release/acquire) and detects a lapped region instead of returning torn audio.
+  `CatchManager` fades the edges, normalises to -3 dBFS, refuses silence, and loads
+  the chosen cloud or (Auto) the first empty, else the longest-unused one.
+- `BloomSampler`: 8 voices, each with 6 playback taps and 8 grains; transforms
+  Swell, Smear, Freeze (granular hold; a true spectral freeze arrives with phase 8's
+  input freeze), Ghost, Constellation, Tape; per-note randomisation, gravity on note
+  pitch, voice stealing, fast release before sample swaps. Notes reach the engine as
+  `ControlEvent::Type::Note`. Bloom can excite the resonator.
+- Sessions (`src/io/Session`): `captureSession` / `applySession` / `defaultSession`,
+  `.tidefield` = zip of `session.json` (format tag, version, params by stable ID,
+  scenes, pins, FX types, MIDI placeholder, sample index) plus 24-bit FLAC audio.
+  Atomic save (temp file then move), migration hook per version, newer-version files
+  refused, unknown IDs reported as warnings. `SnapParam` events recall without
+  sweeping.
+- App: Session menu (New, Open, Save, Save As; Cmd+N/O/S) with background load/save
+  and a 1.5 s fade-out, swap, fade-in when playing; Catch button (K) with status
+  feedback; on-screen keyboard and Bloom/Catch controls on Perform; Bloom section
+  with one-shot loading on Sources; built-in samples compiled in (Bloom = glass,
+  Cloud 1 = chord) so a first launch makes sound; knob panels pack sections side by
+  side.
+- Harness: `note`/`noteOff` events, `catch` command, `bloomSample`, `session`, and
+  `--save-session`. Reports now default to `<output>.report.json` (the old default
+  could overwrite a score sitting next to its output: found while debugging).
+- New `tidefield_io_tests` executable (JUCE) for session round trips.
+
+**Fixes found in this phase**
+- Catch length/source/target posted with the Catch command applied one tick late
+  (read from smoothed values; now from targets, and the target travels in the notice).
+- Bloom forward taps died on their first sample when wobble dipped below unity speed.
+- Scenes: a scene that does not mention a parameter used to pull it to its default;
+  now it has no opinion (blends only among scenes that define it).
+- Resonator was ~-75 dBFS at defaults (unity-gain-at-resonance normalisation barely
+  rings long modes from short bursts). Now impulse-normalised mallet strikes, with an
+  output-driven ducker that bounds sustained in-tune excitation.
+
+**Verified**: 71 core tests + 4 io tests pass (Catch normalisation, fades, targets,
+silence refusal, lapped-region detection, input catch; every Bloom transform audible,
+bounded and finished; Tape pitch accuracy; voice stealing without allocation; notes
+through the engine; session round trip including audio sample-accuracy within 24-bit,
+recall into a fresh engine, warnings, refusal of newer formats and garbage files,
+default session reset). All seven scores pass `--strict`, including Bloom+Catch with
+a saved session that a second score recalls.
+
+**Untested (needs the Mac)**: file dialogs, background save/load timing, keyboard
+playing feel, Bloom transforms by ear.
+
+## Next: phase 5
+MIDI input (device selection, SPSC from the MIDI thread), learn mode for every
+learnable parameter, soft takeover, note input to Bloom (and drone root), default
+8-knob controller layout, MIDI maps saved in sessions.
 
 ## How to run
 ```

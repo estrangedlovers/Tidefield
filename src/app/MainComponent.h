@@ -1,9 +1,11 @@
 #pragma once
 
 #include "AudioHost.h"
+#include "SessionController.h"
 #include "ui/Pages.h"
 #include "ui/Theme.h"
 
+#include <engine/capture/CatchManager.h>
 #include <engine/mix/FxManager.h>
 #include <engine/scene/SceneManager.h>
 
@@ -32,17 +34,25 @@ private:
     void toggleFade();
     void togglePanic();
     void updateHeader();
+    void showSessionMenu();
+    void showStatus(const juce::String& message, bool warning = false);
+    void loadFactoryContent();
+    void updateTitle();
 
     AudioHost& host;
     engine::Engine& engine;
     theme::LookAndFeel lookAndFeel;
     engine::SceneManager scenes;
     engine::FxManager fx;
+    engine::CatchManager catcher;
+    SessionController session;
 
     juce::TextButton settingsButton { "Audio Settings" };
     juce::TextButton fadeInButton { "Fade In" };
     juce::TextButton fadeOutButton { "Fade Out" };
     juce::TextButton panicButton { "PANIC" };
+    juce::TextButton sessionButton { "Session" };
+    juce::TextButton catchButton { "Catch" };
     juce::Label statusLabel;
     juce::TooltipWindow tooltips { this, 600 };
 
@@ -51,6 +61,9 @@ private:
     std::vector<Page*> pages;
 
     engine::TelemetryFrame lastFrame;
+    juce::String statusMessage;
+    bool statusIsWarning = false;
+    juce::uint32 statusUntil = 0;
     float meterL = 0.0f, meterR = 0.0f;
     juce::Rectangle<int> meterArea;
 };

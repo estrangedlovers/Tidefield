@@ -43,37 +43,52 @@ void KnobPanel::update(const engine::TelemetryFrame& frame)
 
 int KnobPanel::layout(int width, bool apply)
 {
-    int y = 0;
-    const int inner = std::max(kKnobW, width - 16);
-    const int perRow = std::max(1, inner / kKnobW);
+    // Flow layout: small sections sit side by side; a section with more knobs than fit
+    // across takes the full width and wraps its knobs.
+    constexpr int kGap = 8;
+    int x = 0, y = 0, rowHeight = 0;
     for (auto& s : sections)
     {
-        // Hidden knobs (e.g. an empty FX slot) take no space; a section with none
-        // collapses to its header.
-        std::vector<ParamKnob*> shown;
+        std::vector<ParamKnob*> shown; // hidden knobs (e.g. an empty FX slot) take no space
         for (auto* k : s.knobs)
             if (k->isVisible())
                 shown.push_back(k);
         const int count = static_cast<int>(shown.size());
+
+        int headerWidth = 170;
+        for (const auto& [comp, w] : s.header)
+            headerWidth += w + 6;
+        const int natural = std::max(count * kKnobW + 16, headerWidth);
+        const int w = std::min(width, natural);
+        const int perRow = std::max(1, (w - 16) / kKnobW);
         const int rows = (count + perRow - 1) / perRow;
         const int h = kHeader + rows * kKnobH + (rows > 0 ? 8 : 0);
+
+        if (x > 0 && x + w > width)
+        {
+            x = 0;
+            y += rowHeight + kGap;
+            rowHeight = 0;
+        }
+
         if (apply)
         {
-            s.bounds = { 0, y, width, h };
-            int hx = width - 8;
-            for (auto& [comp, w] : s.header)
+            s.bounds = { x, y, w, h };
+            int hx = x + w - 8;
+            for (auto& [comp, cw] : s.header)
             {
-                hx -= w;
-                comp->setBounds(hx, y + 3, w, kHeader - 6);
+                hx -= cw;
+                comp->setBounds(hx, y + 3, cw, kHeader - 6);
                 hx -= 6;
             }
             for (int i = 0; i < count; ++i)
-                shown[static_cast<std::size_t>(i)]->setBounds(8 + (i % perRow) * kKnobW, y + kHeader + (i / perRow) * kKnobH, kKnobW,
-                                                                kKnobH);
+                shown[static_cast<std::size_t>(i)]->setBounds(x + 8 + (i % perRow) * kKnobW, y + kHeader + (i / perRow) * kKnobH, kKnobW,
+                                                              kKnobH);
         }
-        y += h + 8;
+        x += w + kGap;
+        rowHeight = std::max(rowHeight, h);
     }
-    return y;
+    return y + rowHeight;
 }
 
 void KnobPanel::paint(juce::Graphics& g)

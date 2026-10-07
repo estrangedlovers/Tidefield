@@ -99,12 +99,14 @@ TEST_CASE("Reverb send keeps sounding after the source stops")
 {
     Rig rig;
     rig.fx.loadDefaultLayout();
+    rig.engine.setParam(P::ResLevel, -60.0f);
     rig.engine.setParam(P::DroneSendA, 0.0f); // full send
     rig.run(4.0);
     rig.engine.setParam(P::DroneLevel, -60.0f); // dry gone, sends are post-fader...
     auto withSend = rig.run(0.3);
 
     Rig dry;
+    dry.engine.setParam(P::ResLevel, -60.0f);
     dry.engine.setParam(P::DroneSendA, -60.0f);
     dry.run(4.0);
     dry.engine.setParam(P::DroneLevel, -60.0f);

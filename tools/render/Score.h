@@ -32,6 +32,10 @@ namespace tf::tools {
       "fx": [ { "slot": "drone.fx1", "type": "tf.medium" } ]   (after the default layout)
       "defaultFx": false                skip the default reverb/delay layout
       "input": "path.wav"               loops a file into the live input
+      "bloomSample": "path.wav"         the one-shot Bloom plays
+      "session": "path.tidefield"       recalled (snapped) before everything else
+    Events may also be notes: { "t": 2, "note": 60, "velocity": 0.8 } and
+    { "t": 4, "noteOff": 60 }, and { "cmd": "catch" }.
     Relative paths resolve against the working directory, then the score's folder.
     Events may also be { "t": 5, "cmd": "releaseLive" }. */
 struct Score
@@ -57,6 +61,8 @@ struct Score
     std::vector<FxLoad> fx;
     bool defaultFx = true;
     juce::File input;
+    juce::File bloomSample;
+    juce::File session;
 
     /** Throws std::runtime_error with a readable message on bad input. */
     static Score load(const juce::File& file, const engine::ParamRegistry& registry);

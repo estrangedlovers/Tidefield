@@ -29,23 +29,29 @@ inline void computeWeights(const SceneSet& set, Point2 p, float focus, float* we
         weights[i] *= inv;
 }
 
-/** Interpolated plain value of one column given weights. */
+/** Interpolated plain value of one column given weights. Only scenes that define
+    the parameter take part; their weights are renormalised among themselves. */
 inline float blendColumn(const SceneSet& set, std::size_t column, const float* weights) noexcept
 {
     const auto blend = set.columns[column].blend;
     if (blend == SceneSet::Blend::Discrete)
     {
-        int best = 0;
-        for (int i = 1; i < set.numScenes; ++i)
-            if (weights[i] > weights[best])
+        int best = -1;
+        for (int i = 0; i < set.numScenes; ++i)
+            if (set.isDefined(i, column) && (best < 0 || weights[i] > weights[best]))
                 best = i;
-        return set.value(best, column);
+        return set.value(std::max(best, 0), column);
     }
 
-    float sum = 0.0f;
+    float sum = 0.0f, total = 0.0f;
     for (int i = 0; i < set.numScenes; ++i)
-        sum += weights[i] * set.value(i, column);
-    return blend == SceneSet::Blend::Log ? std::exp(sum) : sum;
+        if (set.isDefined(i, column))
+        {
+            sum += weights[i] * set.value(i, column);
+            total += weights[i];
+        }
+    const float v = total > 0.0f ? sum / total : 0.0f;
+    return blend == SceneSet::Blend::Log ? std::exp(v) : v;
 }
 
 inline int nearestScene(const SceneSet& set, Point2 p) noexcept

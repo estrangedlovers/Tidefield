@@ -2,6 +2,7 @@
 // a JSON analysis report.
 //
 //   tidefield_render <score.json> [-o out.wav] [--report out.json] [--seed N] [--strict]
+//                    [--save-session out.tidefield]
 //
 // --strict exits non-zero if the render contains non-finite samples or exceeds the
 // limiter ceiling, so scores can run as regression tests.
@@ -10,8 +11,10 @@
 #include "Score.h"
 
 #include <engine/Engine.h>
+#include <engine/capture/CatchManager.h>
 #include <engine/mix/FxManager.h>
 #include <io/AudioFileIO.h>
+#include <io/Session.h>
 
 #include <dsp/core/Random.h>
 
@@ -31,11 +34,12 @@ struct Options
     juce::File report;
     std::optional<std::uint64_t> seed;
     bool strict = false;
+    juce::File saveSession;
 };
 
 void printUsage()
 {
-    std::cerr << "usage: tidefield_render <score.json> [-o out.wav] [--report out.json] [--seed N] [--strict]\n";
+    std::cerr << "usage: tidefield_render <score.json> [-o out.wav] [--report out.json] [--seed N] [--strict] [--save-session out.tidefield]\n";
 }
 
 std::optional<Options> parseArgs(int argc, char** argv)
@@ -55,6 +59,8 @@ std::optional<Options> parseArgs(int argc, char** argv)
             o.seed = static_cast<std::uint64_t>(next().getLargeIntValue());
         else if (arg == "--strict")
             o.strict = true;
+        else if (arg == "--save-session")
+            o.saveSession = cwd.getChildFile(next());
         else if (arg == "-h" || arg == "--help")
             return std::nullopt;
         else if (o.score == juce::File())
@@ -67,7 +73,12 @@ std::optional<Options> parseArgs(int argc, char** argv)
     if (o.output == juce::File())
         o.output = cwd.getChildFile("out").getChildFile(o.score.getFileNameWithoutExtension() + ".wav");
     if (o.report == juce::File())
-        o.report = o.output.withFileExtension("json");
+        o.report = o.output.getSiblingFile(o.output.getFileNameWithoutExtension() + ".report.json");
+    if (o.report == o.score || o.output == o.score)
+    {
+        std::cerr << "error: refusing to overwrite the score file\n";
+        return std::nullopt;
+    }
     return o;
 }
 
@@ -144,9 +155,32 @@ int main(int argc, char** argv)
                 throw std::runtime_error(error.toStdString());
         }
         std::vector<float> inputBlock(static_cast<std::size_t>(score.blockSize));
+        tf::engine::TelemetryFrame lastFrame;
         std::size_t inputPos = 0;
 
         tf::engine::SceneManager scenes(engine);
+        tf::engine::CatchManager catcher(engine);
+        catcher.onCaught = [](int cloud, const std::string& name) { std::cerr << "caught " << name << " into cloud " << cloud + 1 << "\n"; };
+        catcher.onRejected = [](const std::string& reason) { std::cerr << "catch rejected: " << reason << "\n"; };
+
+        if (score.session != juce::File())
+        {
+            juce::String error;
+            auto data = tf::io::loadSession(score.session, error);
+            if (! data)
+                throw std::runtime_error(error.toStdString());
+            for (const auto& w : tf::io::applySession(*data, engine, scenes, fx, true))
+                std::cerr << "session warning: " << w << "\n";
+        }
+        if (score.bloomSample != juce::File())
+        {
+            juce::String error;
+            auto buffer = tf::io::loadSample(score.bloomSample, error);
+            if (buffer == nullptr)
+                throw std::runtime_error(error.toStdString());
+            engine.loadBloomSample(std::move(buffer));
+        }
+
         for (auto p : score.pins)
             scenes.setPinned(p, true);
         for (auto& scene : score.scenes)
@@ -192,8 +226,13 @@ int main(int argc, char** argv)
             while (engine.popTelemetry(frame)) {}
             tf::engine::EngineNotice notice;
             while (engine.popNotice(notice))
+            {
                 if (notice.type == tf::engine::EngineNotice::Type::GuardTripped)
                     std::cerr << "warning: safety guard tripped at " << notice.sampleTime / score.sampleRate << " s\n";
+                catcher.handle(notice);
+            }
+            if (frame.sampleTime > 0)
+                lastFrame = frame;
 
             pos += static_cast<std::uint64_t>(block);
         }
@@ -202,6 +241,16 @@ int main(int argc, char** argv)
         {
             std::cerr << "error: could not write " << options->output.getFullPathName() << "\n";
             return 1;
+        }
+
+        if (options->saveSession != juce::File())
+        {
+            juce::String error;
+            auto data = tf::io::captureSession(engine, lastFrame, scenes, fx);
+            data.name = options->saveSession.getFileNameWithoutExtension().toStdString();
+            if (! tf::io::saveSession(data, options->saveSession, error))
+                throw std::runtime_error(error.toStdString());
+            std::cerr << "saved session " << options->saveSession.getFullPathName() << "\n";
         }
 
         const float ceilingDb = registry.spec(tf::engine::P::MasterCeiling).defaultValue;

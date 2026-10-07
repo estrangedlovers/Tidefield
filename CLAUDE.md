@@ -58,6 +58,7 @@ cmake --build --preset dev
 ctest --preset dev
 ./build/dev/tools/render/tidefield_render scores/ecosystem.json -o out/ecosystem.wav --strict
 python3 tools/scripts/spectrogram.py out/ecosystem.wav   # needs numpy + matplotlib
+./build/dev/tests/tidefield_io_tests                     # JUCE-based session tests
 ```
 
 Presets live in `CMakePresets.json`; CLion picks them up. JUCE 8 and Catch2 are fetched

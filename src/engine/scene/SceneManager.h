@@ -15,8 +15,9 @@ namespace tf::engine {
 
 class Engine;
 
-/** One point on the terrain. Values are sparse: a parameter a scene does not mention
-    takes its default, so adding parameters later never breaks saved scenes. */
+/** One point on the terrain. Values are sparse: a scene that does not mention a
+    parameter has no opinion on it (it blends only among scenes that do), so adding
+    parameters later never breaks saved scenes. Captured scenes store everything. */
 struct Scene
 {
     std::string name;
@@ -65,6 +66,11 @@ public:
     std::string nextSceneName() const;
 
     void clear();
+
+    /** Replaces every scene and pin in one publish (session recall). */
+    void replaceAll(std::vector<Scene> newScenes, const std::vector<ParamIndex>& newPins);
+
+    std::vector<ParamIndex> getPins() const;
 
     /** Rebuilds and publishes. If the engine still holds too many unretired
         snapshots (edits faster than the audio thread consumes them) the terrain is

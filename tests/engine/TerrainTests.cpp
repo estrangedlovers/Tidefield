@@ -204,6 +204,30 @@ TEST_CASE("Commit writes the live layer into a scene; capture stores the current
     REQUIRE(scenes.getScenes()[1].values.at(idx(P::DroneCutoff)) == Approx(5000.0f).epsilon(0.001));
 }
 
+TEST_CASE("A scene that does not mention a parameter has no opinion on it")
+{
+    Engine engine;
+    engine.prepare(48000.0, 256);
+    SceneManager scenes(engine);
+    Scene a;
+    a.position = { 0.0f, 0.5f };
+    a.values[idx(P::DroneCutoff)] = 200.0f;
+    a.values[idx(P::DroneDensity)] = 2.0f;
+    Scene b;
+    b.position = { 1.0f, 0.5f };
+    b.values[idx(P::DroneCutoff)] = 8000.0f; // says nothing about density
+    scenes.addScene(a);
+    scenes.addScene(b);
+    engine.setParam(P::DroneShape, 0.9f); // no scene defines shape
+    engine.setParam(P::TerrainGlide, 0.05f);
+    engine.setParam(P::TerrainX, 0.9f);
+    const auto f = run(engine, 1.0);
+    REQUIRE(target(f, P::DroneDensity) == Approx(2.0f).epsilon(0.001)); // only scene A has an opinion
+    REQUIRE(target(f, P::DroneShape) == Approx(0.9f));                  // untouched by the terrain
+    REQUIRE(f.live[idx(P::DroneShape)] == 1);                            // (set while scenes existed)
+    REQUIRE(target(f, P::DroneCutoff) > 4000.0f);
+}
+
 TEST_CASE("Pinned parameters ignore the terrain")
 {
     Engine engine;

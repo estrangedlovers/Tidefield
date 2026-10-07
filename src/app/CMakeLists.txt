@@ -8,10 +8,19 @@ juce_add_gui_app(Tidefield
     HARDENED_RUNTIME_ENABLED TRUE
     HARDENED_RUNTIME_OPTIONS com.apple.security.device.audio-input)
 
+# Built-in sounds (synthesized by tools/scripts/make_samples.py), compiled in so a
+# first launch has something to play.
+juce_add_binary_data(TidefieldBinaryData SOURCES
+    ${CMAKE_SOURCE_DIR}/resources/samples/glass.wav
+    ${CMAKE_SOURCE_DIR}/resources/samples/chord.wav
+    ${CMAKE_SOURCE_DIR}/resources/samples/pluck.wav
+    ${CMAKE_SOURCE_DIR}/resources/samples/breath.wav)
+
 target_sources(Tidefield PRIVATE
     Main.cpp
     AudioHost.cpp
     MainComponent.cpp
+    SessionController.cpp
     TerrainPad.cpp
     ui/KnobPanel.cpp
     ui/Pages.cpp
@@ -26,6 +35,7 @@ target_compile_definitions(Tidefield PRIVATE
 target_link_libraries(Tidefield PRIVATE
     tidefield_engine
     tidefield_io
+    TidefieldBinaryData
     juce::juce_audio_utils
     juce::juce_audio_devices
     juce::juce_gui_extra

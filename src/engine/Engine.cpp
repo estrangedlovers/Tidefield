@@ -60,12 +60,16 @@ void Engine::prepare(double newSampleRate, int maxBlockSize)
         auto& slot = clouds[static_cast<std::size_t>(k)];
         slot.cloud.prepare(spec, config.seed + 100u + static_cast<std::uint64_t>(k));
         slot.cloud.setHarmony(&harmony);
-        slot.cloud.setBuffer(slot.buffers.current());
+        slot.cloud.setBuffer(rawBuffer(slot.buffers.current()));
         slot.swap = CloudSlot::Swap::Idle;
         slot.swapGain = 1.0f;
     }
     resonator.prepare(spec, config.seed + 200u);
     resonator.setHarmony(&harmony);
+    bloom.prepare(spec, config.seed + 400u);
+    bloom.setHarmony(&harmony);
+    bloom.setBuffer(rawBuffer(bloomBuffers.current()));
+    bloomSwapping = false;
     medium.prepare(spec, config.seed + 300u);
     master.prepare(spec);
     for (auto& slot : fxSlots)
@@ -87,6 +91,13 @@ void Engine::prepare(double newSampleRate, int maxBlockSize)
     for (auto* v : { &busAL, &busAR, &busBL, &busBR, &masterL, &masterR, &inputMono, &excite, &scratchDryL, &scratchDryR,
                      &scratchAltL, &scratchAltR })
         v->assign(n, 0.0f);
+
+    catchCapacity = static_cast<std::size_t>(kCatchRingSeconds * sampleRate);
+    catchL.assign(catchCapacity, 0.0f);
+    catchR.assign(catchCapacity, 0.0f);
+    catchIn.assign(catchCapacity, 0.0f);
+    catchWritten.store(0);
+    inputWritten.store(0);
 
     telemetryInterval = std::max(1, static_cast<int>(sampleRate / config.telemetryRateHz));
     telemetryCountdown = telemetryInterval;
@@ -111,11 +122,98 @@ void Engine::release()
 
 bool Engine::post(const ControlEvent& event) noexcept { return controlQueue.push(event); }
 
-bool Engine::loadCloudSample(int cloud, std::unique_ptr<dsp::SampleBuffer> buffer)
+bool Engine::loadCloudSample(int cloud, std::shared_ptr<const dsp::SampleBuffer> buffer)
 {
     if (cloud < 0 || cloud >= kNumClouds)
         return false;
-    return clouds[static_cast<std::size_t>(cloud)].buffers.publish(std::move(buffer));
+    auto& slot = clouds[static_cast<std::size_t>(cloud)];
+    auto handle = std::make_unique<SampleHandle>();
+    handle->buffer = buffer;
+    if (! slot.buffers.publish(std::move(handle)))
+        return false;
+    slot.mirror = std::move(buffer);
+    return true;
+}
+
+bool Engine::loadBloomSample(std::shared_ptr<const dsp::SampleBuffer> buffer)
+{
+    auto handle = std::make_unique<SampleHandle>();
+    handle->buffer = buffer;
+    if (! bloomBuffers.publish(std::move(handle)))
+        return false;
+    bloomMirror = std::move(buffer);
+    return true;
+}
+
+std::shared_ptr<const dsp::SampleBuffer> Engine::getCloudSample(int cloud) const
+{
+    if (cloud < 0 || cloud >= kNumClouds)
+        return nullptr;
+    return clouds[static_cast<std::size_t>(cloud)].mirror;
+}
+
+bool Engine::copyCatch(const EngineNotice& notice, dsp::SampleBuffer& out) const
+{
+    if (catchCapacity == 0 || notice.type != EngineNotice::Type::CatchReady)
+        return false;
+    const bool fromInput = notice.source == 1;
+    const auto written = (fromInput ? inputWritten : catchWritten).load(std::memory_order_acquire);
+    // The writer must not have lapped the region's start.
+    if (written > notice.start + catchCapacity)
+        return false;
+
+    out.sampleRate = sampleRate;
+    out.left.resize(notice.length);
+    out.right.clear();
+    if (! fromInput)
+        out.right.resize(notice.length);
+    for (std::uint32_t i = 0; i < notice.length; ++i)
+    {
+        const auto idx = static_cast<std::size_t>((notice.start + i) % catchCapacity);
+        if (fromInput)
+        {
+            out.left[i] = catchIn[idx];
+        }
+        else
+        {
+            out.left[i] = catchL[idx];
+            out.right[i] = catchR[idx];
+        }
+    }
+    // Re-check: if the writer reached the region while copying, the copy is torn.
+    const auto after = (fromInput ? inputWritten : catchWritten).load(std::memory_order_acquire);
+    return after <= notice.start + catchCapacity;
+}
+
+void Engine::writeCatch(const float* l, const float* r, int n) noexcept
+{
+    auto pos = catchWritten.load(std::memory_order_relaxed);
+    for (int i = 0; i < n; ++i, ++pos)
+    {
+        const auto idx = static_cast<std::size_t>(pos % catchCapacity);
+        catchL[idx] = l[i];
+        catchR[idx] = r[i];
+    }
+    catchWritten.store(pos, std::memory_order_release);
+}
+
+void Engine::requestCatch() noexcept
+{
+    // Settings, not sound: read targets so values posted with the command apply to it.
+    const bool fromInput = toInt(params.target(idx(P::CatchSource))) == 1;
+    const auto written = (fromInput ? inputWritten : catchWritten).load(std::memory_order_relaxed);
+    const auto wanted = static_cast<std::uint64_t>(params.target(idx(P::CatchSeconds)) * sampleRate);
+    const auto length = std::min(wanted, written);
+    if (length == 0)
+        return;
+    EngineNotice n;
+    n.type = EngineNotice::Type::CatchReady;
+    n.sampleTime = sampleTime;
+    n.start = written - length;
+    n.length = static_cast<std::uint32_t>(length);
+    n.source = fromInput ? 1 : 0;
+    n.target = static_cast<std::uint8_t>(std::clamp(toInt(params.target(idx(P::CatchTarget))), 0, kNumClouds));
+    noticeQueue.push(n);
 }
 
 bool Engine::sendProcessor(int slot, dsp::ProcessorPtr processor)
@@ -135,6 +233,7 @@ int Engine::collectProcessors(int slot)
 void Engine::collectGarbage()
 {
     sceneChannel.collectGarbage();
+    bloomBuffers.collectGarbage();
     for (auto& c : clouds)
         c.buffers.collectGarbage();
 }
@@ -173,6 +272,11 @@ void Engine::applyEvent(const ControlEvent& e) noexcept
             params.setTarget(e.param, e.value);
             break;
 
+        case ControlEvent::Type::SnapParam:
+            if (e.param < registry.size())
+                params.snap(e.param, e.value);
+            break;
+
         case ControlEvent::Type::ReleaseParam:
             if (e.param < live.size())
                 live[e.param] = 0;
@@ -180,6 +284,13 @@ void Engine::applyEvent(const ControlEvent& e) noexcept
 
         case ControlEvent::Type::Command:
             applyCommand(e.command);
+            break;
+
+        case ControlEvent::Type::Note:
+            if (e.value > 0.0f)
+                bloom.noteOn(static_cast<int>(e.param), e.value);
+            else
+                bloom.noteOff(static_cast<int>(e.param));
             break;
     }
 }
@@ -205,6 +316,7 @@ void Engine::applyCommand(Command c) noexcept
             break;
         case Command::ResetFeedback: resetFeedback(); break;
         case Command::ReleaseLiveLayer: std::fill(live.begin(), live.end(), std::uint8_t { 0 }); break;
+        case Command::Catch: requestCatch(); break;
         case Command::None: break;
     }
 }
@@ -216,6 +328,7 @@ void Engine::resetFeedback() noexcept
     for (auto& c : clouds)
         c.cloud.reset();
     resonator.reset();
+    bloom.reset();
     for (auto& slot : fxSlots)
         slot.reset();
     medium.reset();
@@ -298,6 +411,21 @@ void Engine::updateSources(float t) noexcept
     r.spread = params.current(P::ResSpread);
     r.gravity = params.current(P::ResGravity) * globalGravity;
     resonator.setParams(r);
+
+    dsp::BloomSampler::Params b;
+    b.transform = static_cast<dsp::BloomSampler::Transform>(std::clamp(toInt(params.current(P::BloomTransform)), 0, dsp::BloomSampler::kNumTransforms - 1));
+    b.amount = params.current(P::BloomAmount);
+    b.lengthSeconds = params.current(P::BloomLength);
+    b.attackSeconds = params.current(P::BloomAttack);
+    b.releaseSeconds = params.current(P::BloomRelease);
+    b.rootNote = params.current(P::BloomRoot);
+    b.pitch = params.current(P::BloomPitch);
+    b.tone = params.current(P::BloomTone);
+    b.spread = params.current(P::BloomSpread);
+    b.random = params.current(P::BloomRandom);
+    b.position = params.current(P::BloomPosition);
+    b.gravity = params.current(P::BloomGravity) * globalGravity;
+    bloom.setParams(b);
 
     dsp::LiveInput::Params in;
     in.channel = static_cast<dsp::LiveInput::Channel>(std::clamp(toInt(params.current(P::InputChannel)), 0, 2));
@@ -385,6 +513,12 @@ void Engine::processChunk(const float* const* inputs, int numInputs, int inputOf
     // 1. Live input (mono).
     float* in = inputMono.data() + o;
     liveInput.process(inputs, numInputs, inputOffset, in, n);
+    {
+        auto pos = inputWritten.load(std::memory_order_relaxed);
+        for (int i = 0; i < n; ++i, ++pos)
+            catchIn[static_cast<std::size_t>(pos % catchCapacity)] = in[i];
+        inputWritten.store(pos, std::memory_order_release);
+    }
 
     // 2. Drone.
     drone.process(L(StripId::Drone), R(StripId::Drone), n, tide);
@@ -398,10 +532,10 @@ void Engine::processChunk(const float* const* inputs, int numInputs, int inputOf
 
         if (slot.swap == CloudSlot::Swap::Idle && slot.buffers.hasPending())
         {
-            if (slot.buffers.current() == nullptr)
+            if (rawBuffer(slot.buffers.current()) == nullptr)
             {
                 slot.buffers.acquire();
-                slot.cloud.setBuffer(slot.buffers.current());
+                slot.cloud.setBuffer(rawBuffer(slot.buffers.current()));
                 slot.swap = CloudSlot::Swap::FadingIn;
                 slot.swapGain = 0.0f;
             }
@@ -425,7 +559,7 @@ void Engine::processChunk(const float* const* inputs, int numInputs, int inputOf
             if (slot.swap == CloudSlot::Swap::FadingOut && slot.swapGain <= 0.0f)
             {
                 slot.buffers.acquire(); // retires the old buffer; grains stop in setBuffer
-                slot.cloud.setBuffer(slot.buffers.current());
+                slot.cloud.setBuffer(rawBuffer(slot.buffers.current()));
                 slot.swap = CloudSlot::Swap::FadingIn;
             }
             else if (slot.swap == CloudSlot::Swap::FadingIn && slot.swapGain >= 1.0f)
@@ -435,7 +569,25 @@ void Engine::processChunk(const float* const* inputs, int numInputs, int inputOf
         }
     }
 
-    // 4. Resonator, excited by its own rain plus input, drone and clouds.
+    // 4. Bloom. A new one-shot waits until sounding voices have released (20 ms).
+    if (bloomBuffers.hasPending())
+    {
+        if (! bloomSwapping)
+        {
+            bloom.releaseAll(0.02f);
+            bloomSwapping = true;
+        }
+        if (bloom.isSilent())
+        {
+            bloomBuffers.acquire();
+            bloom.setBuffer(rawBuffer(bloomBuffers.current()));
+            bloomSwapping = false;
+        }
+    }
+    bloom.process(L(StripId::Bloom), R(StripId::Bloom), n, tide);
+
+    // 5. Resonator, excited by its own rain plus input, drone, clouds and Bloom.
+    const float exBloom = params.current(P::ResExciteBloom);
     const float exIn = params.current(P::ResExciteInput);
     const float exDrone = params.current(P::ResExciteDrone);
     const float exClouds = params.current(P::ResExciteClouds);
@@ -448,17 +600,16 @@ void Engine::processChunk(const float* const* inputs, int numInputs, int inputOf
             const auto id = static_cast<StripId>(static_cast<int>(StripId::Cloud1) + k);
             cloudsMono += L(id)[i] + R(id)[i];
         }
-        ex[i] = in[i] * exIn + 0.5f * (L(StripId::Drone)[i] + R(StripId::Drone)[i]) * exDrone + 0.25f * cloudsMono * exClouds;
+        ex[i] = in[i] * exIn + 0.5f * (L(StripId::Drone)[i] + R(StripId::Drone)[i]) * exDrone + 0.25f * cloudsMono * exClouds
+                + 0.5f * (L(StripId::Bloom)[i] + R(StripId::Bloom)[i]) * exBloom;
     }
     resonator.process(ex, L(StripId::Resonator), R(StripId::Resonator), n, tide);
 
-    // 5. Input strip carries the conditioned input; Bloom arrives in phase 4.
+    // 6. The input strip carries the conditioned input.
     std::copy_n(in, n, L(StripId::Input));
     std::copy_n(in, n, R(StripId::Input));
-    std::fill_n(L(StripId::Bloom), n, 0.0f);
-    std::fill_n(R(StripId::Bloom), n, 0.0f);
 
-    // 6. Inserts and strips.
+    // 7. Inserts and strips.
     for (int s = 0; s < kNumStrips; ++s)
     {
         const auto sid = static_cast<StripId>(s);
@@ -574,6 +725,7 @@ void Engine::process(const float* const* inputs, int numInputs, float* const* ou
                 std::fill_n(outputs[ch] + done, block, 0.0f);
         }
 
+        writeCatch(masterL.data(), masterR.data(), block);
         accumulateTelemetry(masterL.data(), masterR.data(), block);
         done += block;
     }
@@ -630,7 +782,7 @@ void Engine::accumulateTelemetry(const float* l, const float* r, int n) noexcept
     {
         const auto uk = static_cast<std::size_t>(k);
         const auto& slot = clouds[uk];
-        f.cloudLoaded[uk] = slot.buffers.current() != nullptr;
+        f.cloudLoaded[uk] = rawBuffer(slot.buffers.current()) != nullptr;
         f.cloudGrainCount[uk] = slot.cloud.getActiveGrains();
         f.cloudGrainViews[uk] = slot.cloud.getGrainViews(f.cloudGrains[uk].data());
     }
@@ -639,6 +791,9 @@ void Engine::accumulateTelemetry(const float* l, const float* r, int n) noexcept
         f.modeLevel[static_cast<std::size_t>(m)] = resonator.getModeLevel(m);
         f.modeNote[static_cast<std::size_t>(m)] = resonator.getModeNote(m);
     }
+    f.bloomLoaded = rawBuffer(bloomBuffers.current()) != nullptr;
+    for (int v = 0; v < dsp::BloomSampler::kMaxVoices; ++v)
+        f.bloomVoices[static_cast<std::size_t>(v)] = bloom.getVoice(v);
     f.inputLevel = liveInput.getLevel();
     f.inputGateOpen = liveInput.isGateOpen();
 

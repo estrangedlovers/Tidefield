@@ -1,0 +1,66 @@
+name: macOS app
+
+on:
+  push:
+    branches: [main, "claude/**"]
+  pull_request:
+  workflow_dispatch:
+
+concurrency:
+  group: macos-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  build:
+    runs-on: macos-14 # Apple Silicon
+    timeout-minutes: 60
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+          cache-dependency-path: ui/package-lock.json
+
+      - name: Tools
+        run: brew list ninja >/dev/null 2>&1 || brew install ninja
+
+      - name: Cache JUCE and Catch2
+        uses: actions/cache@v4
+        with:
+          path: build/_deps
+          key: deps-${{ runner.os }}-${{ hashFiles('cmake/Dependencies.cmake') }}
+
+      - name: Configure
+        run: cmake --preset release -DCMAKE_OSX_ARCHITECTURES=arm64
+
+      - name: Build
+        run: cmake --build --preset release --parallel
+
+      - name: Test
+        run: ctest --test-dir build/release --output-on-failure --parallel 4
+
+      - name: Strict renders
+        run: |
+          for s in drone_basic ecosystem bloom_catch safety_panic; do
+            ./build/release/tools/render/tidefield_render "scores/$s.json" -o "out/$s.wav" --strict > /dev/null
+          done
+
+      - name: Package
+        run: |
+          APP=$(find build/release -name "Tidefield.app" -type d -maxdepth 6 | head -1)
+          test -n "$APP"
+          # Ad-hoc signature with the hardened runtime and the audio-input entitlement
+          # (not notarised: first launch needs right-click > Open).
+          codesign --force --deep --options runtime -s - "$APP"
+          codesign --verify --deep --strict "$APP"
+          test -f "$APP/Contents/Resources/ui/index.html"
+          mkdir -p dist
+          ditto -c -k --keepParent "$APP" dist/Tidefield-macOS-arm64.zip
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: Tidefield-macOS-arm64
+          path: dist/Tidefield-macOS-arm64.zip
+          retention-days: 30

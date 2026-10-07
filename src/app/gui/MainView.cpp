@@ -283,6 +283,58 @@ private:
 
 } // namespace
 
+/** The projector: the terrain alone, for the audience, full screen on another
+    display when there is one. Double-click or F toggles full screen; Esc leaves it. */
+class ProjectorWindow final : public juce::DocumentWindow
+{
+public:
+    ProjectorWindow(Model& m, juce::Component* mainWindow, std::function<void()> closed)
+        : juce::DocumentWindow("Tidefield - Projector", colour::well, juce::DocumentWindow::allButtons), view(m, true), onClosed(std::move(closed))
+    {
+        setUsingNativeTitleBar(true);
+        setContentNonOwned(&view, false);
+        setResizable(true, false);
+        view.onDoubleClick = [this] { setFullScreen(! isFullScreen()); };
+
+        // Prefer a display the main window is not on: that is the projector.
+        const auto& displays = juce::Desktop::getInstance().getDisplays();
+        const auto mainCentre = mainWindow != nullptr ? mainWindow->getScreenBounds().getCentre() : juce::Point<int>();
+        const juce::Displays::Display* target = displays.getPrimaryDisplay();
+        for (const auto& d : displays.displays)
+            if (! d.logicalBounds.toNearestInt().contains(mainCentre))
+                target = &d;
+        const auto area = target != nullptr ? target->userBounds.toNearestInt() : juce::Rectangle<int>(0, 0, 1280, 800);
+        setBounds(area.withSizeKeepingCentre(std::min(1280, area.getWidth() - 80), std::min(800, area.getHeight() - 80)));
+        setVisible(true);
+        if (target != nullptr && ! target->logicalBounds.toNearestInt().contains(mainCentre))
+            setFullScreen(true);
+    }
+
+    void closeButtonPressed() override { juce::MessageManager::callAsync(onClosed); }
+
+    bool keyPressed(const juce::KeyPress& key) override
+    {
+        if (key == juce::KeyPress::escapeKey)
+        {
+            if (isFullScreen())
+                setFullScreen(false);
+            else
+                closeButtonPressed();
+            return true;
+        }
+        if (key.getTextCharacter() == 'f' || key.getTextCharacter() == 'F')
+        {
+            setFullScreen(! isFullScreen());
+            return true;
+        }
+        return false;
+    }
+
+private:
+    TerrainView view;
+    std::function<void()> onClosed;
+};
+
 // --- Top bar --------------------------------------------------------------------------
 
 class TopBar final : public juce::Component, public Animated
@@ -299,12 +351,15 @@ public:
             menu.addSeparator();
             menu.addItem(3, "Save");
             menu.addItem(4, "Save as...");
+            menu.addSeparator();
+            menu.addItem(5, "Projector window (Cmd+P)", true, view.isProjectorOpen());
             menu.showMenuAsync(juce::PopupMenu::Options().withTargetComponent(&sessionButton), [this](int r) {
                 auto& s = model.core.session;
                 if (r == 1) s.newSession();
                 else if (r == 2) s.open();
                 else if (r == 3) s.save();
                 else if (r == 4) s.saveAs();
+                else if (r == 5) view.toggleProjector();
             });
         };
         fade.setHelp(&model, "fade the whole instrument in or out over the fade length (Space)");
@@ -929,6 +984,7 @@ MainView::MainView(AppCore& c) : core(c), model(c)
 MainView::~MainView()
 {
     stopTimer();
+    projector.reset(); // its terrain is registered with the model
     vblank.reset();
     releaseHolds();
     core.onStatus = nullptr;
@@ -944,6 +1000,20 @@ MainView::~MainView()
     topBar.reset();
     if (--openViews == 0) // the last window (several plugin instances may be open)
         juce::LookAndFeel::setDefaultLookAndFeel(nullptr);
+}
+
+void MainView::toggleProjector()
+{
+    if (projector != nullptr)
+    {
+        projector.reset();
+        return;
+    }
+    juce::Component::SafePointer<MainView> safe(this);
+    projector = std::make_unique<ProjectorWindow>(model, getTopLevelComponent(), [safe] {
+        if (safe != nullptr)
+            safe->projector.reset();
+    });
 }
 
 void MainView::frame()
@@ -1098,6 +1168,8 @@ bool MainView::keyPressed(const juce::KeyPress& key)
             core.session.newSession();
         else if (code == ',')
             showAudioSettings();
+        else if (code == 'P')
+            toggleProjector();
         else
             return false; // Cmd+Q and the system's own shortcuts
         return true;

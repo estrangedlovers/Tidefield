@@ -26,7 +26,8 @@ void showSceneMenu(Model& model, int scene);
 class TerrainView final : public juce::Component, public Animated
 {
 public:
-    explicit TerrainView(Model& model);
+    /** presentation: the projector's view, with no buttons, labels or hints. */
+    explicit TerrainView(Model& model, bool presentation = false);
     ~TerrainView() override;
 
     void tick() override;
@@ -84,6 +85,11 @@ private:
     int dragScene = -1, hoverScene = -1;
     bool sceneMoved = false;
     bool drawMode = false;
+    const bool presentation;
+public:
+    /** Projector: a double-click toggles full screen instead of capturing. */
+    std::function<void()> onDoubleClick;
+private:
     std::vector<engine::Point2> drawing;
     std::vector<engine::Point2> shownPath; // the loop the engine follows, if any
     std::uint64_t shownPathVersion = 0;

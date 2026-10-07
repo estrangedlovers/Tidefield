@@ -60,7 +60,7 @@ void showSceneMenu(Model& model, int scene)
     });
 }
 
-TerrainView::TerrainView(Model& m) : model(m)
+TerrainView::TerrainView(Model& m, bool present) : model(m), presentation(present)
 {
     model.add(this);
     setOpaque(false);
@@ -72,8 +72,11 @@ TerrainView::TerrainView(Model& m) : model(m)
         if (juce::roundToInt(model.value(engine::P::TerrainWanderStyle)) == 4)
             model.set(engine::P::TerrainWanderStyle, 0.0f);
     };
-    addAndMakeVisible(drawButton);
-    addChildComponent(clearButton);
+    if (! presentation)
+    {
+        addAndMakeVisible(drawButton);
+        addChildComponent(clearButton);
+    }
     lastTime = juce::Time::getMillisecondCounterHiRes();
 }
 
@@ -212,7 +215,7 @@ void TerrainView::tick()
         shownPathVersion = model.core.paths.getVersion();
         const auto loop = engine::TerrainPath::build(model.core.paths.getStroke(), 0);
         shownPath.assign(loop.points.begin(), loop.points.begin() + loop.count);
-        clearButton.setVisible(loop.count > 0);
+        clearButton.setVisible(loop.count > 0 && ! presentation);
     }
     tidePhase += dt * 0.12f * tide;
     orbit += dt * 0.35f * tide;
@@ -384,12 +387,15 @@ void TerrainView::paint(juce::Graphics& g)
         g.fillEllipse(juce::Rectangle<float>(s, s).withCentre(p));
     }
 
-    // Performer's cursor: crosshair and ring.
+    // Performer's cursor: crosshair and ring (on the projector, only a faint ring).
     const auto cur = toScreen(shownCursor);
-    g.setColour(colour::tide.withAlpha(0.22f));
-    g.drawLine(f.getX(), cur.y, f.getRight(), cur.y, 1.0f);
-    g.drawLine(cur.x, f.getY(), cur.x, f.getBottom(), 1.0f);
-    g.setColour(colour::tide);
+    if (! presentation)
+    {
+        g.setColour(colour::tide.withAlpha(0.22f));
+        g.drawLine(f.getX(), cur.y, f.getRight(), cur.y, 1.0f);
+        g.drawLine(cur.x, f.getY(), cur.x, f.getBottom(), 1.0f);
+    }
+    g.setColour(colour::tide.withAlpha(presentation ? 0.35f : 1.0f));
     g.drawEllipse(juce::Rectangle<float>(18.0f, 18.0f).withCentre(cur), 2.0f);
 
     // The sound.
@@ -419,6 +425,14 @@ void TerrainView::paint(juce::Graphics& g)
             g.drawEllipse(juce::Rectangle<float>(30.0f, 30.0f).withCentre(s), 1.5f);
 
         const auto name = juce::String(scenes[k].name);
+        if (presentation)
+        {
+            // The audience sees places, not buttons: a faint name under the dot.
+            g.setFont(font(13.0f, 500));
+            g.setColour(c.withAlpha(0.35f + 0.5f * w));
+            g.drawText(name, juce::Rectangle<float>(200.0f, 18.0f).withCentre(s.translated(0.0f, 24.0f)), juce::Justification::centred, false);
+            continue;
+        }
         g.setFont(font(11.0f, 600));
         const float tw = juce::GlyphArrangement::getStringWidth(g.getCurrentFont(), name) + 14.0f;
         auto pill = juce::Rectangle<float>(tw, 18.0f).withCentre(s.translated(0.0f, 24.0f));
@@ -432,6 +446,8 @@ void TerrainView::paint(juce::Graphics& g)
     }
 
     // Guidance.
+    if (presentation)
+        return;
     g.setFont(font(12.0f, 500));
     g.setColour(colour::textFaint);
     if (drawMode)
@@ -544,6 +560,8 @@ void TerrainView::mouseUp(const juce::MouseEvent& e)
 
 void TerrainView::mouseDoubleClick(const juce::MouseEvent& e)
 {
+    if (onDoubleClick)
+        return onDoubleClick();
     if (drawMode || sceneAt(e.position) >= 0)
         return;
     if (model.core.scenes.captureScene({}, toTerrain(e.position), model.frame()) < 0)

@@ -166,6 +166,11 @@ public:
         // (CI runs it on the shipped app; sanitizer builds use it for teardown).
         if (commandLine.contains("--ui-test"))
         {
+            juce::Timer::callAfterDelay(500, [this] {
+                if (window != nullptr)
+                    if (auto* v = dynamic_cast<gui::MainView*>(window->getContentComponent()))
+                        v->toggleProjector(); // open
+            });
             for (int p = 0; p <= gui::DeviceView::NumPages; ++p)
                 juce::Timer::callAfterDelay(800 + p * 250, [this, p] {
                     if (window == nullptr)
@@ -174,7 +179,10 @@ public:
                         v->showPage(p % gui::DeviceView::NumPages);
                 });
             juce::Timer::callAfterDelay(800 + (gui::DeviceView::NumPages + 2) * 250, [this] {
-                std::cout << "UI test passed: every page shown" << std::endl;
+                if (auto* v = window != nullptr ? dynamic_cast<gui::MainView*>(window->getContentComponent()) : nullptr)
+                    if (v->isProjectorOpen())
+                        v->toggleProjector(); // and close
+                std::cout << "UI test passed: every page shown, projector opened and closed" << std::endl;
                 systemRequestedQuit();
             });
         }

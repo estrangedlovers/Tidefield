@@ -43,6 +43,9 @@ public:
     void showAudioSettings();
     /** Shows a device page (also used by `--ui-test` to visit every page). */
     void showPage(int page) { devices->show(page); }
+    /** Opens or closes the projector window (a full-screen terrain for the audience). */
+    void toggleProjector();
+    bool isProjectorOpen() const noexcept { return projector != nullptr; }
 
 private:
     void frame();
@@ -63,6 +66,7 @@ private:
     std::unique_ptr<StatusBar> status;
     std::unique_ptr<juce::VBlankAttachment> vblank;
     std::unique_ptr<juce::FileChooser> chooser;
+    std::unique_ptr<juce::DocumentWindow> projector;
 
     struct Hold
     {

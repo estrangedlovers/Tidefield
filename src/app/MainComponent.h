@@ -21,6 +21,7 @@ public:
 
     void paint(juce::Graphics&) override;
     void resized() override;
+    bool keyPressed(const juce::KeyPress&) override;
 
 private:
     struct ParamControl
@@ -30,9 +31,21 @@ private:
         juce::Label label;
     };
 
+    struct Section
+    {
+        juce::String title;
+        std::size_t firstControl = 0;
+        std::size_t numControls = 0;
+        juce::Rectangle<int> bounds;
+    };
+
     void timerCallback() override;
     void addParamControl(engine::P param);
+    void addSection(const juce::String& title, std::initializer_list<engine::P> params);
     void showDeviceSettings();
+    void toggleFade();
+    void togglePanic();
+    void updateTransportButtons();
 
     AudioHost& host;
     engine::Engine& engine;
@@ -44,6 +57,8 @@ private:
     juce::Label statusLabel;
 
     std::vector<std::unique_ptr<ParamControl>> controls;
+    std::vector<Section> sections;
+    bool deviceWarningShown = false;
 
     engine::TelemetryFrame lastFrame;
     float meterL = 0.0f, meterR = 0.0f;

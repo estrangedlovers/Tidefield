@@ -49,6 +49,7 @@ void DroneGenerator::prepare(const ProcessSpec& newSpec, std::uint64_t seed)
         v.cutoffDrift.setSeed(voiceSeed + 2);
         v.panDrift.setSeed(voiceSeed + 3);
         v.ampDrift.setSeed(voiceSeed + 4);
+        v.noise.setSeed(voiceSeed + 5);
         v.filter.prepare(spec.sampleRate);
         v.interval = v.pendingInterval = kInitialIntervals[static_cast<size_t>(i)];
         v.basePan = (i % 2 == 0 ? -1.0f : 1.0f) * (0.2f + 0.15f * static_cast<float>(i / 2));
@@ -160,7 +161,7 @@ void DroneGenerator::updateControl(float dt) noexcept
     }
 }
 
-float DroneGenerator::renderVoiceSample(Voice& v, float noiseSample) noexcept
+float DroneGenerator::renderVoiceSample(Voice& v) noexcept
 {
     float saw = 0.0f;
     float sine = 0.0f;
@@ -169,19 +170,21 @@ float DroneGenerator::renderVoiceSample(Voice& v, float noiseSample) noexcept
         const double t = v.phase[o];
         const double dt = v.increment[o];
         saw += static_cast<float>(2.0 * t - 1.0 - polyBlep(t, dt));
-        sine += std::sin(kTwoPi * static_cast<float>(t));
+        sine += fastSin01(static_cast<float>(t));
         double next = t + dt;
         if (next >= 1.0)
             next -= 1.0;
         v.phase[o] = next;
     }
     const float osc = lerp(saw, sine, sineMix) * (1.0f / 3.0f);
-    return v.filter.processLow(osc + noiseSample * noiseGain);
+    return v.filter.processLow(osc + v.noise.nextBipolar() * noiseGain);
 }
 
 void DroneGenerator::process(float* left, float* right, int numSamples, float timeScale) noexcept
 {
-    constexpr float kVoiceGain = 0.3f;
+    // Sized so the default patch (3 voices, -3 dB pan law) sits near -20 dBFS RMS with
+    // peaks around -8 dBFS: healthy level into the master without leaning on the limiter.
+    constexpr float kVoiceGain = 0.55f;
     int i = 0;
     while (i < numSamples)
     {
@@ -199,14 +202,13 @@ void DroneGenerator::process(float* left, float* right, int numSamples, float ti
         {
             // Interpolate gains across the control interval to avoid steps.
             const float frac = static_cast<float>(chunkStart + s + 1) / static_cast<float>(kControlInterval);
-            const float noiseSample = rng.nextBipolar();
             float outL = 0.0f;
             float outR = 0.0f;
             for (auto& v : voices)
             {
                 if (v.gainL == 0.0f && v.gainR == 0.0f && v.prevGainL == 0.0f && v.prevGainR == 0.0f)
                     continue;
-                const float y = renderVoiceSample(v, noiseSample);
+                const float y = renderVoiceSample(v);
                 outL += y * lerp(v.prevGainL, v.gainL, frac);
                 outR += y * lerp(v.prevGainR, v.gainR, frac);
             }

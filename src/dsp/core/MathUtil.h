@@ -16,6 +16,18 @@ inline float midiToHz(float note) noexcept { return 440.0f * std::exp2((note - 6
 
 inline float lerp(float a, float b, float t) noexcept { return a + (b - a) * t; }
 
+/** sin(2*pi*phase) for phase in [0, 1). Parabolic approximation with one correction
+    step: worst-case error ~0.1% of full scale, a few multiplies, no transcendental.
+    Use for oscillators and modulators where std::sin per sample would dominate. */
+inline float fastSin01(float phase) noexcept
+{
+    // Map to [-pi, pi] then apply Bhaskara-style parabola y = 4x(1-|x|) in units of pi.
+    const float x = phase * 2.0f - 1.0f;                   // -1..1
+    const float y = 4.0f * x * (1.0f - std::fabs(x));       // parabola, sign-correct for -sin
+    const float corrected = 0.225f * (y * std::fabs(y) - y) + y;
+    return -corrected;
+}
+
 inline float smoothstep(float t) noexcept
 {
     t = std::clamp(t, 0.0f, 1.0f);

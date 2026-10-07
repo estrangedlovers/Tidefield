@@ -45,6 +45,9 @@ public:
     void prepare(double sampleRate, int maxBlockSize);
     void release();
 
+    /** Renders numSamples. `inputs` may alias `outputs` (AudioProcessor in-place
+        convention), so inputs are always copied to scratch before anything is written.
+        numSamples may exceed the prepared block size; the engine chunks internally. */
     void process(const float* const* inputs, int numInputs, float* const* outputs, int numOutputs, int numSamples) noexcept;
 
     // --- Producer side (one thread) ---------------------------------------------------

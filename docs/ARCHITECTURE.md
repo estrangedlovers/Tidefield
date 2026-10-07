@@ -26,9 +26,16 @@ tidefield_tests   (Catch2 v3)        dsp/engine/io tests. No JUCE GUI.
 ```
 
 `dsp` and `engine` have no JUCE dependency at all, so they build and test headless
-in seconds. If imported plugin DSP (reverse shimmer, fuzz) is written against
-`juce_dsp`, it goes in a separate `tidefield_fx_juce` library behind the same
-`Processor` interface instead of pulling JUCE into `dsp`.
+in seconds. The imported plugin DSP (reverse shimmer, fuzz) is JUCE-based, so it goes
+in a separate `tidefield_fx_juce` library behind the same `Processor` interface
+instead of pulling JUCE into `dsp`.
+
+**Plugin build is planned.** `Engine::process` follows the `AudioProcessor` contract
+already: inputs may alias outputs (inputs are copied to scratch before any write),
+block sizes may vary and exceed the prepared size, `getLatencySamples()` reports the
+limiter lookahead, and all state lives in the engine, never in a view. The AU/VST3
+target will be a thin `AudioProcessor` adapter plus a `getStateInformation` that
+reuses the session serializer. Tail length is not applicable to an instrument.
 
 **One event path.** Every change (UI, MIDI, scores, terrain, later OSC) is a
 `ControlEvent { type, source, command, param, value }`. Gesture recording is
@@ -157,8 +164,8 @@ new models over ~300 ms (both pre-allocated). Each model is a `Processor`, so th
 same code also works as a strip insert ("only the cloud is on cassette") or inside a
 delay's feedback loop (a degrading tape echo).
 
-*Default placement (pending confirmation):* on the master, before the limiter, so it
-is heard live and printed to recordings. Recording to disk captures post-Medium.
+*Placement (decided):* on the master, before the limiter, so it is heard live and
+printed to recordings. Recording to disk captures post-Medium.
 
 ## 9. Bloom: one-shot sampler keyboard (phase 4)
 
@@ -181,7 +188,7 @@ on-screen keyboard (performance view), MIDI note input, or the Eno loop generato
 This brings sample import into scope earlier than first planned; it shares the
 worker-thread decode path with Catch.
 
-## 10. Ambient feature catalogue (proposed, pending approval)
+## 10. Ambient feature catalogue (proposed; user to pick)
 
 Each item is either a `Source`, a `Processor` or a control-layer feature, so any of
 them can be added without changing the core.

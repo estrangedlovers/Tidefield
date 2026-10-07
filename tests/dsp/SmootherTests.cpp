@@ -61,3 +61,18 @@ TEST_CASE("Log-domain smoother moves evenly in pitch")
     const float v = s.skip(4800);
     REQUIRE(v == Approx(100.0f * std::pow(16.0f, 0.632f)).epsilon(0.02));
 }
+
+#include <dsp/core/MathUtil.h>
+
+TEST_CASE("fastSin01 tracks std::sin within 0.2% over a full cycle")
+{
+    float worst = 0.0f;
+    for (int i = 0; i < 10000; ++i)
+    {
+        const float phase = static_cast<float>(i) / 10000.0f;
+        worst = std::max(worst, std::fabs(fastSin01(phase) - std::sin(kTwoPi * phase)));
+    }
+    REQUIRE(worst < 0.002f);
+    REQUIRE(fastSin01(0.0f) == Approx(0.0f).margin(1e-6));
+    REQUIRE(fastSin01(0.25f) == Approx(1.0f).margin(1e-3));
+}

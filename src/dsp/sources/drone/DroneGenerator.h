@@ -58,6 +58,7 @@ private:
     {
         std::array<double, 3> phase {};
         Svf filter;
+        Random noise;                // per-voice so breath noise is decorrelated across the field
         Drift pitchDrift, cutoffDrift, panDrift, ampDrift;
         float interval = 0.0f;
         float pendingInterval = 0.0f;
@@ -75,7 +76,7 @@ private:
     };
 
     void updateControl(float dtSeconds) noexcept;
-    float renderVoiceSample(Voice& v, float noiseSample) noexcept;
+    float renderVoiceSample(Voice& v) noexcept;
 
     ProcessSpec spec;
     Params params;

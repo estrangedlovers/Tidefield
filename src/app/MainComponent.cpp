@@ -9,6 +9,7 @@ const juce::Colour kPanel { 0xff1b2028 };
 const juce::Colour kText { 0xffc9d1d9 };
 const juce::Colour kAccent { 0xff7fb4c9 };
 const juce::Colour kWarn { 0xffc97f7f };
+const juce::Colour kButton { 0xff2a313c };
 
 const char* fadeStateName(engine::FadeState s)
 {
@@ -29,26 +30,79 @@ MainComponent::MainComponent(AudioHost& h) : host(h), engine(h.getEngine())
     for (auto* b : { &settingsButton, &fadeInButton, &fadeOutButton, &panicButton })
         addAndMakeVisible(*b);
 
+    for (auto* b : { &settingsButton, &fadeInButton, &fadeOutButton })
+        b->setColour(juce::TextButton::buttonColourId, kButton);
     panicButton.setColour(juce::TextButton::buttonColourId, kWarn.darker(0.6f));
     settingsButton.onClick = [this] { showDeviceSettings(); };
     fadeInButton.onClick = [this] { engine.command(engine::Command::FadeIn); };
     fadeOutButton.onClick = [this] { engine.command(engine::Command::FadeOut); };
-    panicButton.onClick = [this] {
-        engine.command(lastFrame.panicActive ? engine::Command::ResumeFromPanic : engine::Command::Panic);
-    };
+    panicButton.onClick = [this] { togglePanic(); };
+    fadeInButton.setTooltip("Space toggles fade in / fade out");
+    panicButton.setTooltip("Esc: fast fade to silence and reset. Press again to resume.");
 
     statusLabel.setColour(juce::Label::textColourId, kText);
     statusLabel.setJustificationType(juce::Justification::centredLeft);
     addAndMakeVisible(statusLabel);
 
     using engine::P;
-    for (auto p : { P::MasterLevel, P::MasterFadeSecs, P::DroneLevel, P::DroneRoot, P::DroneCutoff, P::DroneResonance,
-                    P::DroneDensity, P::DroneEvolve, P::DroneDriftDepth, P::DroneDriftRate, P::DroneDetune, P::DroneShape,
-                    P::DroneNoise, P::DroneSpread, P::DroneWidth })
-        addParamControl(p);
+    addSection("Master", { P::MasterLevel, P::MasterFadeSecs, P::MasterCeiling });
+    addSection("Drone: tone", { P::DroneLevel, P::DroneRoot, P::DroneCutoff, P::DroneResonance, P::DroneDetune, P::DroneShape, P::DroneNoise });
+    addSection("Drone: motion", { P::DroneDensity, P::DroneEvolve, P::DroneDriftDepth, P::DroneDriftRate, P::DroneSpread, P::DroneWidth, P::DronePan });
 
-    setSize(980, 560);
+    setWantsKeyboardFocus(true);
+    setSize(1100, 800);
     startTimerHz(30);
+}
+
+void MainComponent::addSection(const juce::String& title, std::initializer_list<engine::P> params)
+{
+    Section section;
+    section.title = title;
+    section.firstControl = controls.size();
+    for (auto p : params)
+        addParamControl(p);
+    section.numControls = controls.size() - section.firstControl;
+    sections.push_back(section);
+}
+
+bool MainComponent::keyPressed(const juce::KeyPress& key)
+{
+    if (key == juce::KeyPress::spaceKey)
+    {
+        toggleFade();
+        return true;
+    }
+    if (key == juce::KeyPress::escapeKey)
+    {
+        togglePanic();
+        return true;
+    }
+    return false;
+}
+
+void MainComponent::toggleFade()
+{
+    using engine::FadeState;
+    const bool goingUp = lastFrame.fadeState == FadeState::Silent || lastFrame.fadeState == FadeState::FadingOut;
+    engine.command(goingUp ? engine::Command::FadeIn : engine::Command::FadeOut);
+}
+
+void MainComponent::togglePanic()
+{
+    engine.command(lastFrame.panicActive ? engine::Command::ResumeFromPanic : engine::Command::Panic);
+}
+
+void MainComponent::updateTransportButtons()
+{
+    using engine::FadeState;
+    const auto state = lastFrame.fadeState;
+    const bool up = state == FadeState::FadingIn || state == FadeState::Open;
+    const bool moving = state == FadeState::FadingIn || state == FadeState::FadingOut;
+    const auto active = kAccent.darker(0.4f);
+    fadeInButton.setColour(juce::TextButton::buttonColourId, up ? (moving ? active.withAlpha(0.7f) : active) : kButton);
+    fadeOutButton.setColour(juce::TextButton::buttonColourId, ! up && moving ? active.withAlpha(0.7f) : kButton);
+    panicButton.setButtonText(lastFrame.panicActive ? "Resume" : "PANIC");
+    panicButton.setColour(juce::TextButton::buttonColourId, lastFrame.panicActive ? kWarn : kWarn.darker(0.6f));
 }
 
 MainComponent::~MainComponent() { stopTimer(); }
@@ -117,7 +171,16 @@ void MainComponent::timerCallback()
     meterL = std::max(lastFrame.peakL, meterL * 0.85f);
     meterR = std::max(lastFrame.peakR, meterR * 0.85f);
 
-    panicButton.setButtonText(lastFrame.panicActive ? "Resume" : "PANIC");
+    updateTransportButtons();
+
+    // No usable output device (first launch on a machine without a default, or a
+    // remembered interface that is unplugged): open settings once instead of sitting silent.
+    if (! deviceWarningShown && host.getDeviceManager().getCurrentAudioDevice() == nullptr)
+    {
+        deviceWarningShown = true;
+        showDeviceSettings();
+    }
+
     statusLabel.setText(juce::String::formatted("CPU %4.1f%%   xruns %d   master %s   limiter %4.1f dB   guard trips %u",
                                                 host.getCpuLoad() * 100.0, host.getXrunCount(),
                                                 fadeStateName(lastFrame.fadeState),
@@ -135,6 +198,15 @@ void MainComponent::paint(juce::Graphics& g)
     g.setColour(kText);
     g.setFont(juce::FontOptions(22.0f));
     g.drawText("Tidefield", 20, 14, 300, 30, juce::Justification::centredLeft);
+
+    for (const auto& section : sections)
+    {
+        g.setColour(kPanel);
+        g.fillRoundedRectangle(section.bounds.toFloat(), 6.0f);
+        g.setColour(kText.withAlpha(0.5f));
+        g.setFont(juce::FontOptions(13.0f));
+        g.drawText(section.title.toUpperCase(), section.bounds.reduced(12, 6).removeFromTop(16), juce::Justification::centredLeft);
+    }
 
     // Peak meters.
     g.setColour(kPanel);
@@ -180,16 +252,25 @@ void MainComponent::resized()
     area.removeFromBottom(90);
     meterArea = area.removeFromRight(50).reduced(0, 10);
 
-    constexpr int kColumns = 8;
-    const int cellW = area.getWidth() / kColumns;
-    const int cellH = 150;
-    for (std::size_t i = 0; i < controls.size(); ++i)
+    constexpr int kCellW = 118;
+    constexpr int kCellH = 150;
+    constexpr int kHeader = 26;
+    int y = area.getY();
+    for (auto& section : sections)
     {
-        const int col = static_cast<int>(i) % kColumns;
-        const int row = static_cast<int>(i) / kColumns;
-        juce::Rectangle<int> cell(area.getX() + col * cellW, area.getY() + row * cellH, cellW, cellH);
-        controls[i]->label.setBounds(cell.removeFromTop(20));
-        controls[i]->slider.setBounds(cell.reduced(6));
+        const int cols = std::max(1, std::min(static_cast<int>(section.numControls), area.getWidth() / kCellW));
+        const int rows = (static_cast<int>(section.numControls) + cols - 1) / cols;
+        section.bounds = { area.getX(), y, area.getWidth(), kHeader + rows * kCellH + 8 };
+        for (std::size_t i = 0; i < section.numControls; ++i)
+        {
+            const int col = static_cast<int>(i) % cols;
+            const int row = static_cast<int>(i) / cols;
+            juce::Rectangle<int> cell(area.getX() + 8 + col * kCellW, y + kHeader + row * kCellH, kCellW, kCellH);
+            auto& c = *controls[section.firstControl + i];
+            c.label.setBounds(cell.removeFromTop(20));
+            c.slider.setBounds(cell.reduced(6));
+        }
+        y = section.bounds.getBottom() + 8;
     }
 }
 

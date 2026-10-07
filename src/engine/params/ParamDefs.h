@@ -23,7 +23,7 @@ inline constexpr unsigned kPerformance = 1u << 3;   // shown in the performance 
     X(MasterLevel,      "master.level",       "Master Level",    -60.0f,   6.0f,    0.0f, Decibel, Linear,         0.05f, "dB", kMidiLearnable | kPerformance) \
     X(MasterFadeSecs,   "master.fadeSeconds", "Fade Length",       0.5f, 120.0f,    8.0f, Log,     Linear,         0.0f,  "s",  kMidiLearnable | kPerformance) \
     X(MasterCeiling,    "master.ceiling",     "Limiter Ceiling",  -12.0f,  0.0f,   -1.0f, Linear,  Linear,         0.05f, "dB", kNone) \
-    X(DroneLevel,       "drone.level",        "Drone Level",     -60.0f,   6.0f,   -6.0f, Decibel, Linear,         0.05f, "dB", kTerrainBound | kMidiLearnable | kPerformance) \
+    X(DroneLevel,       "drone.level",        "Drone Level",     -60.0f,   6.0f,    0.0f, Decibel, Linear,         0.05f, "dB", kTerrainBound | kMidiLearnable | kPerformance) \
     X(DronePan,         "drone.pan",          "Drone Pan",        -1.0f,   1.0f,    0.0f, Linear,  Linear,         0.05f, "",   kTerrainBound | kMidiLearnable) \
     X(DroneWidth,       "drone.width",        "Drone Width",       0.0f,   2.0f,    1.0f, Linear,  Linear,         0.05f, "",   kTerrainBound | kMidiLearnable) \
     X(DroneRoot,        "drone.root",         "Root Note",        24.0f,  72.0f,   38.0f, Linear,  Exponential,    0.8f,  "st", kTerrainBound | kMidiLearnable) \

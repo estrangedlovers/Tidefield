@@ -24,12 +24,12 @@ public:
         previous = target;
         const float level = dsp::dbToGain(s.levelDb);
         const auto pan = dsp::equalPowerPan(s.pan);
-        // Width is applied on mid/side; the pan law is normalised so centre is unity.
-        constexpr float kCentreNorm = 1.41421356f;
+        // Width is applied on mid/side. Equal-power pan law: -3 dB at centre, 0 dB at
+        // the edges, the convention every mixer user expects when summing sources.
         target.mid = level;
         target.side = level * std::clamp(s.width, 0.0f, 2.0f);
-        target.panL = pan.left * kCentreNorm;
-        target.panR = pan.right * kCentreNorm;
+        target.panL = pan.left;
+        target.panR = pan.right;
     }
 
     /** Snaps ramps to the current target (after prepare or reset). */

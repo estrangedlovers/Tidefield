@@ -51,15 +51,33 @@ Read `CLAUDE.md` (rules) and `docs/ARCHITECTURE.md` (design) first.
   within it). Fine for UI/MIDI; revisit for gesture playback.
 - The 8 s default fade length means "Fade In" is slow by design; lower it in the panel.
 
-## Decisions taken at approval
+### Phase 1 review pass (plugin-developer eyes)
+Re-read everything after phase 1. Verified the limiter's guarantee by hand (the
+delayed sample is always inside the sliding-minimum window, so the box average can
+never exceed its required gain). Changes made:
+- Gain staging: drone default 0 dB, voice gain raised, channel strip switched to the
+  conventional equal-power law (-3 dB centre, 0 dB edges). Default patch now peaks
+  around -8 dBFS with RMS near -24 dBFS instead of -31 dBFS.
+- Breath noise is now per voice (was one shared noise source feeding all six
+  filters, which collapsed the stereo image of the noise component).
+- Oscillator sine term uses `fastSin01` (18 `std::sin` per sample removed; accuracy
+  test added, error < 0.2%).
+- Placeholder UI: grouped sections, fade/panic buttons reflect engine state, Space
+  toggles fade, Esc toggles panic, Audio Settings opens automatically when no output
+  device could be opened.
+- `Engine::process` contract documented for the future plugin adapter (in-place
+  safe, variable block size).
+Nothing in the audio path allocates, locks or logs; the allocation test still passes.
+
+## Decisions confirmed by the user
 - Terrain vs direct edits: live layer override + explicit "commit to scene".
 - Every `kMidiLearnable` parameter is learnable.
-- Engine stays `AudioProcessor`-adapter friendly (plugin build possible later).
-- `dsp` stays JUCE-free; JUCE-based imported DSP goes in a separate fx library.
+- Plugin (AU/VST3) build is planned; Engine keeps the `AudioProcessor` contract.
+- Imported shimmer/fuzz are JUCE-based: separate `tidefield_fx_juce` library;
+  `dsp` stays JUCE-free.
+- Medium (recording type) sits on the master, heard live and printed.
 
-## Open questions for the user
-- Medium (recording type) placement: master, heard live and printed (current
-  default), or only applied to recordings? Also usable per source as an insert?
+## Open question for the user
 - Which items from the ambient feature catalogue (ARCHITECTURE.md section 10) to
   keep for phase 8.
 

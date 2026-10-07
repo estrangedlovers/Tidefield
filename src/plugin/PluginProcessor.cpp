@@ -3,6 +3,8 @@
 #include <app/gui/MainView.h>
 #include <io/Session.h>
 
+#include <optional>
+
 namespace tf::plugin {
 
 namespace {
@@ -111,11 +113,26 @@ juce::AudioProcessorEditor* TidefieldProcessor::createEditor() { return new Edit
 
 void TidefieldProcessor::getStateInformation(juce::MemoryBlock& dest)
 {
-    // The whole piece, sounds included, in the same format as a .tidefield file.
-    const auto session = io::captureSession(engine, core->latest(), core->scenes, core->fx, &core->midi, &core->seasons, &core->paths);
+    // The whole piece, sounds included, in the same format as a .tidefield file. The
+    // managers belong to the message thread; some hosts ask for state from another
+    // thread, so the capture runs there (writing the zip can happen here).
+    std::optional<io::SessionData> session;
+    auto capture = [&] { session = io::captureSession(engine, core->latest(), core->scenes, core->fx, &core->midi, &core->seasons, &core->paths); };
+    auto* mm = juce::MessageManager::getInstance();
+    if (mm->isThisTheMessageThread() || mm->currentThreadHasLockedMessageManager())
+        capture();
+    else
+        mm->callFunctionOnMessageThread(
+            [](void* f) -> void* {
+                (*static_cast<decltype(capture)*>(f))();
+                return nullptr;
+            },
+            &capture);
+    if (! session)
+        return;
     juce::MemoryOutputStream out(dest, false);
     juce::String error;
-    if (! io::writeSession(session, out, error))
+    if (! io::writeSession(*session, out, error))
         juce::Logger::writeToLog("Tidefield: could not save state: " + error);
 }
 

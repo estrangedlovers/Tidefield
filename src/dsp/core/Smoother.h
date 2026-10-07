@@ -93,6 +93,15 @@ public:
         state = targetState = toState(value);
     }
 
+    /** Changes the time constant without disturbing the current value. */
+    void setTimeConstant(float seconds) noexcept
+    {
+        if (seconds == tau)
+            return;
+        tau = seconds;
+        coefficient = onePoleCoefficient(tau, fs);
+    }
+
     void setTarget(float value) noexcept { targetState = toState(value); }
 
     float next() noexcept

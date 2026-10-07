@@ -2,6 +2,7 @@
 
 #include <engine/control/ControlEvent.h>
 #include <engine/params/ParamRegistry.h>
+#include <engine/scene/SceneManager.h>
 
 #include <juce_core/juce_core.h>
 
@@ -22,7 +23,12 @@ namespace tf::tools {
       ]
     }
 
-    Optional: "randomBlockSizes": true renders with varying host block sizes. */
+    Optional:
+      "randomBlockSizes": true          render with varying host block sizes
+      "scenes": [ { "name": "Dawn", "x": 0.2, "y": 0.3,
+                    "values": { "drone.cutoff": 400, "drone.density": 2 } } ]
+      "pins": [ "drone.level" ]         parameters the terrain must not touch
+    Events may also be { "t": 5, "cmd": "releaseLive" }. */
 struct Score
 {
     struct TimedEvent
@@ -37,6 +43,8 @@ struct Score
     std::uint64_t seed = 1;
     bool randomBlockSizes = false;
     std::vector<TimedEvent> events; // sorted by sample
+    std::vector<engine::Scene> scenes;
+    std::vector<engine::ParamIndex> pins;
 
     /** Throws std::runtime_error with a readable message on bad input. */
     static Score load(const juce::File& file, const engine::ParamRegistry& registry);

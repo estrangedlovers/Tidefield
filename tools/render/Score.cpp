@@ -15,6 +15,7 @@ engine::Command parseCommand(const juce::String& name)
     if (name == "panic") return Command::Panic;
     if (name == "resume") return Command::ResumeFromPanic;
     if (name == "resetFeedback") return Command::ResetFeedback;
+    if (name == "releaseLive") return Command::ReleaseLiveLayer;
     throw std::runtime_error("Unknown command: " + name.toStdString());
 }
 
@@ -68,6 +69,32 @@ Score Score::load(const juce::File& file, const engine::ParamRegistry& registry)
             s.events.push_back(te);
         }
     }
+
+    auto paramIndex = [&](const juce::String& id) {
+        const auto index = registry.find(id.toStdString());
+        if (! index)
+            throw std::runtime_error("Unknown parameter in score: " + id.toStdString());
+        return *index;
+    };
+
+    if (const auto* scenes = root.getProperty("scenes", juce::var()).getArray())
+    {
+        for (const auto& sc : *scenes)
+        {
+            engine::Scene scene;
+            scene.name = sc.getProperty("name", "").toString().toStdString();
+            scene.position = { static_cast<float>(static_cast<double>(sc.getProperty("x", 0.5))),
+                               static_cast<float>(static_cast<double>(sc.getProperty("y", 0.5))) };
+            if (const auto* values = sc.getProperty("values", juce::var()).getDynamicObject())
+                for (const auto& prop : values->getProperties())
+                    scene.values[paramIndex(prop.name.toString())] = static_cast<float>(static_cast<double>(prop.value));
+            s.scenes.push_back(std::move(scene));
+        }
+    }
+
+    if (const auto* pins = root.getProperty("pins", juce::var()).getArray())
+        for (const auto& id : *pins)
+            s.pins.push_back(paramIndex(id.toString()));
 
     std::stable_sort(s.events.begin(), s.events.end(),
                      [](const TimedEvent& a, const TimedEvent& b) { return a.sample < b.sample; });

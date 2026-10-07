@@ -1,0 +1,31 @@
+{
+  "duration": 60,
+  "sampleRate": 48000,
+  "blockSize": 256,
+  "seed": 4,
+  "scenes": [
+    { "name": "Hollow", "x": 0.15, "y": 0.2,
+      "values": { "drone.cutoff": 250, "drone.density": 1.5, "drone.root": 33, "drone.shape": 0.9, "drone.noise": 0.4 } },
+    { "name": "Glass", "x": 0.85, "y": 0.2,
+      "values": { "drone.cutoff": 6000, "drone.density": 4, "drone.root": 45, "drone.shape": 0.1, "drone.resonance": 0.6 } },
+    { "name": "Fog", "x": 0.5, "y": 0.85,
+      "values": { "drone.cutoff": 900, "drone.density": 6, "drone.root": 38, "drone.detune": 30, "drone.driftDepth": 1.0 } }
+  ],
+  "pins": [ "drone.level" ],
+  "events": [
+    { "t": 0,  "param": "master.fadeSeconds", "value": 4 },
+    { "t": 0,  "param": "terrain.glide", "value": 6 },
+    { "t": 0,  "param": "terrain.x", "value": 0.15 },
+    { "t": 0,  "param": "terrain.y", "value": 0.2 },
+    { "t": 0,  "cmd": "fadeIn" },
+    { "t": 10, "param": "terrain.x", "value": 0.85 },
+    { "t": 22, "param": "terrain.x", "value": 0.5 },
+    { "t": 22, "param": "terrain.y", "value": 0.85 },
+    { "t": 32, "param": "drone.cutoff", "value": 3000 },
+    { "t": 38, "cmd": "releaseLive" },
+    { "t": 40, "param": "terrain.wander", "value": 1.0 },
+    { "t": 40, "param": "terrain.wanderRate", "value": 0.1 },
+    { "t": 40, "param": "terrain.wanderStyle", "value": 2 },
+    { "t": 54, "cmd": "fadeOut" }
+  ]
+}

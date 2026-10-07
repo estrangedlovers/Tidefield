@@ -117,6 +117,13 @@ int main(int argc, char** argv)
         tf::engine::Engine engine(config);
         engine.prepare(score.sampleRate, score.blockSize);
 
+        tf::engine::SceneManager scenes(engine);
+        for (auto p : score.pins)
+            scenes.setPinned(p, true);
+        for (auto& scene : score.scenes)
+            if (scenes.addScene(scene) < 0)
+                throw std::runtime_error("Score has more scenes than the terrain holds");
+
         const auto total = static_cast<std::uint64_t>(score.durationSeconds * score.sampleRate);
         std::vector<std::vector<float>> out(2, std::vector<float>(static_cast<std::size_t>(total), 0.0f));
 
@@ -139,6 +146,7 @@ int main(int argc, char** argv)
             float* ptrs[2] = { out[0].data() + pos, out[1].data() + pos };
             engine.process(nullptr, 0, ptrs, 2, block);
 
+            scenes.tick();
             tf::engine::TelemetryFrame frame;
             while (engine.popTelemetry(frame)) {}
             tf::engine::EngineNotice notice;

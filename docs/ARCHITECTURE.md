@@ -188,7 +188,7 @@ on-screen keyboard (performance view), MIDI note input, or the Eno loop generato
 This brings sample import into scope earlier than first planned; it shares the
 worker-thread decode path with Catch.
 
-## 10. Ambient feature catalogue (proposed; user to pick)
+## 10. Ambient feature catalogue (approved in full)
 
 Each item is either a `Source`, a `Processor` or a control-layer feature, so any of
 them can be added without changing the core.

@@ -2,7 +2,7 @@
 
 Read `CLAUDE.md` (rules) and `docs/ARCHITECTURE.md` (design) first.
 
-## Status: phase 1 complete, phase 2 next
+## Status: phase 2 complete, phase 3 next
 
 ### Phase 1: skeleton, device settings, safety chain, drone, render harness
 
@@ -77,16 +77,46 @@ Nothing in the audio path allocates, locks or logs; the allocation test still pa
   `dsp` stays JUCE-free.
 - Medium (recording type) sits on the master, heard live and printed.
 
-## Open question for the user
-- Which items from the ambient feature catalogue (ARCHITECTURE.md section 10) to
-  keep for phase 8.
+- The whole ambient feature catalogue (ARCHITECTURE.md section 10) is approved for
+  phase 8. The user asked for phases to continue back to back, stopping only when
+  input is needed.
 
-## Next: phase 2
-Scene system and terrain interpolation: `Scene` (sparse map), `SceneSet` snapshot
-published via atomic exchange + `ReleasePool`, `Terrain` + IDW interpolator,
-cursor smoothing, wander (OU walk), live layer, pinning; placeholder 2D pad in the
-JUCE panel; tests for interpolation weights, snapshot hand-off without allocation on
-the audio thread, and a terrain sweep score.
+### Phase 2: scenes and terrain
+
+**Built**
+- `SnapshotChannel<T>`: two SPSC queues (publish, retire) moving immutable snapshots
+  to the audio thread; retired ones are deleted by `collectGarbage()` on the message
+  thread. In-flight count is bounded so neither queue can overflow.
+- `SceneSet` (dense matrix of terrain-bound, unpinned parameters; log-taper columns
+  stored as logs, discrete columns pick the strongest scene), `TerrainMath`
+  (inverse-distance weights with `terrain.focus` as the power), `Wander` (Drift = OU
+  walk, Orbit, Tide pool attracted to the nearest scene).
+- Engine: cursor glide (`terrain.glide`), wander, terrain evaluated every 4 control
+  ticks, live layer (any SetParam on a terrain-bound parameter while scenes exist holds
+  it; `ReleaseParam` / `ReleaseLiveLayer` hand it back). Telemetry now carries cursor,
+  effective position, per-scene weights, every parameter's target and the live mask.
+- `SceneManager` (message thread): add, capture current sound, move, rename, delete,
+  set value, pin, commit live layer, release. Rebuilds and publishes on every edit;
+  `tick()` retries publishes the snapshot queue refused, so rapid edits are never lost
+  (a bug found while writing the tests).
+- Render harness: `scenes`, `pins` and the `releaseLive` command in scores;
+  `scores/terrain_sweep.json`.
+- Placeholder app: terrain pad (drag cursor, double-click to capture, drag scenes,
+  right-click for commit/replace/rename/delete), Capture and Release buttons (C / R),
+  wander style menu, terrain knobs. Knobs follow the terrain and turn gold while held
+  in the live layer.
+
+**Verified**: 42 tests pass (IDW properties, log and discrete blending, morphing,
+glide, live layer, commit, capture, pinning, wander bounds, tide pool statistics,
+snapshot hand-off and a 32-scene wandering terrain with zero audio-thread
+allocations). `terrain_sweep` passes `--strict`. App compiles and the layout renders.
+
+**Untested**: interaction feel of the pad on a real trackpad; how morphs sound.
+
+## Next: phase 3
+Granular cloud (4 slots), resonator bank, live input; mixer with sends A/B, FX
+chains with a `Processor` interface and factory, reverb and delay; Tide clock;
+harmonic gravity; the Medium stage on the master.
 
 ## How to run
 ```

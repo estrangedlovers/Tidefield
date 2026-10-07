@@ -14,6 +14,7 @@ inline constexpr unsigned kTerrainBound = 1u << 0; // scenes and the terrain may
 inline constexpr unsigned kMidiLearnable = 1u << 1;
 inline constexpr unsigned kTideScaled = 1u << 2;    // a rate that follows Tide
 inline constexpr unsigned kPerformance = 1u << 3;   // shown in the performance view
+inline constexpr unsigned kDiscrete = 1u << 4;      // integer choice; scenes pick, never blend
 } // namespace ParamFlag
 
 // clang-format off
@@ -23,6 +24,13 @@ inline constexpr unsigned kPerformance = 1u << 3;   // shown in the performance 
     X(MasterLevel,      "master.level",       "Master Level",    -60.0f,   6.0f,    0.0f, Decibel, Linear,         0.05f, "dB", kMidiLearnable | kPerformance) \
     X(MasterFadeSecs,   "master.fadeSeconds", "Fade Length",       0.5f, 120.0f,    8.0f, Log,     Linear,         0.0f,  "s",  kMidiLearnable | kPerformance) \
     X(MasterCeiling,    "master.ceiling",     "Limiter Ceiling",  -12.0f,  0.0f,   -1.0f, Linear,  Linear,         0.05f, "dB", kNone) \
+    X(TerrainX,         "terrain.x",          "Terrain X",         0.0f,   1.0f,    0.5f, Linear,  Linear,         0.0f,  "",   kMidiLearnable | kPerformance) \
+    X(TerrainY,         "terrain.y",          "Terrain Y",         0.0f,   1.0f,    0.5f, Linear,  Linear,         0.0f,  "",   kMidiLearnable | kPerformance) \
+    X(TerrainGlide,     "terrain.glide",      "Glide",             0.05f, 30.0f,    1.5f, Log,     Linear,         0.0f,  "s",  kMidiLearnable | kPerformance) \
+    X(TerrainFocus,     "terrain.focus",      "Focus",             1.0f,   6.0f,    2.5f, Linear,  Exponential,    0.3f,  "",   kMidiLearnable) \
+    X(TerrainWander,    "terrain.wander",     "Wander",            0.0f,   1.0f,    0.0f, Linear,  Exponential,    0.5f,  "",   kMidiLearnable | kPerformance) \
+    X(TerrainWanderRate,"terrain.wanderRate", "Wander Rate",       0.002f, 0.5f,    0.03f, Log,    LogExponential, 0.5f,  "Hz", kMidiLearnable | kTideScaled) \
+    X(TerrainWanderStyle,"terrain.wanderStyle","Wander Style",     0.0f,   2.0f,    0.0f, Linear,  Linear,         0.0f,  "",   kMidiLearnable | kDiscrete) \
     X(DroneLevel,       "drone.level",        "Drone Level",     -60.0f,   6.0f,    0.0f, Decibel, Linear,         0.05f, "dB", kTerrainBound | kMidiLearnable | kPerformance) \
     X(DronePan,         "drone.pan",          "Drone Pan",        -1.0f,   1.0f,    0.0f, Linear,  Linear,         0.05f, "",   kTerrainBound | kMidiLearnable) \
     X(DroneWidth,       "drone.width",        "Drone Width",       0.0f,   2.0f,    1.0f, Linear,  Linear,         0.05f, "",   kTerrainBound | kMidiLearnable) \

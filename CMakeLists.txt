@@ -38,6 +38,7 @@ add_library(tidefield_engine STATIC
     src/engine/Engine.cpp
     src/engine/params/ParamRegistry.cpp
     src/engine/master/MasterChain.cpp
+    src/engine/scene/SceneManager.cpp
 )
 target_link_libraries(tidefield_engine PUBLIC tidefield_dsp)
 tf_set_warnings(tidefield_engine)

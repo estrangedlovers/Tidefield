@@ -1,5 +1,8 @@
 #pragma once
 
+#include "../params/ParamDefs.h"
+#include "../scene/SceneSet.h"
+
 #include <array>
 #include <cstdint>
 
@@ -20,6 +23,18 @@ struct TelemetryFrame
     std::uint32_t guardTrips = 0;
     std::array<float, 6> droneVoiceLevel {};
     std::array<float, 6> droneVoiceInterval {};
+
+    // Terrain.
+    Point2 cursor {};          // performer's cursor after glide
+    Point2 position {};        // effective position after wander
+    int numScenes = 0;
+    std::uint64_t sceneSetVersion = 0;
+    std::array<float, kMaxScenes> sceneWeights {};
+
+    // Every parameter's current target, so controls can follow the terrain, and
+    // which parameters are held in the live layer.
+    std::array<float, kNumParams> paramTargets {};
+    std::array<std::uint8_t, kNumParams> live {};
 };
 
 /** Discrete things the UI should hear about once. */

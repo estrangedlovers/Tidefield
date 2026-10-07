@@ -1,5 +1,7 @@
 #include "Engine.h"
 
+#include "scene/TerrainMath.h"
+
 #include <dsp/core/Denormal.h>
 #include <dsp/core/MathUtil.h>
 
@@ -16,6 +18,10 @@ Engine::Engine(const Config& c)
       telemetryQueue(c.telemetryQueueSize),
       noticeQueue(c.noticeQueueSize)
 {
+    paramFlags.reserve(registry.size());
+    for (const auto& s : registry.all())
+        paramFlags.push_back(s.flags);
+    live.assign(registry.size(), 0);
 }
 
 void Engine::prepare(double newSampleRate, int maxBlockSize)
@@ -23,11 +29,19 @@ void Engine::prepare(double newSampleRate, int maxBlockSize)
     sampleRate = newSampleRate;
     maxBlock = std::max(maxBlockSize, kControlInterval);
     sampleTime = 0;
+    tickCount = 0;
 
     const dsp::ProcessSpec spec { sampleRate, maxBlock };
     params.prepare(registry, sampleRate);
     drone.prepare(spec, config.seed);
     master.prepare(spec);
+
+    const double terrainRate = sampleRate / (kControlInterval * kTerrainDecimation);
+    cursorX.prepare(terrainRate, 1.0f, false);
+    cursorY.prepare(terrainRate, 1.0f, false);
+    cursorX.reset(params.current(P::TerrainX));
+    cursorY.reset(params.current(P::TerrainY));
+    wander.setSeed(config.seed ^ 0x77616e64ull);
 
     const auto n = static_cast<std::size_t>(maxBlock);
     sourceL.assign(n, 0.0f);
@@ -58,15 +72,41 @@ void Engine::notify(EngineNotice::Type type) noexcept
     noticeQueue.push(EngineNotice { type, sampleTime }); // dropped if the UI is not reading
 }
 
+bool Engine::terrainActive() const noexcept
+{
+    const auto* set = sceneChannel.current();
+    return set != nullptr && set->numScenes > 0;
+}
+
 void Engine::drainControl() noexcept
 {
+    sceneChannel.acquire();
     ControlEvent e;
     while (controlQueue.pop(e))
+        applyEvent(e);
+}
+
+void Engine::applyEvent(const ControlEvent& e) noexcept
+{
+    switch (e.type)
     {
-        if (e.type == ControlEvent::Type::SetParam)
+        case ControlEvent::Type::SetParam:
+            if (e.param >= registry.size())
+                return;
+            // A performer touching a terrain-driven parameter takes it over.
+            if ((paramFlags[e.param] & ParamFlag::kTerrainBound) != 0 && terrainActive() && e.source != ControlSource::Terrain)
+                live[e.param] = 1;
             params.setTarget(e.param, e.value);
-        else
+            break;
+
+        case ControlEvent::Type::ReleaseParam:
+            if (e.param < live.size())
+                live[e.param] = 0;
+            break;
+
+        case ControlEvent::Type::Command:
             applyCommand(e.command);
+            break;
     }
 }
 
@@ -90,6 +130,7 @@ void Engine::applyCommand(Command c) noexcept
             master.resumeFromPanic();
             break;
         case Command::ResetFeedback: resetFeedback(); break;
+        case Command::ReleaseLiveLayer: std::fill(live.begin(), live.end(), std::uint8_t { 0 }); break;
         case Command::None: break;
     }
 }
@@ -100,8 +141,39 @@ void Engine::resetFeedback() noexcept
     master.reset();
 }
 
+void Engine::updateTerrain(float dt) noexcept
+{
+    // Cursor glide. The glide time is itself a control, so the coefficient follows it.
+    const float glide = params.current(P::TerrainGlide);
+    cursorX.setTimeConstant(glide);
+    cursorY.setTimeConstant(glide);
+    cursorX.setTarget(params.current(P::TerrainX));
+    cursorY.setTarget(params.current(P::TerrainY));
+    cursor = { cursorX.next(), cursorY.next() };
+
+    const auto* set = sceneChannel.current();
+    const auto style = static_cast<Wander::Style>(std::clamp(static_cast<int>(std::lround(params.current(P::TerrainWanderStyle))), 0, 2));
+    constexpr float kTide = 1.0f; // Tide arrives in phase 3.
+    position = wander.update(cursor, params.current(P::TerrainWander), params.current(P::TerrainWanderRate), style, set,
+                             dt * kTide);
+
+    if (set == nullptr || set->numScenes == 0)
+        return;
+
+    terrain::computeWeights(*set, position, params.current(P::TerrainFocus), weights.data());
+    for (std::size_t c = 0; c < set->columns.size(); ++c)
+    {
+        const auto p = set->columns[c].param;
+        if (live[p] == 0)
+            params.setTarget(p, terrain::blendColumn(*set, c, weights.data()));
+    }
+}
+
 void Engine::controlTick() noexcept
 {
+    if (tickCount++ % kTerrainDecimation == 0)
+        updateTerrain(static_cast<float>(kControlInterval * kTerrainDecimation / sampleRate));
+
     params.advance(kControlInterval);
 
     dsp::DroneGenerator::Params d;
@@ -232,6 +304,21 @@ void Engine::accumulateTelemetry(const float* l, const float* r, int n) noexcept
         f.droneVoiceLevel[static_cast<std::size_t>(v)] = drone.getVoiceLevel(v);
         f.droneVoiceInterval[static_cast<std::size_t>(v)] = drone.getVoiceInterval(v);
     }
+
+    f.cursor = cursor;
+    f.position = position;
+    if (const auto* set = sceneChannel.current())
+    {
+        f.numScenes = set->numScenes;
+        f.sceneSetVersion = set->version;
+        std::copy_n(weights.begin(), set->numScenes, f.sceneWeights.begin());
+    }
+    for (std::size_t i = 0; i < kNumParams; ++i)
+    {
+        f.paramTargets[i] = params.target(static_cast<ParamIndex>(i));
+        f.live[i] = live[i];
+    }
+
     telemetryQueue.push(f); // dropped if the UI is behind; the next frame supersedes it
 
     accPeakL = accPeakR = 0.0f;

@@ -11,7 +11,8 @@ juce_add_gui_app(Tidefield
 target_sources(Tidefield PRIVATE
     Main.cpp
     AudioHost.cpp
-    MainComponent.cpp)
+    MainComponent.cpp
+    TerrainPad.cpp)
 
 target_compile_definitions(Tidefield PRIVATE
     JUCE_WEB_BROWSER=0            # turned on in phase 6 for the React UI

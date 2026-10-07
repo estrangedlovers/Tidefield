@@ -1,6 +1,7 @@
 #include "AppCore.h"
 
 #include <BinaryData.h>
+#include <AudioProcessorEffect.h>
 #include <io/AudioFileIO.h>
 #include <io/Session.h>
 
@@ -11,6 +12,7 @@ AppCore::AppCore(AudioHost& h)
       midiInputs(h.getEngine(), h.getSettings()), session(h.getEngine(), scenes, fx, &midi, &seasons), recorder(h.getEngine().getRecordTap())
 {
     engine.setGuardrailsEnabled(true);
+    fxjuce::registerUserEffects(); // before any slot or session asks for an FX type
     fx.loadDefaultLayout();
     loadRigMidi();
     loadFactoryContent();

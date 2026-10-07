@@ -6091,6 +6091,343 @@
           }
         }
       ]
+    },
+    {
+      "type": "tf.wornEcho",
+      "name": "Worn Echo",
+      "send": true,
+      "controls": [
+        {
+          "name": "Time",
+          "def": 0.620000004768372,
+          "display": {
+            "curve": "exp",
+            "a": 20.0,
+            "b": 100.0,
+            "unit": "ms",
+            "decimals": 0,
+            "choices": []
+          }
+        },
+        {
+          "name": "Feedback",
+          "def": 0.550000011920929,
+          "display": {
+            "curve": "linear",
+            "a": 0.0,
+            "b": 105.0,
+            "unit": "%",
+            "decimals": 0,
+            "choices": []
+          }
+        },
+        {
+          "name": "Medium",
+          "def": 0.0,
+          "display": {
+            "curve": "choice",
+            "a": 0.0,
+            "b": 1.0,
+            "unit": "",
+            "decimals": 0,
+            "choices": [
+              "Cassette",
+              "Vinyl",
+              "Sampler"
+            ]
+          }
+        },
+        {
+          "name": "Age",
+          "def": 0.5,
+          "display": {
+            "curve": "linear",
+            "a": 0.0,
+            "b": 100.0,
+            "unit": "%",
+            "decimals": 0,
+            "choices": []
+          }
+        },
+        {
+          "name": "Wobble",
+          "def": 0.400000005960464,
+          "display": {
+            "curve": "linear",
+            "a": 0.0,
+            "b": 100.0,
+            "unit": "%",
+            "decimals": 0,
+            "choices": []
+          }
+        },
+        {
+          "name": "Spread",
+          "def": 0.300000011920929,
+          "display": {
+            "curve": "linear",
+            "a": 0.0,
+            "b": 100.0,
+            "unit": "%",
+            "decimals": 0,
+            "choices": []
+          }
+        }
+      ]
+    },
+    {
+      "type": "tf.ensemble",
+      "name": "Ensemble",
+      "send": false,
+      "controls": [
+        {
+          "name": "Rate",
+          "def": 0.449999988079071,
+          "display": {
+            "curve": "exp",
+            "a": 0.050000000745058,
+            "b": 40.0,
+            "unit": "Hz",
+            "decimals": 2,
+            "choices": []
+          }
+        },
+        {
+          "name": "Depth",
+          "def": 0.600000023841858,
+          "display": {
+            "curve": "linear",
+            "a": 0.0,
+            "b": 100.0,
+            "unit": "%",
+            "decimals": 0,
+            "choices": []
+          }
+        },
+        {
+          "name": "Vibrato",
+          "def": 0.300000011920929,
+          "display": {
+            "curve": "linear",
+            "a": 0.0,
+            "b": 100.0,
+            "unit": "%",
+            "decimals": 0,
+            "choices": []
+          }
+        },
+        {
+          "name": "Voices",
+          "def": 0.400000005960464,
+          "display": {
+            "curve": "choice",
+            "a": 0.0,
+            "b": 1.0,
+            "unit": "",
+            "decimals": 0,
+            "choices": [
+              "Two",
+              "Three",
+              "Four",
+              "Six"
+            ]
+          }
+        },
+        {
+          "name": "Spread",
+          "def": 0.800000011920929,
+          "display": {
+            "curve": "linear",
+            "a": 0.0,
+            "b": 100.0,
+            "unit": "%",
+            "decimals": 0,
+            "choices": []
+          }
+        },
+        {
+          "name": "Tone",
+          "def": 0.699999988079071,
+          "display": {
+            "curve": "exp",
+            "a": 1500.0,
+            "b": 12.0,
+            "unit": "Hz",
+            "decimals": 0,
+            "choices": []
+          }
+        }
+      ]
+    },
+    {
+      "type": "tf.blur",
+      "name": "Spectral Blur",
+      "send": false,
+      "controls": [
+        {
+          "name": "Blur",
+          "def": 0.5,
+          "display": {
+            "curve": "power",
+            "a": 20.0,
+            "b": 2.0,
+            "unit": "s",
+            "decimals": 2,
+            "choices": []
+          }
+        },
+        {
+          "name": "Smear",
+          "def": 0.300000011920929,
+          "display": {
+            "curve": "linear",
+            "a": 0.0,
+            "b": 100.0,
+            "unit": "%",
+            "decimals": 0,
+            "choices": []
+          }
+        },
+        {
+          "name": "Drift",
+          "def": 0.400000005960464,
+          "display": {
+            "curve": "linear",
+            "a": 0.0,
+            "b": 100.0,
+            "unit": "%",
+            "decimals": 0,
+            "choices": []
+          }
+        },
+        {
+          "name": "Shimmer",
+          "def": 0.0,
+          "display": {
+            "curve": "linear",
+            "a": 0.0,
+            "b": 100.0,
+            "unit": "%",
+            "decimals": 0,
+            "choices": []
+          }
+        },
+        {
+          "name": "Tone",
+          "def": 0.5,
+          "display": {
+            "curve": "linear",
+            "a": -6.0,
+            "b": 12.0,
+            "unit": "dB/oct",
+            "decimals": 1,
+            "choices": []
+          }
+        },
+        {
+          "name": "Freeze",
+          "def": 0.0,
+          "display": {
+            "curve": "choice",
+            "a": 0.0,
+            "b": 1.0,
+            "unit": "",
+            "decimals": 0,
+            "choices": [
+              "Off",
+              "On"
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "type": "tf.strings",
+      "name": "Sympathetic Strings",
+      "send": false,
+      "controls": [
+        {
+          "name": "Excite",
+          "def": 0.5,
+          "display": {
+            "curve": "linear",
+            "a": 0.0,
+            "b": 100.0,
+            "unit": "%",
+            "decimals": 0,
+            "choices": []
+          }
+        },
+        {
+          "name": "Decay",
+          "def": 0.5,
+          "display": {
+            "curve": "exp",
+            "a": 0.5,
+            "b": 40.0,
+            "unit": "s",
+            "decimals": 1,
+            "choices": []
+          }
+        },
+        {
+          "name": "Brightness",
+          "def": 0.5,
+          "display": {
+            "curve": "linear",
+            "a": 0.0,
+            "b": 100.0,
+            "unit": "%",
+            "decimals": 0,
+            "choices": []
+          }
+        },
+        {
+          "name": "Register",
+          "def": 0.400000005960464,
+          "display": {
+            "curve": "choice",
+            "a": 0.0,
+            "b": 1.0,
+            "unit": "",
+            "decimals": 0,
+            "choices": [
+              "Low",
+              "Middle",
+              "High",
+              "Very high"
+            ]
+          }
+        },
+        {
+          "name": "Strings",
+          "def": 0.5,
+          "display": {
+            "curve": "choice",
+            "a": 0.0,
+            "b": 1.0,
+            "unit": "",
+            "decimals": 0,
+            "choices": [
+              "Six",
+              "Nine",
+              "Twelve"
+            ]
+          }
+        },
+        {
+          "name": "Level",
+          "def": 0.600000023841858,
+          "display": {
+            "curve": "linear",
+            "a": 0.0,
+            "b": 100.0,
+            "unit": "%",
+            "decimals": 0,
+            "choices": []
+          }
+        }
+      ]
     }
   ],
   "cloudFirstParam": [

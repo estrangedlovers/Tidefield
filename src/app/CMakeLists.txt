@@ -38,6 +38,7 @@ target_compile_definitions(Tidefield PRIVATE
     JUCE_APPLICATION_VERSION_STRING="$<TARGET_PROPERTY:Tidefield,JUCE_VERSION>")
 
 target_link_libraries(Tidefield PRIVATE
+    tidefield_fx_juce
     tidefield_engine
     tidefield_io
     TidefieldBinaryData

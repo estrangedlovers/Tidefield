@@ -27,6 +27,10 @@ include(cmake/Dependencies.cmake)
 add_library(tidefield_dsp STATIC
     src/dsp/fx/Limiter.cpp
     src/dsp/fx/ProcessorFactory.cpp
+    src/dsp/fx/chorus/Ensemble.cpp
+    src/dsp/fx/delay/WornEcho.cpp
+    src/dsp/fx/spectral/SpectralBlur.cpp
+    src/dsp/fx/strings/SympatheticStrings.cpp
     src/dsp/fx/delay/TapeDelay.cpp
     src/dsp/fx/medium/Medium.cpp
     src/dsp/fx/reverb/FdnReverb.cpp
@@ -69,6 +73,8 @@ target_sources(tidefield_io INTERFACE
     ${CMAKE_CURRENT_SOURCE_DIR}/src/io/Session.cpp
     ${CMAKE_CURRENT_SOURCE_DIR}/src/io/UiProtocol.cpp)
 target_link_libraries(tidefield_io INTERFACE tidefield_engine)
+
+add_subdirectory(src/fx_juce)
 
 if(TIDEFIELD_BUILD_RENDER)
     add_subdirectory(tools/render)

@@ -53,7 +53,7 @@ jobs:
           test -n "$APP"
           # Ad-hoc signature with the hardened runtime and the audio-input entitlement
           # (not notarised: first launch needs right-click > Open).
-          codesign --force --deep --options runtime -s - "$APP"
+          codesign --force --deep --options runtime --preserve-metadata=entitlements -s - "$APP"
           codesign --verify --deep --strict "$APP"
           test -f "$APP/Contents/Resources/ui/index.html"
           mkdir -p dist

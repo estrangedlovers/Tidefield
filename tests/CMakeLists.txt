@@ -7,6 +7,7 @@ add_executable(tidefield_tests
     dsp/LimiterTests.cpp
     dsp/DroneTests.cpp
     dsp/Phase3DspTests.cpp
+    dsp/Phase8FxTests.cpp
     engine/SpscQueueTests.cpp
     engine/ParamTests.cpp
     engine/MasterChainTests.cpp
@@ -28,12 +29,14 @@ catch_discover_tests(tidefield_tests)
 # tests above stay free of JUCE.
 if(TARGET juce::juce_core)
     juce_add_console_app(tidefield_io_tests PRODUCT_NAME "tidefield_io_tests")
-    target_sources(tidefield_io_tests PRIVATE io/SessionTests.cpp io/UiProtocolTests.cpp io/RecorderTests.cpp)
+    target_sources(tidefield_io_tests PRIVATE io/SessionTests.cpp io/UiProtocolTests.cpp io/RecorderTests.cpp io/JuceEffectTests.cpp)
     target_include_directories(tidefield_io_tests PRIVATE ${CMAKE_CURRENT_SOURCE_DIR})
     target_compile_definitions(tidefield_io_tests PRIVATE JUCE_WEB_BROWSER=0 JUCE_USE_CURL=0 JUCE_STANDALONE_APPLICATION=1)
     target_link_libraries(tidefield_io_tests PRIVATE
         tidefield_io
+        tidefield_fx_juce
         Catch2::Catch2WithMain
+        juce::juce_audio_processors
         juce::juce_core
         juce::juce_audio_basics
         juce::juce_audio_formats

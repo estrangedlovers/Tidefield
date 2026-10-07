@@ -1,8 +1,12 @@
 #include "ProcessorFactory.h"
 
+#include "chorus/Ensemble.h"
 #include "delay/TapeDelay.h"
+#include "delay/WornEcho.h"
 #include "medium/Medium.h"
 #include "reverb/FdnReverb.h"
+#include "spectral/SpectralBlur.h"
+#include "strings/SympatheticStrings.h"
 
 namespace tf::dsp {
 
@@ -17,6 +21,10 @@ ProcessorFactory::ProcessorFactory()
     add(FdnReverb::kInfo, [] { return ProcessorPtr(new FdnReverb()); });
     add(TapeDelay::kInfo, [] { return ProcessorPtr(new TapeDelay()); });
     add(MediumProcessor::kInfo, [] { return ProcessorPtr(new MediumProcessor()); });
+    add(WornEcho::kInfo, [] { return ProcessorPtr(new WornEcho()); });
+    add(Ensemble::kInfo, [] { return ProcessorPtr(new Ensemble()); });
+    add(SpectralBlur::kInfo, [] { return ProcessorPtr(new SpectralBlur()); });
+    add(SympatheticStrings::kInfo, [] { return ProcessorPtr(new SympatheticStrings()); });
 }
 
 void ProcessorFactory::add(const ProcessorInfo& info, CreateFn createFn)

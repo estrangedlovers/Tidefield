@@ -687,7 +687,7 @@ std::array<float, 6> Engine::slotControls(int slot) const noexcept
 
 void Engine::updateFx(float t) noexcept
 {
-    const dsp::ModContext ctx { t };
+    const dsp::ModContext ctx { t, &harmony };
     for (int s = 0; s < kNumFxSlots; ++s)
         if (fxSlots[static_cast<std::size_t>(s)].isActive())
             fxSlots[static_cast<std::size_t>(s)].setControls(slotControls(s), ctx);

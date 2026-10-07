@@ -52,10 +52,14 @@ struct ProcessorInfo
     bool sendStyle = false;
 };
 
-/** Context that changes per block: Tide for every modulation rate. */
+class HarmonicGravity;
+
+/** Context that changes per control tick: Tide for every modulation rate, and the
+    current key for processors that tune themselves (may be null outside the engine). */
 struct ModContext
 {
     float timeScale = 1.0f;
+    const HarmonicGravity* harmony = nullptr;
 };
 
 /** Base for everything that can sit in an FX slot: inserts, send buses, master.

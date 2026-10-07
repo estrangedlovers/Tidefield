@@ -1,8 +1,10 @@
 juce_add_gui_app(Tidefield
     PRODUCT_NAME "Tidefield"
     COMPANY_NAME "Tidefield"
+    COMPANY_COPYRIGHT "Copyright 2026 Tidefield"
     BUNDLE_ID "com.tidefield.app"
     VERSION ${PROJECT_VERSION}
+    ICON_BIG ${CMAKE_SOURCE_DIR}/resources/icon/icon_1024.png
     MICROPHONE_PERMISSION_ENABLED TRUE
     MICROPHONE_PERMISSION_TEXT "Tidefield uses audio input for the live input channel."
     HARDENED_RUNTIME_ENABLED TRUE

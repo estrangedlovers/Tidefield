@@ -3,8 +3,12 @@ name: macOS app
 on:
   push:
     branches: [main, "claude/**"]
+    tags: ["v*"]
   pull_request:
   workflow_dispatch:
+
+permissions:
+  contents: write # a version tag publishes a release with the app attached
 
 concurrency:
   group: macos-${{ github.ref }}
@@ -56,6 +60,11 @@ jobs:
           codesign --force --deep --options runtime --preserve-metadata=entitlements -s - "$APP"
           codesign --verify --deep --strict "$APP"
           test -f "$APP/Contents/Resources/ui/index.html"
+          # The shipped binary: Apple Silicon, macOS 12+, and it passes its own self-test.
+          lipo -info "$APP/Contents/MacOS/Tidefield"
+          /usr/libexec/PlistBuddy -c "Print :LSMinimumSystemVersion" "$APP/Contents/Info.plist"
+          /usr/libexec/PlistBuddy -c "Print :CFBundleShortVersionString" "$APP/Contents/Info.plist"
+          "$APP/Contents/MacOS/Tidefield" --self-test
           mkdir -p dist
           ditto -c -k --keepParent "$APP" dist/Tidefield-macOS-arm64.zip
 
@@ -64,3 +73,15 @@ jobs:
           name: Tidefield-macOS-arm64
           path: dist/Tidefield-macOS-arm64.zip
           retention-days: 30
+
+      - name: Publish release (version tags only)
+        if: startsWith(github.ref, 'refs/tags/v')
+        uses: softprops/action-gh-release@v2
+        with:
+          files: dist/Tidefield-macOS-arm64.zip
+          generate_release_notes: true
+          body: |
+            Tidefield for macOS 12+ on Apple Silicon.
+
+            Unzip, move Tidefield.app to Applications, then right-click it and choose Open the first time
+            (the app is signed ad hoc, not notarised). If macOS still refuses: `xattr -cr /Applications/Tidefield.app`.

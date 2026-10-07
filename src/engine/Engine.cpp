@@ -1173,6 +1173,10 @@ void Engine::processFreeze(int offset, int n) noexcept
     }
 
     freezeCloud.process(l, r, n, tide);
+    // A dense granular sum (Hann windows normalised by sqrt(overlap), panned wide)
+    // sits ~8 dB under the material it reads; make it up so freezing holds the
+    // moment at the level it was playing rather than dropping away.
+    constexpr float kFreezeMakeup = 2.5f;
     const float target = wanted ? 1.0f : 0.0f;
     const float fs = static_cast<float>(sampleRate);
     const float inStep = 1.0f / (0.4f * fs);
@@ -1181,8 +1185,8 @@ void Engine::processFreeze(int offset, int n) noexcept
     {
         freezeGain = target > freezeGain ? std::min(target, freezeGain + inStep) : std::max(target, freezeGain - outStep);
         g[i] = freezeGain;
-        l[i] *= freezeGain;
-        r[i] *= freezeGain;
+        l[i] *= freezeGain * kFreezeMakeup;
+        r[i] *= freezeGain * kFreezeMakeup;
     }
     if (! wanted && freezeGain <= 0.0f)
         freezeLoaded = false; // the next freeze captures afresh

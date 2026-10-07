@@ -226,13 +226,16 @@ TEST_CASE("Engine: freeze all holds the mix, ducks it, and releases", "[freeze][
         return out;
     };
     run(4.0);
+    const auto before = run(2.0);
     eng.setParam(engine::P::FreezeOn, 1.0f);
     eng.setParam(engine::P::FreezeDuck, 1.0f); // only the frozen hold remains
     eng.setParam(engine::P::DroneLevel, -60.0f);
     run(1.5);
     CHECK(f.freezeGain == 1.0f);
     const auto held = run(3.0);
-    CHECK(db(rms(held)) > -45.0f); // the hold sounds with the source gone and ducked
+    INFO("mix " << db(rms(before)) << " dB, hold " << db(rms(held)) << " dB");
+    // The hold sounds with the source gone and ducked, at about the level it caught.
+    CHECK(std::fabs(db(rms(held)) - db(rms(before))) < 6.0f);
     CHECK(allFinite(held));
     eng.setParam(engine::P::FreezeOn, 0.0f);
     run(2.5);

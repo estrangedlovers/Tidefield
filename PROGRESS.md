@@ -466,9 +466,13 @@ feel, CPU on the M1 Pro under real load, and the app on your interface and contr
 - `Wander::setSeed`/`reset` set the offset to `Point2`'s default (0.5, 0.5) instead
   of zero, starting the wandering sound off-centre after every reset.
 
-**Verified**: 130 ctest tests; every score strict at 48 kHz; the app's self-test;
-the VST3 under `tidefield_plugincheck` on Linux (44.1/48/96 kHz, block sizes 1-1024,
-state round-trip, editor opens); screenshots of every page under Xvfb.
+**Verified**: 130 ctest tests; every score strict at 48 kHz; the app's self-test and
+`--ui-test` (every page, clean quit) on the shipped macOS bundle; Apple's `auval`
+passes on the AU; `tidefield_plugincheck` passes on the VST3 and the AU in macOS CI
+(44.1/48/96 kHz, block sizes 1-1024, state round-trip with sounds, scenes and every
+parameter) and on the Linux VST3 with its editor; the app under AddressSanitizer and
+UBSan through 800 random clicks, drags and keys and a clean quit with leak
+detection; screenshots of every page under Xvfb.
 
 **Untested (needs the Mac and ears)**: the interface on a Retina display and with a
 trackpad, key handling inside Logic/Live/Bitwig, how the starter scenes and new

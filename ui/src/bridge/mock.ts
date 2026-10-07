@@ -1,5 +1,5 @@
 import schemaJson from "./schema.json";
-import type { FadeState, MidiState, Schema, SceneInfo, SessionInfo, TelemetryMessage, Transport } from "./types";
+import type { FadeState, MidiState, RecordState, Schema, SceneInfo, SessionInfo, TelemetryMessage, Transport } from "./types";
 
 // A stand-in engine for developing the UI in a plain browser (npm run dev). It uses
 // the real schema (dumped by `tidefield_render --dump-schema`) and imitates the
@@ -36,6 +36,9 @@ class MockEngine {
     devices: [{ id: "mock", name: "Mock Controller", enabled: true, open: true }],
   };
   session: SessionInfo = { name: "Untitled", busy: false, device: "Browser mock", sampleRate: 48000, blockSize: 256, cpu: 0.11, xruns: 0 };
+
+  record: RecordState = { state: "idle", seconds: 0, stems: false, dropped: 0, folder: "~/Music/Tidefield", last: "" };
+  recordTimer: ReturnType<typeof setInterval> | null = null;
 
   fadeGain = 0;
   fadeState: FadeState = 0;
@@ -216,6 +219,33 @@ class MockEngine {
       case "midi.setNotesToDrone":
         this.midi = { ...this.midi, notesToDrone: args[0] };
         break;
+      case "record.toggle":
+      case "record.start":
+      case "record.stop": {
+        const start = method === "record.start" || (method === "record.toggle" && this.record.state === "idle");
+        if (start && this.record.state === "idle") {
+          this.record = { ...this.record, state: "recording", seconds: 0 };
+          this.recordTimer = setInterval(() => {
+            this.record = { ...this.record, seconds: this.record.seconds + 1 };
+            this.emit("record", this.record);
+          }, 1000);
+          this.status(this.record.stems ? "Recording master and stems" : "Recording");
+        } else if (!start && this.record.state === "recording") {
+          if (this.recordTimer) clearInterval(this.recordTimer);
+          this.record = { ...this.record, state: "idle", last: "2026-10-07 18.04.12 Untitled" };
+          this.status("Recording saved: " + this.record.last);
+        }
+        this.emit("record", this.record);
+        return null;
+      }
+      case "record.setStems":
+        this.record = { ...this.record, stems: Boolean(args[0]) };
+        this.emit("record", this.record);
+        return null;
+      case "record.chooseFolder":
+      case "record.reveal":
+        this.status("Not available in the browser preview");
+        return null;
       case "audio.settings":
         this.status("Audio settings open in the app (mock)");
         break;
@@ -267,6 +297,7 @@ class MockEngine {
     this.emit("samples", this.samples);
     this.emit("midi", this.midi);
     this.emit("session", this.session);
+    this.emit("record", this.record);
   }
 
   tick(dt: number) {
@@ -383,6 +414,7 @@ class MockEngine {
       fade: [this.fadeGain, this.fadeState],
       panic: this.panic,
       guard: 0,
+      load: [0.18 + 0.04 * Math.sin(this.time * 0.3), 0],
       tide,
       key: [Math.round(t[P("harmony.root")]), Math.round(t[P("harmony.scale")]), this.keyMorph],
       medium: Math.round(t[P("medium.type")]),

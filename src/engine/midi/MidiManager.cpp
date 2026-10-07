@@ -18,6 +18,7 @@ const char* MidiManager::actionName(MidiAction action) noexcept
         case MidiAction::Panic: return "Panic";
         case MidiAction::ReleaseLive: return "Release live layer";
         case MidiAction::CaptureScene: return "Capture scene";
+        case MidiAction::RecordToggle: return "Record";
         case MidiAction::None: break;
     }
     return "";

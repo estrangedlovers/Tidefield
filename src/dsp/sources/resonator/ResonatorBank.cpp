@@ -45,6 +45,7 @@ void ResonatorBank::reset() noexcept
     outputLevel = 0.0f;
     samplesToBurst = 0.0;
     samplesUntilControl = 0;
+    ringingModes = 0;
 }
 
 float ResonatorBank::modeTargetNote(int i) const noexcept
@@ -87,13 +88,26 @@ void ResonatorBank::updateModes(float dt) noexcept
     const float baseDecay = std::clamp(params.decaySeconds, 0.05f, 60.0f);
 
     const int active = std::min(params.modes, modeLimit);
+    ringingModes = std::max(ringingModes, active);
+    // Modes above the count (lowered by the user or the CPU guardrails) are not cut:
+    // they stop taking excitation and ring out over ~80 ms, so a cut never clicks.
+    const float dyingR = std::exp(-6.9078f / (0.08f * fs));
     for (int i = 0; i < kMaxModes; ++i)
     {
         auto& m = modes[static_cast<size_t>(i)];
         m.targetNote = modeTargetNote(i);
         m.note += (m.targetNote - m.note) * glide;
         if (i >= active)
+        {
+            if (i < ringingModes)
+            {
+                const float w = kTwoPi * midiToHz(std::min(m.note, nyquistNote)) / fs;
+                m.b1 = 2.0f * dyingR * std::cos(w);
+                m.b2 = dyingR * dyingR;
+                m.inGain = 0.0f;
+            }
             continue;
+        }
 
         const float note = std::min(m.note + detune, nyquistNote);
         const float w = kTwoPi * midiToHz(note) / fs;
@@ -116,7 +130,6 @@ void ResonatorBank::process(const float* excite, float* left, float* right, int 
     std::fill_n(left, n, 0.0f);
     std::fill_n(right, n, 0.0f);
 
-    const int active = std::min(params.modes, modeLimit);
     const float rainRate = 8.0f * std::clamp(params.rain, 0.0f, 1.0f) * std::max(timeScale, 0.0f);
     // Strike width 3 ms (soft felt) to 0.3 ms (hard glass): narrower is brighter.
     const int strikeWidth = std::max(4, static_cast<int>(lerp(0.003f, 0.0003f, std::clamp(params.rainColour, 0.0f, 1.0f))
@@ -131,6 +144,7 @@ void ResonatorBank::process(const float* excite, float* left, float* right, int 
             updateModes(static_cast<float>(kControlInterval / spec.sampleRate) * timeScale);
             samplesUntilControl = kControlInterval;
         }
+        const int ringing = ringingModes;
         const int chunk = std::min(n - i, samplesUntilControl);
 
         for (int s = 0; s < chunk; ++s)
@@ -162,7 +176,7 @@ void ResonatorBank::process(const float* excite, float* left, float* right, int 
             const float duck = 1.0f / (1.0f + ratio * ratio);
             const float x = (strike + (excite != nullptr ? excite[i + s] * 0.05f : 0.0f)) * duck;
             float outL = 0.0f, outR = 0.0f;
-            for (int k = 0; k < active; ++k)
+            for (int k = 0; k < ringing; ++k)
             {
                 auto& m = modes[static_cast<size_t>(k)];
                 const float y = m.inGain * (x - m.x2) + m.b1 * m.y1 - m.b2 * m.y2;
@@ -183,7 +197,7 @@ void ResonatorBank::process(const float* excite, float* left, float* right, int 
         // recursions near r = 1 can settle into a self-sustaining rounding ripple
         // around 1e-12 (a limit cycle) instead of reaching zero. Below -200 dB the mode
         // is cleared, so silence is exact and the tail cannot idle forever.
-        for (int k = 0; k < active; ++k)
+        for (int k = 0; k < ringing; ++k)
         {
             auto& m = modes[static_cast<size_t>(k)];
             const float mag = std::fabs(m.y1) + std::fabs(m.y2);
@@ -192,12 +206,22 @@ void ResonatorBank::process(const float* excite, float* left, float* right, int 
             m.level = std::max(mag, m.level * 0.95f);
         }
 
+        // Dying modes leave the processed set once they are silent.
+        const int active = std::min(params.modes, modeLimit);
+        while (ringingModes > active)
+        {
+            const auto& m = modes[static_cast<size_t>(ringingModes - 1)];
+            if (std::fabs(m.y1) + std::fabs(m.y2) > 1.0e-6f)
+                break;
+            --ringingModes;
+        }
+
         i += chunk;
         samplesUntilControl -= chunk;
     }
 
-    // Modes switched off by the limit must not keep stale state.
-    for (int k = active; k < kMaxModes; ++k)
+    // Modes outside the processed set must not keep stale state.
+    for (int k = ringingModes; k < kMaxModes; ++k)
     {
         auto& m = modes[static_cast<size_t>(k)];
         m.y1 = m.y2 = m.x1 = m.x2 = m.level = 0.0f;

@@ -2,7 +2,10 @@
 // a JSON analysis report.
 //
 //   tidefield_render <score.json> [-o out.wav] [--report out.json] [--seed N] [--strict]
-//                    [--save-session out.tidefield]
+//                    [--save-session out.tidefield] [--stems dir]
+//
+// --stems writes the take the way the app's recorder does (dir/master.wav plus
+// dir/stems/<strip>.wav), through the same record tap.
 //
 // --strict exits non-zero if the render contains non-finite samples or exceeds the
 // limiter ceiling, so scores can run as regression tests.
@@ -14,6 +17,7 @@
 #include <engine/capture/CatchManager.h>
 #include <engine/mix/FxManager.h>
 #include <io/AudioFileIO.h>
+#include <io/Recorder.h>
 #include <io/Session.h>
 #include <io/UiProtocol.h>
 
@@ -36,11 +40,13 @@ struct Options
     std::optional<std::uint64_t> seed;
     bool strict = false;
     juce::File saveSession;
+    juce::File stems;
 };
 
 void printUsage()
 {
-    std::cerr << "usage: tidefield_render <score.json> [-o out.wav] [--report out.json] [--seed N] [--strict] [--save-session out.tidefield]\n";
+    std::cerr << "usage: tidefield_render <score.json> [-o out.wav] [--report out.json] [--seed N] [--strict] [--save-session out.tidefield]\n"
+                 "                       [--stems dir]\n";
 }
 
 std::optional<Options> parseArgs(int argc, char** argv)
@@ -62,6 +68,8 @@ std::optional<Options> parseArgs(int argc, char** argv)
             o.strict = true;
         else if (arg == "--save-session")
             o.saveSession = cwd.getChildFile(next());
+        else if (arg == "--stems")
+            o.stems = cwd.getChildFile(next());
         else if (arg == "-h" || arg == "--help")
             return std::nullopt;
         else if (o.score == juce::File())
@@ -213,6 +221,16 @@ int main(int argc, char** argv)
         const auto total = static_cast<std::uint64_t>(score.durationSeconds * score.sampleRate);
         std::vector<std::vector<float>> out(2, std::vector<float>(static_cast<std::size_t>(total), 0.0f));
 
+        std::unique_ptr<tf::io::Recorder> recorder;
+        if (options->stems != juce::File())
+        {
+            options->stems.deleteRecursively();
+            recorder = std::make_unique<tf::io::Recorder>(engine.getRecordTap());
+            const auto result = recorder->start(options->stems, score.sampleRate, true);
+            if (result.failed())
+                throw std::runtime_error(result.getErrorMessage().toStdString());
+        }
+
         tf::dsp::Random blockRng(score.seed ^ 0xb10cull);
         std::size_t nextEvent = 0;
         std::uint64_t pos = 0;
@@ -256,8 +274,20 @@ int main(int argc, char** argv)
             }
             if (frame.sampleTime > 0)
                 lastFrame = frame;
+            if (recorder != nullptr)
+                recorder->drainNow(); // offline runs faster than the writer thread polls
 
             pos += static_cast<std::uint64_t>(block);
+        }
+
+        if (recorder != nullptr)
+        {
+            recorder->stop();
+            engine.getRecordTap().beginBlock(); // no more blocks: acknowledge the stop here
+            recorder->drainNow();
+            if (const auto dropped = recorder->getStatus().droppedFrames; dropped > 0)
+                std::cerr << "warning: " << dropped << " frames were dropped from the stems\n";
+            std::cerr << "wrote stems to " << options->stems.getFullPathName() << "\n";
         }
 
         if (! writeWav(options->output, out, score.sampleRate))

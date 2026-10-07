@@ -8,8 +8,9 @@ namespace tf::app {
 
 AppCore::AppCore(AudioHost& h)
     : host(h), engine(h.getEngine()), scenes(h.getEngine()), fx(h.getEngine()), catcher(h.getEngine()), midi(h.getEngine()),
-      midiInputs(h.getEngine(), h.getSettings()), session(h.getEngine(), scenes, fx, &midi)
+      midiInputs(h.getEngine(), h.getSettings()), session(h.getEngine(), scenes, fx, &midi), recorder(h.getEngine().getRecordTap())
 {
+    engine.setGuardrailsEnabled(true);
     fx.loadDefaultLayout();
     loadRigMidi();
     loadFactoryContent();
@@ -20,6 +21,16 @@ AppCore::AppCore(AudioHost& h)
     catcher.onRejected = [this](const std::string& reason) { status(reason, true); };
     midi.onLearned = [this](const std::string& d) { status("MIDI learned: " + juce::String(d)); };
     session.onStatus = [this](const juce::String& m) { status(m); };
+    recorder.onFinished = [this](const juce::File& folder, bool ok) {
+        juce::MessageManager::callAsync([this, folder, ok] {
+            if (ok)
+                status("Recording saved: " + folder.getFileName());
+            else
+                status("Recording stopped: the disk could not keep up or is full. Saved what was written to "
+                           + folder.getFileName(),
+                       true);
+        });
+    };
     session.onSessionChanged = [this] {
         if (onSessionChanged)
             onSessionChanged();
@@ -30,7 +41,64 @@ AppCore::AppCore(AudioHost& h)
 AppCore::~AppCore()
 {
     stopTimer();
+    recorder.onFinished = nullptr; // the take is still finished by the recorder
     saveRigMidi();
+}
+
+juce::File AppCore::getRecordingsFolder() const
+{
+    const auto stored = host.getSettings().getValue("recordingsFolder");
+    if (stored.isNotEmpty() && juce::File::isAbsolutePath(stored))
+        return juce::File(stored);
+    return juce::File::getSpecialLocation(juce::File::userMusicDirectory).getChildFile("Tidefield");
+}
+
+void AppCore::setRecordingsFolder(const juce::File& folder)
+{
+    host.getSettings().setValue("recordingsFolder", folder.getFullPathName());
+    host.getSettings().saveIfNeeded();
+}
+
+bool AppCore::getRecordStems() const { return host.getSettings().getBoolValue("recordStems", false); }
+
+void AppCore::setRecordStems(bool stems)
+{
+    host.getSettings().setValue("recordStems", stems);
+    host.getSettings().saveIfNeeded();
+}
+
+void AppCore::startRecording()
+{
+    if (recorder.isActive())
+        return;
+    if (host.getDeviceManager().getCurrentAudioDevice() == nullptr)
+    {
+        status("No audio device is running, so there is nothing to record.", true);
+        return;
+    }
+    const auto parent = getRecordingsFolder();
+    if (! parent.createDirectory())
+    {
+        status("Could not create the recordings folder " + parent.getFullPathName(), true);
+        return;
+    }
+    const auto take = io::Recorder::makeFolder(parent, session.getName());
+    recordingRate = engine.getSampleRate();
+    const auto result = recorder.start(take, recordingRate, getRecordStems());
+    if (result.failed())
+        status("Could not start recording: " + result.getErrorMessage(), true);
+    else
+        status(getRecordStems() ? "Recording master and stems" : "Recording");
+}
+
+void AppCore::stopRecording() { recorder.stop(); }
+
+void AppCore::toggleRecording()
+{
+    if (recorder.getStatus().state == io::Recorder::State::Recording)
+        stopRecording();
+    else
+        startRecording();
 }
 
 void AppCore::status(const juce::String& message, bool warning)
@@ -98,8 +166,25 @@ void AppCore::timerCallback()
     {
         lastFrame = f;
         session.setLatest(lastFrame);
+        if (lastFrame.guardLevel != lastGuardLevel)
+        {
+            if (lastFrame.guardLevel > lastGuardLevel)
+                status("CPU is running hot: lightening grains and voices (level " + juce::String(lastFrame.guardLevel) + " of "
+                           + juce::String(engine::kMaxGuardLevel) + ")",
+                       true);
+            else if (lastFrame.guardLevel == 0)
+                status("CPU has headroom again: full quality restored");
+            lastGuardLevel = lastFrame.guardLevel;
+        }
         if (onTelemetry)
             onTelemetry(lastFrame);
+    }
+
+    // A sample-rate change mid-take would corrupt the file: end it there.
+    if (recorder.getStatus().state == io::Recorder::State::Recording && engine.getSampleRate() != recordingRate)
+    {
+        recorder.stop();
+        status("The sample rate changed, so the recording was stopped and saved.", true);
     }
 
     engine::EngineNotice notice;
@@ -109,6 +194,8 @@ void AppCore::timerCallback()
             status("Safety guard tripped: a non-finite sample was caught and the engine reset.", true);
         if (notice.type == engine::EngineNotice::Type::CaptureSceneRequest)
             captureSceneAtCursor();
+        if (notice.type == engine::EngineNotice::Type::RecordToggleRequest)
+            toggleRecording();
         catcher.handle(notice);
         session.handleNotice(notice);
     }

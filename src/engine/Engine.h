@@ -4,6 +4,7 @@
 #include "control/SnapshotChannel.h"
 #include "control/SpscQueue.h"
 #include "control/Telemetry.h"
+#include "guard/DegradationPolicy.h"
 #include "master/MasterChain.h"
 #include "mix/ChannelStrip.h"
 #include "mix/FxSlot.h"
@@ -11,6 +12,7 @@
 #include "mix/Layout.h"
 #include "params/ParamRegistry.h"
 #include "params/ParamState.h"
+#include "record/RecordTap.h"
 #include "SampleHandle.h"
 #include "scene/SceneSet.h"
 #include "scene/Wander.h"
@@ -118,6 +120,16 @@ public:
     /** Frees retired scene sets and sample buffers. Call regularly (UI timer). */
     void collectGarbage();
 
+    /** Recording: the disk writer is the tap's consumer (see io::Recorder). */
+    RecordTap& getRecordTap() noexcept { return recordTap; }
+
+    /** CPU guardrails: measure each block's DSP time and trim grains, modes and voices
+        when the load stays high. Off by default so offline renders stay deterministic;
+        the app turns it on. Any thread. */
+    void setGuardrailsEnabled(bool enabled) noexcept { guardEnabled.store(enabled, std::memory_order_relaxed); }
+    /** Tests: use this load instead of measuring (negative = measure). */
+    void forceLoadForTesting(float load) noexcept { forcedLoad.store(load, std::memory_order_relaxed); }
+
     // --- Consumer side (one thread) ---------------------------------------------------
     bool popTelemetry(TelemetryFrame& out) noexcept { return telemetryQueue.pop(out); }
     bool popNotice(EngineNotice& out) noexcept { return noticeQueue.pop(out); }
@@ -155,6 +167,8 @@ private:
     void applyMidiBinding(std::size_t index, const MidiBinding& b, int value) noexcept;
     void fireMidiAction(MidiAction action) noexcept;
     void accumulateTelemetry(const float* l, const float* r, int n) noexcept;
+    void updateGuardrails(double elapsedSeconds, int numSamples) noexcept;
+    void applyGuardLimits(const GuardLimits& limits) noexcept;
     bool terrainActive() const noexcept;
     float mixRamp(P mixParam, int tickPos) const noexcept;
     std::array<float, 6> slotControls(int slot) const noexcept;
@@ -228,6 +242,19 @@ private:
     std::atomic<std::uint64_t> inputWritten { 0 };
     void writeCatch(const float* l, const float* r, int n) noexcept;
     void requestCatch() noexcept;
+
+    // Recording: stems are post-fader strips then the two bus returns (maxBlock each),
+    // filled only while a stem recording runs.
+    RecordTap recordTap;
+    std::array<std::vector<float>, RecordTap::kStemPairs> stemL, stemR;
+    int recordStride = 0; // this block's
+    void pushRecording(int numSamples) noexcept;
+
+    // CPU guardrails.
+    DegradationPolicy guard;
+    std::atomic<bool> guardEnabled { false };
+    std::atomic<float> forcedLoad { -1.0f };
+    float droneVoiceCap = static_cast<float>(dsp::DroneGenerator::kMaxVoices);
 
     // Telemetry accumulation.
     int telemetryInterval = 800;

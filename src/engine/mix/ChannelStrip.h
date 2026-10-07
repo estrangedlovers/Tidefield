@@ -44,9 +44,11 @@ public:
     bool isSilent() const noexcept { return previous.mid == 0.0f && target.mid == 0.0f; }
 
     /** Adds the processed source into master and both send buses. tickPos/tickLength
-        place this chunk inside the current control tick. Tracks peak for meters. */
+        place this chunk inside the current control tick. Tracks peak for meters.
+        `stemL`/`stemR`, when given, receive the post-fader signal (recording stems);
+        they are left untouched while the strip is silent, so the caller zeroes them. */
     void processAdd(const float* inL, const float* inR, float* outL, float* outR, float* aL, float* aR, float* bL, float* bR,
-                    int n, int tickPos, int tickLength) noexcept
+                    int n, int tickPos, int tickLength, float* stemL = nullptr, float* stemR = nullptr) noexcept
     {
         if (isSilent())
             return;
@@ -67,6 +69,11 @@ public:
             const float r = (m - s) * pr;
             outL[i] += l;
             outR[i] += r;
+            if (stemL != nullptr)
+            {
+                stemL[i] = l;
+                stemR[i] = r;
+            }
             aL[i] += l * sa;
             aR[i] += r * sa;
             bL[i] += l * sb;

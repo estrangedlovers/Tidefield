@@ -23,6 +23,7 @@ function useShortcuts() {
       else if (k === "escape") store.command("panicToggle");
       else if (k === "k") store.command("catch");
       else if (k === "c") void store.call("scene.capture");
+      else if (k === "r" && e.shiftKey) void store.call("record.toggle");
       else if (k === "r") void store.call("scene.releaseLive");
       else if (k === "tab") store.setView(store.view === "perform" ? "edit" : "perform");
       else return;

@@ -81,6 +81,7 @@ private:
     const HarmonicGravity* harmony = nullptr;
     std::array<Mode, kMaxModes> modes {};
     int modeLimit = kMaxModes;
+    int ringingModes = 0; // modes still processed: the active ones plus any dying out after a cut
     // Rain strikes: raised-cosine pulses.
     int strikePos = 0, strikeLength = 0;
     float strikeAmp = 0.0f;

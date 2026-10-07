@@ -40,6 +40,8 @@ private:
     juce::var hello();
     juce::var describeMidi() const;
     juce::var describeSession() const;
+    juce::var describeRecording() const;
+    void chooseRecordingsFolder();
     void pushIfChanged(const juce::String& event, const juce::var& value, juce::String& last);
     void emit(const juce::String& event, const juce::var& value);
     std::optional<juce::WebBrowserComponent::Resource> serve(const juce::String& path) const;
@@ -51,7 +53,7 @@ private:
     io::TelemetryEncoder encoder;
     std::unique_ptr<juce::WebBrowserComponent> browser;
     std::unique_ptr<juce::FileChooser> chooser;
-    juce::String lastScenes, lastFx, lastSamples, lastMidi, lastSession;
+    juce::String lastScenes, lastFx, lastSamples, lastMidi, lastSession, lastRecord;
     juce::String lastActivity;
     bool pageReady = false;
     int slowTick = 0;

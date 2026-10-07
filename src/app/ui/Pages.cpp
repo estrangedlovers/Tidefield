@@ -306,8 +306,9 @@ MidiPage::MidiPage(engine::MidiManager& m, MidiInputs& in) : midi(m), inputs(in)
     title(bindingsTitle, "Controller mappings");
     title(notesTitle, "Notes and actions");
 
-    const engine::MidiAction actions[5] = { engine::MidiAction::Catch, engine::MidiAction::FadeToggle, engine::MidiAction::Panic,
-                                            engine::MidiAction::ReleaseLive, engine::MidiAction::CaptureScene };
+    const engine::MidiAction actions[6] = { engine::MidiAction::Catch,       engine::MidiAction::FadeToggle,
+                                            engine::MidiAction::Panic,       engine::MidiAction::ReleaseLive,
+                                            engine::MidiAction::CaptureScene, engine::MidiAction::RecordToggle };
     for (std::size_t i = 0; i < actionButtons.size(); ++i)
     {
         auto action = actions[i];

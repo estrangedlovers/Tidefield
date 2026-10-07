@@ -140,7 +140,7 @@ private:
     engine::MidiManager& midi;
     MidiInputs& inputs;
     juce::OwnedArray<juce::ToggleButton> deviceToggles;
-    std::array<juce::TextButton, 5> actionButtons;
+    std::array<juce::TextButton, 6> actionButtons;
     juce::TextButton defaultsButton { "Default 8-knob layout" }, clearButton { "Clear all" }, removeButton { "Remove selected" };
     juce::ComboBox noteChannel;
     juce::ToggleButton notesToDrone { "Notes also set the drone root" };

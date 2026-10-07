@@ -28,7 +28,7 @@ inline constexpr int kMaxMidiBindings = 128;
 
 /** What a controller can drive besides parameters. Buttons fire on a rising edge
     (value crossing 64 upward). */
-enum class MidiAction : std::uint8_t { None, Catch, FadeToggle, Panic, ReleaseLive, CaptureScene };
+enum class MidiAction : std::uint8_t { None, Catch, FadeToggle, Panic, ReleaseLive, CaptureScene, RecordToggle };
 
 struct MidiBinding
 {

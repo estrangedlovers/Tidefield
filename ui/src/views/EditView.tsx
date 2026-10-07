@@ -366,6 +366,7 @@ function MidiPage() {
     ["panic", "Panic"],
     ["releaseLive", "Release live layer"],
     ["captureScene", "Capture scene"],
+    ["recordToggle", "Record"],
   ];
   return (
     <Page title="MIDI" subtitle="Right-click any control to learn it. Controllers pick up softly: an arrow shows which way to turn until they catch the value.">

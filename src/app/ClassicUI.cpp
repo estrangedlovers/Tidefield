@@ -24,12 +24,18 @@ ClassicUI::ClassicUI(AppCore& c) : core(c), engine(c.engine)
     juce::LookAndFeel::setDefaultLookAndFeel(&lookAndFeel);
     knobContext().midi = &core.midi;
 
-    for (auto* b : { &settingsButton, &fadeInButton, &fadeOutButton, &panicButton, &sessionButton, &catchButton })
+    for (auto* b : { &settingsButton, &fadeInButton, &fadeOutButton, &panicButton, &sessionButton, &catchButton, &recordButton })
         addAndMakeVisible(*b);
     panicButton.setColour(juce::TextButton::buttonColourId, theme::warn.darker(0.6f));
     catchButton.setColour(juce::TextButton::buttonColourId, theme::accent.darker(0.55f));
     catchButton.setTooltip("K: capture the last few seconds of the output into a granular cloud");
     catchButton.onClick = [this] { engine.command(engine::Command::Catch); };
+    recordButton.onClick = [this] {
+        if (! juce::ModifierKeys::getCurrentModifiers().isPopupMenu()) // right-click opens the menu instead
+            core.toggleRecording();
+    };
+    recordButton.setTooltip("Shift+R: record what you hear to disk. Right-click for stems and the folder.");
+    recordButton.addMouseListener(this, false);
     sessionButton.onClick = [this] { showSessionMenu(); };
     sessionButton.setTooltip("New, open and save sessions (Cmd+N, Cmd+O, Cmd+S)");
     settingsButton.onClick = [this] { showDeviceSettings(); };
@@ -70,6 +76,7 @@ ClassicUI::ClassicUI(AppCore& c) : core(c), engine(c.engine)
 ClassicUI::~ClassicUI()
 {
     stopTimer();
+    recordButton.removeMouseListener(this);
     core.onTelemetry = nullptr;
     core.onMidiActivity = nullptr;
     core.onStatus = nullptr;
@@ -144,6 +151,8 @@ bool ClassicUI::keyPressed(const juce::KeyPress& key)
         togglePanic();
     else if (c == 'c')
         perform->captureScene();
+    else if (c == 'r' && key.getModifiers().isShiftDown())
+        core.toggleRecording();
     else if (c == 'r')
         perform->releaseLive();
     else if (c >= '1' && c <= '5')
@@ -175,6 +184,14 @@ void ClassicUI::updateHeader()
     fadeInButton.setColour(juce::TextButton::buttonColourId, up ? (moving ? active.withAlpha(0.7f) : active) : theme::button);
     fadeOutButton.setColour(juce::TextButton::buttonColourId, ! up && moving ? active.withAlpha(0.7f) : theme::button);
     panicButton.setButtonText(lastFrame.panicActive ? "Resume" : "PANIC");
+    {
+        const auto rec = core.recorder.getStatus();
+        const bool on = rec.state == io::Recorder::State::Recording;
+        const int secs = static_cast<int>(rec.seconds);
+        recordButton.setButtonText(on ? juce::String::formatted("Stop %d:%02d", secs / 60, secs % 60)
+                                      : rec.state == io::Recorder::State::Finishing ? juce::String("Saving") : juce::String("Record"));
+        recordButton.setColour(juce::TextButton::buttonColourId, on ? theme::warn.darker(0.2f) : theme::button);
+    }
     panicButton.setColour(juce::TextButton::buttonColourId, lastFrame.panicActive ? theme::warn : theme::warn.darker(0.6f));
 
     // No usable output device (no default on this machine, or a remembered interface
@@ -196,11 +213,33 @@ void ClassicUI::updateHeader()
     statusLabel.setColour(juce::Label::textColourId, theme::textDim);
 
     const int liveCount = static_cast<int>(std::count_if(lastFrame.live.begin(), lastFrame.live.end(), [](auto v) { return v != 0; }));
-    statusLabel.setText(juce::String::formatted("CPU %4.1f%%   xruns %d   master %s   limiter %4.1f dB   tide %.2fx   scenes %d   live %d   guard %u",
-                                                core.host.getCpuLoad() * 100.0, core.host.getXrunCount(), fadeStateName(lastFrame.fadeState),
+    statusLabel.setText(juce::String::formatted("CPU %4.1f%% (guard %d)   xruns %d   master %s   limiter %4.1f dB   tide %.2fx   scenes %d   live %d   guard %u",
+                                                core.host.getCpuLoad() * 100.0, lastFrame.guardLevel, core.host.getXrunCount(), fadeStateName(lastFrame.fadeState),
                                                 juce::Decibels::gainToDecibels(lastFrame.limiterGain), lastFrame.tide, core.scenes.size(),
                                                 liveCount, lastFrame.guardTrips),
                         juce::dontSendNotification);
+}
+
+void ClassicUI::mouseDown(const juce::MouseEvent& e)
+{
+    if (e.eventComponent == &recordButton && e.mods.isPopupMenu())
+        showRecordMenu();
+}
+
+void ClassicUI::showRecordMenu()
+{
+    juce::PopupMenu menu;
+    menu.addItem(1, "Record stems too", ! core.recorder.isActive(), core.getRecordStems());
+    menu.addItem(2, "Show recordings");
+    menu.showMenuAsync(juce::PopupMenu::Options().withTargetComponent(&recordButton), [this](int r) {
+        if (r == 1)
+            core.setRecordStems(! core.getRecordStems());
+        else if (r == 2)
+        {
+            const auto last = core.getLastRecording();
+            (last.exists() ? last : core.getRecordingsFolder()).revealToUser();
+        }
+    });
 }
 
 void ClassicUI::showDeviceSettings()
@@ -257,6 +296,7 @@ void ClassicUI::resized()
     panicButton.setBounds(top.removeFromRight(110).reduced(3));
     top.removeFromRight(10);
     catchButton.setBounds(top.removeFromRight(110).reduced(3));
+    recordButton.setBounds(top.removeFromRight(110).reduced(3));
     top.removeFromRight(10);
     meterArea = top.removeFromRight(200).reduced(0, 8);
 

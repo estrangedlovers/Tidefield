@@ -220,6 +220,7 @@ juce::var TelemetryEncoder::encode(const engine::TelemetryFrame& f)
     o->setProperty("fade", arr({ q(f.fadeGain), static_cast<int>(f.fadeState) }));
     o->setProperty("panic", f.panicActive);
     o->setProperty("guard", static_cast<int>(f.guardTrips));
+    o->setProperty("load", arr({ q(f.dspLoad), f.guardLevel }));
     o->setProperty("tide", q(f.tide));
     o->setProperty("key", arr({ f.harmonyRoot, f.harmonyScale, q(f.harmonyMorph) }));
     o->setProperty("medium", f.mediumType);

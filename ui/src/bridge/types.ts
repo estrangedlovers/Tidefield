@@ -77,6 +77,8 @@ export interface TelemetryMessage {
   fade: [number, FadeState];
   panic: boolean;
   guard: number;
+  /** Smoothed DSP load (0..1 of the real-time budget) and CPU guardrail level (0 = full quality). */
+  load: [number, number];
   tide: number;
   key: [number, number, number];
   medium: number;
@@ -122,6 +124,15 @@ export interface SessionInfo {
   blockSize: number;
   cpu: number;
   xruns: number;
+}
+
+export interface RecordState {
+  state: "idle" | "recording" | "finishing";
+  seconds: number;
+  stems: boolean;
+  dropped: number;
+  folder: string;
+  last: string;
 }
 
 export interface StatusMessage {

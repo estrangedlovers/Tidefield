@@ -85,19 +85,21 @@ void BloomSampler::noteOn(int note, float velocity) noexcept
     if (buffer == nullptr || buffer->size() < 256 || velocity <= 0.0f)
         return;
 
+    const auto pool = static_cast<std::size_t>(voiceLimit);
     Voice* target = nullptr;
-    for (auto& v : voices)
-        if (! v.active)
+    for (std::size_t i = 0; i < pool; ++i)
+        if (! voices[i].active)
         {
-            target = &v;
+            target = &voices[i];
             break;
         }
     if (target == nullptr)
     {
         // Steal the quietest voice, preferring ones already releasing.
         float best = 1.0e9f;
-        for (auto& v : voices)
+        for (std::size_t i = 0; i < pool; ++i)
         {
+            auto& v = voices[i];
             const float score = v.env + (v.stage == Stage::Release ? 0.0f : 1.0f);
             if (score < best)
             {
@@ -144,6 +146,22 @@ void BloomSampler::releaseAll(float seconds) noexcept
             v.stage = Stage::Release;
             v.releaseCoeff = coeff;
         }
+}
+
+void BloomSampler::setVoiceLimit(int limit) noexcept
+{
+    voiceLimit = std::clamp(limit, 1, kMaxVoices);
+    const float coeff = std::exp(-1.0f / (0.5f * static_cast<float>(spec.sampleRate)));
+    for (auto i = static_cast<std::size_t>(voiceLimit); i < voices.size(); ++i)
+    {
+        auto& v = voices[i];
+        if (v.active && v.stage != Stage::Release)
+        {
+            v.held = v.sustained = false;
+            v.stage = Stage::Release;
+            v.releaseCoeff = coeff;
+        }
+    }
 }
 
 void BloomSampler::startVoice(Voice& v, int note, float velocity) noexcept

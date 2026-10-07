@@ -1,12 +1,106 @@
+import { useEffect, useRef } from "react";
 import { store, useSlice } from "../state/store";
 import { Meter } from "../components/Meter";
 import { openMenu } from "../components/ContextMenu";
 import "./TopBar.css";
 
+const GUARD_HINT =
+  "CPU guardrails are lightening the load: fewer grains per cloud, resonator modes, drone and Bloom voices. Full quality returns by itself when there is headroom.";
+
+/** DSP load and guardrail level, read from telemetry a few times a second without
+ *  re-rendering React. */
+function CpuReadout() {
+  const text = useRef<HTMLSpanElement>(null);
+  const badge = useRef<HTMLSpanElement>(null);
+  useEffect(() => {
+    let raf = 0;
+    let last = 0;
+    const draw = (now: number) => {
+      if (now - last > 250) {
+        last = now;
+        const t = store.telemetry;
+        const load = t?.load?.[0] || store.session.cpu;
+        const level = t?.load?.[1] ?? 0;
+        const pct = Math.round(load * 100);
+        if (text.current) {
+          text.current.textContent = `${pct}% CPU`;
+          text.current.classList.toggle("hot", pct > 70);
+        }
+        if (badge.current) {
+          badge.current.style.display = level > 0 ? "" : "none";
+          badge.current.textContent = `lite ${level}`;
+        }
+      }
+      raf = requestAnimationFrame(draw);
+    };
+    raf = requestAnimationFrame(draw);
+    return () => cancelAnimationFrame(raf);
+  }, []);
+  return (
+    <>
+      <span ref={text} className="cpu" title="Share of the audio deadline the engine uses" />
+      <span ref={badge} className="guard-badge" title={GUARD_HINT} style={{ display: "none" }} />
+    </>
+  );
+}
+
+function clock(seconds: number) {
+  const s = Math.max(0, Math.floor(seconds));
+  const h = Math.floor(s / 3600);
+  const m = Math.floor((s % 3600) / 60);
+  const ss = String(s % 60).padStart(2, "0");
+  return h > 0 ? `${h}:${String(m).padStart(2, "0")}:${ss}` : `${m}:${ss}`;
+}
+
+function RecordButton() {
+  const { record } = useSlice("record");
+  const on = record.state === "recording";
+  const finishing = record.state === "finishing";
+
+  const menu = (e: { clientX: number; clientY: number }) =>
+    openMenu(
+      e,
+      [
+        {
+          label: `${record.stems ? "✓ " : ""}Record stems too`,
+          onSelect: () => void store.call("record.setStems", !record.stems),
+          disabled: record.state !== "idle",
+        },
+        { label: "Recordings folder...", onSelect: () => void store.call("record.chooseFolder") },
+        { label: record.last ? "Show last recording" : "Show recordings", onSelect: () => void store.call("record.reveal") },
+      ],
+      "Recording",
+    );
+
+  return (
+    <button
+      className={`record-btn${on ? " on" : ""}${finishing ? " finishing" : ""}`}
+      onClick={() => void store.call("record.toggle")}
+      onContextMenu={(e) => {
+        e.preventDefault();
+        menu(e);
+      }}
+      title={
+        on
+          ? "Stop recording (Shift+R)"
+          : `Record what you hear to ${record.folder || "disk"}${record.stems ? ", with stems" : ""} (Shift+R). Right-click for options.`
+      }
+    >
+      <span className="rec-dot" />
+      <span className="rec-label">{on ? clock(record.seconds) : finishing ? "Saving" : "Rec"}</span>
+      {record.stems && <span className="rec-stems">stems</span>}
+      {on && record.dropped > 0 && (
+        <span className="rec-warn" title="The disk fell behind and some audio was lost">
+          !
+        </span>
+      )}
+    </button>
+  );
+}
+
 export function TopBar() {
   const { session, view } = useSlice("session");
   useSlice("view");
-  const cpu = Math.round(session.cpu * 100);
 
   return (
     <header className="topbar">
@@ -45,11 +139,12 @@ export function TopBar() {
       </nav>
 
       <div className="topbar-right">
+        <RecordButton />
         <div className="device" title={`${session.sampleRate} Hz, ${session.blockSize} samples`}>
           {session.device ? (
             <>
-              <span>{session.device}</span>
-              <span className={cpu > 70 ? "cpu hot" : "cpu"}>{cpu}% CPU</span>
+              <span className="device-name">{session.device}</span>
+              <CpuReadout />
             </>
           ) : (
             <span className="no-device">No audio output</span>

@@ -49,6 +49,7 @@ engine::MidiAction actionFor(const juce::String& name)
     if (name == "panic") return engine::MidiAction::Panic;
     if (name == "releaseLive") return engine::MidiAction::ReleaseLive;
     if (name == "captureScene") return engine::MidiAction::CaptureScene;
+    if (name == "recordToggle") return engine::MidiAction::RecordToggle;
     return engine::MidiAction::None;
 }
 
@@ -217,11 +218,37 @@ juce::var WebUI::describeSession() const
     return juce::var(o);
 }
 
+juce::var WebUI::describeRecording() const
+{
+    const auto st = core.recorder.getStatus();
+    auto* o = new juce::DynamicObject();
+    o->setProperty("state", st.state == io::Recorder::State::Recording   ? "recording"
+                            : st.state == io::Recorder::State::Finishing ? "finishing"
+                                                                         : "idle");
+    o->setProperty("seconds", std::floor(st.seconds));
+    o->setProperty("stems", st.state == io::Recorder::State::Idle ? core.getRecordStems() : st.stems);
+    o->setProperty("dropped", static_cast<double>(st.droppedFrames));
+    o->setProperty("folder", core.getRecordingsFolder().getFullPathName());
+    o->setProperty("last", st.folder.getFileName());
+    return juce::var(o);
+}
+
+void WebUI::chooseRecordingsFolder()
+{
+    chooser = std::make_unique<juce::FileChooser>("Where should recordings go?", core.getRecordingsFolder());
+    juce::Component::SafePointer<WebUI> safe(this);
+    chooser->launchAsync(juce::FileBrowserComponent::openMode | juce::FileBrowserComponent::canSelectDirectories,
+                         [safe](const juce::FileChooser& fc) {
+                             if (safe != nullptr && fc.getResult() != juce::File())
+                                 safe->core.setRecordingsFolder(fc.getResult());
+                         });
+}
+
 juce::var WebUI::hello()
 {
     pageReady = true;
     encoder.reset();
-    lastScenes = lastFx = lastSamples = lastMidi = lastSession = {};
+    lastScenes = lastFx = lastSamples = lastMidi = lastSession = lastRecord = {};
     auto* o = new juce::DynamicObject();
     o->setProperty("schema", io::buildSchema(core.engine));
     o->setProperty("version", JUCE_APPLICATION_VERSION_STRING);
@@ -237,6 +264,7 @@ void WebUI::timerCallback()
     pushIfChanged("samples", io::describeSamples(core.engine), lastSamples);
     pushIfChanged("midi", describeMidi(), lastMidi);
     pushIfChanged("session", describeSession(), lastSession);
+    pushIfChanged("record", describeRecording(), lastRecord);
 }
 
 void WebUI::chooseSample(int slot)
@@ -430,6 +458,22 @@ juce::var WebUI::call(const juce::String& method, const juce::Array<juce::var>& 
         const bool enabled = static_cast<bool>(a[1]);
         juce::MessageManager::callAsync([this, id, enabled] { core.midiInputs.setEnabled(id, enabled); });
     }
+    // Recording.
+    else if (method == "record.toggle")
+        core.toggleRecording();
+    else if (method == "record.start")
+        core.startRecording();
+    else if (method == "record.stop")
+        core.stopRecording();
+    else if (method == "record.setStems")
+        core.setRecordStems(static_cast<bool>(a[0]));
+    else if (method == "record.chooseFolder")
+        chooseRecordingsFolder();
+    else if (method == "record.reveal")
+    {
+        const auto last = core.getLastRecording();
+        (last.exists() ? last : core.getRecordingsFolder()).revealToUser();
+    }
     // Audio.
     else if (method == "audio.settings")
         showAudioSettings();
@@ -437,6 +481,7 @@ juce::var WebUI::call(const juce::String& method, const juce::Array<juce::var>& 
         return juce::var("unknown method: " + method);
 
     lastMidi.clear(); // MIDI and other state may have changed: refresh on the next tick
+    lastRecord.clear();
     return {};
 }
 

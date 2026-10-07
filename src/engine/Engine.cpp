@@ -6,6 +6,7 @@
 #include <dsp/core/MathUtil.h>
 
 #include <algorithm>
+#include <chrono>
 #include <cmath>
 
 namespace tf::engine {
@@ -95,6 +96,16 @@ void Engine::prepare(double newSampleRate, int maxBlockSize)
                      &scratchAltL, &scratchAltR })
         v->assign(n, 0.0f);
 
+    for (std::size_t k = 0; k < stemL.size(); ++k)
+    {
+        stemL[k].assign(n, 0.0f);
+        stemR[k].assign(n, 0.0f);
+    }
+    recordTap.prepare(sampleRate);
+    recordStride = 0;
+    guard.reset();
+    applyGuardLimits(guard.getLimits());
+
     catchCapacity = static_cast<std::size_t>(kCatchRingSeconds * sampleRate);
     catchL.assign(catchCapacity, 0.0f);
     catchR.assign(catchCapacity, 0.0f);
@@ -113,6 +124,11 @@ void Engine::prepare(double newSampleRate, int maxBlockSize)
 
 void Engine::release()
 {
+    for (std::size_t k = 0; k < stemL.size(); ++k)
+    {
+        stemL[k].clear();
+        stemR[k].clear();
+    }
     for (int s = 0; s < kNumStrips; ++s)
     {
         stripL[static_cast<std::size_t>(s)].clear();
@@ -296,6 +312,7 @@ void Engine::fireMidiAction(MidiAction action) noexcept
             break;
         }
         case MidiAction::CaptureScene: notify(EngineNotice::Type::CaptureSceneRequest); break; // needs the message thread
+        case MidiAction::RecordToggle: notify(EngineNotice::Type::RecordToggleRequest); break;  // files open there too
         case MidiAction::None: break;
     }
 }
@@ -528,7 +545,7 @@ void Engine::updateSources(float t) noexcept
     d.noise = params.current(P::DroneNoise);
     d.driftDepth = params.current(P::DroneDriftDepth);
     d.driftRate = params.current(P::DroneDriftRate);
-    d.density = params.current(P::DroneDensity);
+    d.density = std::min(params.current(P::DroneDensity), droneVoiceCap);
     d.evolve = params.current(P::DroneEvolve);
     d.spread = params.current(P::DroneSpread);
     d.gravity = params.current(P::DroneGravity) * globalGravity;
@@ -777,15 +794,19 @@ void Engine::processChunk(const float* const* inputs, int numInputs, int inputOf
             slot.process(L(sid), R(sid), n, mixRamp(mixParam, tickPos), mixRamp(mixParam, tickPos + n), scratchDryL.data(),
                          scratchDryR.data(), scratchAltL.data(), scratchAltR.data());
         }
-        strips[static_cast<std::size_t>(s)].processAdd(L(sid), R(sid), masterL.data() + o, masterR.data() + o, busAL.data() + o,
-                                                       busAR.data() + o, busBL.data() + o, busBR.data() + o, n, tickPos,
-                                                       kControlInterval);
+        const bool stems = recordStride > 2;
+        const auto us = static_cast<std::size_t>(s);
+        strips[us].processAdd(L(sid), R(sid), masterL.data() + o, masterR.data() + o, busAL.data() + o, busAR.data() + o,
+                              busBL.data() + o, busBR.data() + o, n, tickPos, kControlInterval,
+                              stems ? stemL[us].data() + o : nullptr, stems ? stemR[us].data() + o : nullptr);
     }
 }
 
 void Engine::process(const float* const* inputs, int numInputs, float* const* outputs, int numOutputs, int numSamples) noexcept
 {
     const dsp::ScopedFlushDenormals noDenormals;
+    const bool measure = guardEnabled.load(std::memory_order_relaxed);
+    const auto startTime = measure ? std::chrono::steady_clock::now() : std::chrono::steady_clock::time_point {};
 
     drainControl();
 
@@ -795,6 +816,13 @@ void Engine::process(const float* const* inputs, int numInputs, float* const* ou
         const int block = std::min(numSamples - done, maxBlock);
         for (auto* v : { &masterL, &masterR, &busAL, &busAR, &busBL, &busBR })
             std::fill_n(v->data(), block, 0.0f);
+        recordStride = recordTap.beginBlock();
+        if (recordStride > 2)
+            for (std::size_t k = 0; k < stemL.size(); ++k)
+            {
+                std::fill_n(stemL[k].data(), block, 0.0f);
+                std::fill_n(stemR[k].data(), block, 0.0f);
+            }
 
         const float levelStart = dsp::dbToGain(params.current(P::MasterLevel));
         const float busAStart = dsp::dbToGain(params.current(P::BusALevel));
@@ -813,7 +841,7 @@ void Engine::process(const float* const* inputs, int numInputs, float* const* ou
         }
 
         // Send buses, returned to master with a ramped level.
-        auto runBus = [&](int firstSlot, std::vector<float>& bl, std::vector<float>& br, float startGain, P levelParam) {
+        auto runBus = [&](int firstSlot, std::vector<float>& bl, std::vector<float>& br, float startGain, P levelParam, int stem) {
             for (int slotIndex : { firstSlot, firstSlot + 1 })
             {
                 auto& slot = fxSlots[static_cast<std::size_t>(slotIndex)];
@@ -831,9 +859,20 @@ void Engine::process(const float* const* inputs, int numInputs, float* const* ou
                 masterL[static_cast<std::size_t>(i)] += bl[static_cast<std::size_t>(i)] * g;
                 masterR[static_cast<std::size_t>(i)] += br[static_cast<std::size_t>(i)] * g;
             }
+            if (recordStride > 2)
+            {
+                auto& sl = stemL[static_cast<std::size_t>(stem)];
+                auto& sr = stemR[static_cast<std::size_t>(stem)];
+                for (int i = 0; i < block; ++i)
+                {
+                    const float g = startGain + step * static_cast<float>(i + 1);
+                    sl[static_cast<std::size_t>(i)] = bl[static_cast<std::size_t>(i)] * g;
+                    sr[static_cast<std::size_t>(i)] = br[static_cast<std::size_t>(i)] * g;
+                }
+            }
         };
-        runBus(kBusASlot, busAL, busAR, busAStart, P::BusALevel);
-        runBus(kBusBSlot, busBL, busBR, busBStart, P::BusBLevel);
+        runBus(kBusASlot, busAL, busAR, busAStart, P::BusALevel, kNumStrips);
+        runBus(kBusBSlot, busBL, busBR, busBStart, P::BusBLevel, kNumStrips + 1);
 
         // Master inserts, then the Medium, then the safety chain.
         for (int slotIndex : { kMasterSlot, kMasterSlot + 1 })
@@ -881,9 +920,56 @@ void Engine::process(const float* const* inputs, int numInputs, float* const* ou
         }
 
         writeCatch(masterL.data(), masterR.data(), block);
+        pushRecording(block);
         accumulateTelemetry(masterL.data(), masterR.data(), block);
         done += block;
     }
+
+    if (measure)
+    {
+        const std::chrono::duration<double> elapsed = std::chrono::steady_clock::now() - startTime;
+        updateGuardrails(elapsed.count(), numSamples);
+    }
+    else if (guard.getLevel() != 0)
+    {
+        guard.reset();
+        applyGuardLimits(guard.getLimits());
+    }
+}
+
+void Engine::pushRecording(int numSamples) noexcept
+{
+    if (recordStride == 0)
+        return;
+    std::array<const float*, RecordTap::kMaxChannels> ch {};
+    ch[0] = masterL.data();
+    ch[1] = masterR.data();
+    for (std::size_t k = 0; k < stemL.size(); ++k)
+    {
+        ch[2 + 2 * k] = stemL[k].data();
+        ch[3 + 2 * k] = stemR[k].data();
+    }
+    recordTap.push(ch.data(), numSamples);
+}
+
+void Engine::updateGuardrails(double elapsedSeconds, int numSamples) noexcept
+{
+    if (numSamples <= 0)
+        return;
+    const double budget = static_cast<double>(numSamples) / sampleRate;
+    const float forced = forcedLoad.load(std::memory_order_relaxed);
+    const float load = forced >= 0.0f ? forced : static_cast<float>(elapsedSeconds / budget);
+    if (guard.update(load, static_cast<float>(budget)))
+        applyGuardLimits(guard.getLimits());
+}
+
+void Engine::applyGuardLimits(const GuardLimits& limits) noexcept
+{
+    for (auto& slot : clouds)
+        slot.cloud.setGrainLimit(limits.cloudGrains);
+    resonator.setModeLimit(limits.resonatorModes);
+    bloom.setVoiceLimit(limits.bloomVoices);
+    droneVoiceCap = limits.droneVoices; // applied at the next control tick
 }
 
 void Engine::accumulateTelemetry(const float* l, const float* r, int n) noexcept
@@ -917,6 +1003,8 @@ void Engine::accumulateTelemetry(const float* l, const float* r, int n) noexcept
     f.fadeState = master.getFadeState();
     f.panicActive = master.isPanicActive();
     f.guardTrips = master.getGuardTrips();
+    f.dspLoad = guardEnabled.load(std::memory_order_relaxed) ? guard.getSmoothedLoad() : 0.0f;
+    f.guardLevel = guard.getLevel();
 
     f.tide = tide;
     f.harmonyRoot = harmony.getTarget().root;

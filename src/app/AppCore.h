@@ -8,6 +8,7 @@
 #include <engine/midi/MidiManager.h>
 #include <engine/mix/FxManager.h>
 #include <engine/scene/SceneManager.h>
+#include <io/Recorder.h>
 
 #include <juce_events/juce_events.h>
 
@@ -33,6 +34,7 @@ public:
     engine::MidiManager midi;
     MidiInputs midiInputs;
     SessionController session;
+    io::Recorder recorder;
 
     const engine::TelemetryFrame& latest() const noexcept { return lastFrame; }
 
@@ -47,12 +49,25 @@ public:
     void captureSceneAtCursor();
     void loadFactoryContent();
 
+    // Recording to disk (post-Medium master, optional stems).
+    void startRecording();
+    void stopRecording();
+    void toggleRecording();
+    bool getRecordStems() const;
+    void setRecordStems(bool stems);
+    juce::File getRecordingsFolder() const;
+    void setRecordingsFolder(const juce::File& folder);
+    /** The folder of the most recent take, if any. */
+    juce::File getLastRecording() const { return recorder.getStatus().folder; }
+
 private:
     void timerCallback() override;
     void loadRigMidi();
     void saveRigMidi();
 
     engine::TelemetryFrame lastFrame;
+    double recordingRate = 0.0;
+    int lastGuardLevel = 0;
 };
 
 } // namespace tf::app

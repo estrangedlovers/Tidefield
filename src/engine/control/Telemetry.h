@@ -28,6 +28,11 @@ struct TelemetryFrame
     bool panicActive = false;
     std::uint32_t guardTrips = 0;
 
+    // CPU guardrails: smoothed DSP load (fraction of the real-time budget, 0 when not
+    // measured) and the degradation level (0 = full quality).
+    float dspLoad = 0.0f;
+    int guardLevel = 0;
+
     // Global state.
     float tide = 1.0f;
     int harmonyRoot = 2;
@@ -83,7 +88,7 @@ struct TelemetryFrame
 struct EngineNotice
 {
     enum class Type : std::uint8_t { FadeInComplete, FadeOutComplete, PanicSilent, GuardTripped, ControlQueueOverflow, CatchReady,
-                                     CaptureSceneRequest };
+                                     CaptureSceneRequest, RecordToggleRequest };
     Type type = Type::FadeInComplete;
     std::uint64_t sampleTime = 0;
 

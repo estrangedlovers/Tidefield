@@ -30,6 +30,8 @@ private:
     void togglePanic();
     void updateHeader();
     void showSessionMenu();
+    void showRecordMenu();
+    void mouseDown(const juce::MouseEvent& e) override;
     void showStatus(const juce::String& message, bool warning = false);
     void updateTitle();
     void onTelemetry(const engine::TelemetryFrame& frame);
@@ -44,6 +46,7 @@ private:
     juce::TextButton panicButton { "PANIC" };
     juce::TextButton sessionButton { "Session" };
     juce::TextButton catchButton { "Catch" };
+    juce::TextButton recordButton { "Record" };
     juce::Label statusLabel;
     juce::TooltipWindow tooltips { this, 600 };
 

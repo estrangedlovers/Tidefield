@@ -76,6 +76,9 @@ public:
     void setSustain(bool down) noexcept;
     /** Fast release of every voice (e.g. before swapping the sample). */
     void releaseAll(float seconds = 0.02f) noexcept;
+    /** Polyphony cap from CPU guardrails, 1..kMaxVoices. Voices above the cap release
+        over half a second; new notes steal within the cap. */
+    void setVoiceLimit(int limit) noexcept;
 
     void process(float* left, float* right, int numSamples, float timeScale) noexcept;
 
@@ -146,6 +149,7 @@ private:
     std::array<Voice, kMaxVoices> voices {};
     std::vector<float> hann;
     bool sustainPedal = false;
+    int voiceLimit = kMaxVoices;
 };
 
 } // namespace tf::dsp

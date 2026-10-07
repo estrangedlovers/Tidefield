@@ -258,13 +258,33 @@ voices -> Bloom polyphony, and steps back up slowly. Hard caps apply regardless.
 
 ## 14. UI (phase 6)
 
-`juce::WebBrowserComponent` (WKWebView on macOS) with native functions (`setParam`,
-`beginGesture`/`endGesture`, `moveCursor`, `catch`, `panic`, `learn`, `session`) and
-telemetry pushed with `emitEventIfBrowserIsVisible`. React + TypeScript + Vite; dev
-mode loads the Vite server (hot reload), release serves `ui/dist` from the bundle via a
-`ResourceProvider`. Terrain and particles on WebGL. One theme token file: restrained
-palette, one typeface family (bundled), slow eased motion. Phase 1 to 5 use a plain
-JUCE placeholder panel that talks to the engine through exactly the same contract.
+`AppCore` (message thread) owns the managers and a 30 Hz pump that drains telemetry,
+notices and the MIDI monitor; front ends observe it through callbacks. The face of
+the instrument is `WebUI`: a `juce::WebBrowserComponent` (WKWebView on macOS) serving
+`ui/dist` through a resource provider, or a Vite dev server via `TIDEFIELD_UI_DEV`.
+The JUCE `ClassicUI` panel remains as a fallback.
+
+Protocol (`src/io/UiProtocol`, tested): one native function `tidefield(method,
+...args)` for everything the UI asks; events back to the page: `telemetry` (~30 Hz,
+parameter targets/live/pickup as deltas, the rest compact), `scenes`, `fx`,
+`samples`, `midi`, `session` (pushed when their JSON changes), `status`,
+`midiActivity`. The page asks once for the schema (`hello`), so the front end has no
+hard-coded parameter tables. FX control display is declarative (`dsp::DisplayMap`)
+so C++ and TypeScript format identically.
+
+Front end (`ui/`): React 19 + TypeScript + Vite. A single external store keeps
+parameters in typed arrays with per-parameter subscriptions, so 30 Hz telemetry only
+re-renders the controls whose values moved; canvases (terrain field, waveform with
+grains, pitch lanes, meters, keyboard glow) read telemetry in requestAnimationFrame
+loops. Performance view: three tall faders (Tide, Wander, Gravity), key and scale,
+the terrain (scenes, cursor, wander trail, particles per grain, drone voices as
+orbiting lights, resonator strikes as ripples, Bloom blooms, a Medium texture), the
+scene strip, recording-type tiles, Catch, Bloom transforms, fade and panic, and a
+four-octave Bloom keyboard. Edit view: global, every source, mixer, effects, scenes,
+MIDI. Knobs: drag, Shift fine, wheel, double-click default, Alt-click release,
+right-click learn/forget/release/reset; sand = live layer, coral = learning, arrows
+= soft takeover. Shortcuts: Space fade, Esc panic, K catch, C capture, R release,
+Tab switch view, Cmd+N/O/S sessions.
 
 ## 15. Extension points for later features
 
@@ -286,6 +306,6 @@ JUCE placeholder panel that talks to the engine through exactly the same contrac
    **Medium stage**. **(done)**
 4. Catch, **sample import + Bloom keyboard**, session save/recall. **(done)**
 5. MIDI learn, soft takeover, note input. **(done)**
-6. React WebView UI: performance view, then edit view.
+6. React WebView UI: performance view, then edit view. **(done)**
 7. Recording to disk, CPU guardrails, polish.
 8. Ambient feature pack: the approved items from section 10.

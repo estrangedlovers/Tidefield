@@ -276,14 +276,13 @@ void FxPage::refreshSlot(int slot)
         if (info == nullptr)
             continue;
         const auto& control = info->controls[static_cast<std::size_t>(c)];
-        auto fmt = control.format;
-        knob->setDisplay(control.name, [fmt](double v) {
-            char text[32] {};
-            if (fmt != nullptr)
-                fmt(static_cast<float>(v), text, sizeof(text));
+        const auto display = control.display;
+        knob->setDisplay(control.name, [display](double v) {
+            char text[48] {};
+            display.format(static_cast<float>(v), text, sizeof(text));
             return juce::String(text);
         });
-        knob->setVisible(std::string_view(control.name) != "-");
+        knob->setVisible(display.curve != dsp::DisplayMap::Curve::Hidden);
     }
     panel.findKnob(static_cast<P>(first + 6))->setVisible(info != nullptr);
     resized();

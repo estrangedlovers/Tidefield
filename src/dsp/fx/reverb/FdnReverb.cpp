@@ -11,12 +11,6 @@ namespace tf::dsp {
 
 namespace {
 
-void formatSize(float v, char* out, int n) { std::snprintf(out, static_cast<size_t>(n), "%.0f%%", FdnReverb::sizeFrom01(v) * 100.0f); }
-void formatDecay(float v, char* out, int n) { std::snprintf(out, static_cast<size_t>(n), "%.1f s", FdnReverb::decayFrom01(v)); }
-void formatDamping(float v, char* out, int n) { std::snprintf(out, static_cast<size_t>(n), "%.0f Hz", FdnReverb::dampingFrom01(v)); }
-void formatPredelay(float v, char* out, int n) { std::snprintf(out, static_cast<size_t>(n), "%.0f ms", FdnReverb::predelayFrom01(v)); }
-void formatPercent(float v, char* out, int n) { std::snprintf(out, static_cast<size_t>(n), "%.0f%%", v * 100.0f); }
-
 // Mutually prime-ish line lengths in ms at size 1.
 constexpr std::array<float, 8> kLineMs { 31.7f, 37.3f, 41.9f, 47.3f, 53.1f, 59.9f, 67.7f, 73.1f };
 constexpr std::array<float, 4> kDiffuserMs { 4.7f, 6.1f, 7.9f, 11.3f };
@@ -25,14 +19,16 @@ constexpr float kMaxModMs = 1.2f;
 
 } // namespace
 
+using Curve = DisplayMap::Curve;
+
 const ProcessorInfo FdnReverb::kInfo {
     "tf.reverb", "Cloud Reverb",
-    { { { "Size", 0.6f, formatSize },
-        { "Decay", 0.55f, formatDecay },
-        { "Damping", 0.6f, formatDamping },
-        { "Pre-delay", 0.15f, formatPredelay },
-        { "Shimmer mod", 0.3f, formatPercent },
-        { "Hold", 0.0f, formatPercent } } },
+    { { { "Size", 0.6f, { Curve::Linear, 30.0f, 170.0f, "%" } },
+        { "Decay", 0.55f, { Curve::Exp, 0.3f, 200.0f, "s", 1 } },
+        { "Damping", 0.6f, { Curve::Exp, 1000.0f, 16.0f, "Hz" } },
+        { "Pre-delay", 0.15f, { Curve::Power, 250.0f, 2.0f, "ms" } },
+        { "Modulation", 0.3f, { Curve::Linear, 0.0f, 100.0f, "%" } },
+        { "Hold", 0.0f, { Curve::Linear, 0.0f, 100.0f, "%" } } } },
     true
 };
 

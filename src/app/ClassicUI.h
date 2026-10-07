@@ -1,30 +1,23 @@
 #pragma once
 
-#include "AudioHost.h"
-#include "MidiInputs.h"
-#include "SessionController.h"
+#include "AppCore.h"
 #include "ui/Pages.h"
 #include "ui/Theme.h"
-
-#include <engine/capture/CatchManager.h>
-#include <engine/midi/MidiManager.h>
-#include <engine/mix/FxManager.h>
-#include <engine/scene/SceneManager.h>
 
 #include <juce_audio_utils/juce_audio_utils.h>
 #include <juce_gui_extra/juce_gui_extra.h>
 
 namespace tf::app {
 
-/** Placeholder UI for phases 1 to 5: a header with transport, safety and status, and
-    tabs for performing, sources, mixer and FX. It talks to the engine only through
-    Engine::post, the managers and the telemetry queues: the same contract the React
-    UI uses in phase 6. */
-class MainComponent final : public juce::Component, private juce::Timer
+/** The JUCE fallback front end (used when the web UI files are missing, or when
+    TIDEFIELD_CLASSIC_UI=1): a header with transport, safety and status, and tabs for
+    performing, sources, mixer, FX and MIDI. Talks to the engine only through AppCore,
+    the same as the web UI. */
+class ClassicUI final : public juce::Component, private juce::Timer
 {
 public:
-    explicit MainComponent(AudioHost& host);
-    ~MainComponent() override;
+    explicit ClassicUI(AppCore& core);
+    ~ClassicUI() override;
 
     void paint(juce::Graphics&) override;
     void resized() override;
@@ -38,20 +31,12 @@ private:
     void updateHeader();
     void showSessionMenu();
     void showStatus(const juce::String& message, bool warning = false);
-    void loadFactoryContent();
     void updateTitle();
-    void loadRigMidi();
-    void saveRigMidi();
+    void onTelemetry(const engine::TelemetryFrame& frame);
 
-    AudioHost& host;
+    AppCore& core;
     engine::Engine& engine;
     theme::LookAndFeel lookAndFeel;
-    engine::SceneManager scenes;
-    engine::FxManager fx;
-    engine::CatchManager catcher;
-    engine::MidiManager midi;
-    MidiInputs midiInputs;
-    SessionController session;
 
     juce::TextButton settingsButton { "Audio Settings" };
     juce::TextButton fadeInButton { "Fade In" };

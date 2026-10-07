@@ -13,22 +13,14 @@ namespace {
 
 inline float softClip(float x) noexcept { return std::tanh(x); }
 
-void formatType(float v, char* out, int n) { std::snprintf(out, static_cast<size_t>(n), "%s", Medium::typeName(MediumProcessor::typeFrom01(v))); }
-void formatPercent(float v, char* out, int n) { std::snprintf(out, static_cast<size_t>(n), "%.0f%%", v * 100.0f); }
-void formatUnused(float, char* out, int n) { std::snprintf(out, static_cast<size_t>(n), "-"); }
+constexpr const char* kTypeNames[] = { "Digital", "Cassette", "Vinyl", "Noisy sampler" };
 
 } // namespace
 
 const char* Medium::typeName(Type t) noexcept
 {
-    switch (t)
-    {
-        case Type::Digital: return "Digital";
-        case Type::Cassette: return "Cassette";
-        case Type::Vinyl: return "Vinyl";
-        case Type::Sampler: return "Noisy sampler";
-    }
-    return "";
+    const int i = static_cast<int>(t);
+    return i >= 0 && i < kNumTypes ? kTypeNames[i] : "";
 }
 
 void Medium::prepare(const ProcessSpec& spec, std::uint64_t seed)
@@ -342,14 +334,16 @@ void Medium::process(float* left, float* right, int numSamples) noexcept
     }
 }
 
+using Curve = DisplayMap::Curve;
+
 const ProcessorInfo MediumProcessor::kInfo {
     "tf.medium", "Medium",
-    { { { "Type", 0.375f, formatType },
-        { "Age", 0.3f, formatPercent },
-        { "Noise", 0.4f, formatPercent },
-        { "Wobble", 0.3f, formatPercent },
-        { "Drive", 0.3f, formatPercent },
-        { "-", 0.0f, formatUnused } } },
+    { { { "Type", 0.375f, { Curve::Choice, 0.0f, 1.0f, "", 0, kTypeNames, 4 } },
+        { "Age", 0.3f, { Curve::Linear, 0.0f, 100.0f, "%" } },
+        { "Noise", 0.4f, { Curve::Linear, 0.0f, 100.0f, "%" } },
+        { "Wobble", 0.3f, { Curve::Linear, 0.0f, 100.0f, "%" } },
+        { "Drive", 0.3f, { Curve::Linear, 0.0f, 100.0f, "%" } },
+        { "-", 0.0f, { Curve::Hidden } } } },
     false
 };
 

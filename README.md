@@ -19,4 +19,8 @@ cmake --build --preset dev
 ctest --preset dev
 ```
 
-On macOS this also builds `Tidefield.app`. Open the folder in CLion and pick a preset.
+On macOS this also builds `Tidefield.app` (the React UI in `ui/` is built with npm
+and bundled; Node 20+ needed). Open the folder in CLion and pick a preset.
+
+To work on the UI in a browser without audio: `cd ui && npm install && npm run dev`,
+then open http://localhost:5173/?demo.

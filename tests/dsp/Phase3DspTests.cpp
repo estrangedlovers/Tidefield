@@ -371,6 +371,28 @@ TEST_CASE("Medium type changes crossfade without clicks")
     REQUIRE(worstJump < 0.05f);
 }
 
+TEST_CASE("Declarative control display matches the processors' own mappings")
+{
+    char text[48];
+    const auto& rev = FdnReverb::kInfo.controls;
+    rev[1].display.format(0.4f, text, sizeof(text));
+    REQUIRE(std::string(text) == "2.5 s"); // decayFrom01(0.4) = 2.48
+    REQUIRE(rev[1].display.value(0.4f) == Approx(FdnReverb::decayFrom01(0.4f)));
+    REQUIRE(rev[2].display.value(0.7f) == Approx(FdnReverb::dampingFrom01(0.7f)));
+    REQUIRE(rev[3].display.value(0.5f) == Approx(FdnReverb::predelayFrom01(0.5f)));
+    REQUIRE(rev[0].display.value(0.5f) == Approx(FdnReverb::sizeFrom01(0.5f) * 100.0f));
+    const auto& del = TapeDelay::kInfo.controls;
+    REQUIRE(del[0].display.value(0.8f) == Approx(TapeDelay::timeMsFrom01(0.8f)));
+    del[0].display.format(1.0f, text, sizeof(text));
+    REQUIRE(std::string(text) == "2.00 s");
+    del[1].display.format(0.5f, text, sizeof(text));
+    REQUIRE(std::string(text) == "55%");
+    const auto& med = MediumProcessor::kInfo.controls;
+    med[0].display.format(0.6f, text, sizeof(text));
+    REQUIRE(std::string(text) == "Vinyl");
+    REQUIRE(med[5].display.curve == DisplayMap::Curve::Hidden);
+}
+
 TEST_CASE("Every factory processor is realtime-safe and finite")
 {
     for (const auto& entry : ProcessorFactory::instance().entries())

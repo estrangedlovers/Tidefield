@@ -65,6 +65,23 @@ Presets live in `CMakePresets.json`; CLion picks them up. JUCE 8 and Catch2 are 
 by `cmake/Dependencies.cmake`. The app target defaults on for macOS only; on Linux
 pass `-DTIDEFIELD_BUILD_APP=ON` (needs ALSA/X11 headers) to compile-check it.
 
+## Web UI (ui/)
+
+React + TypeScript + Vite, one typeface (Inter), tokens in `ui/src/theme/tokens.css`.
+- `cd ui && npm install && npm run dev`: the UI in a browser against a mock engine
+  (`ui/src/bridge/mock.ts`); add `?demo` for a populated terrain.
+- In the app with hot reload: run `npm run dev`, then start the app with
+  `TIDEFIELD_UI_DEV=http://localhost:5173`.
+- `npm run build` is run by CMake (target `tidefield_ui`) and copied into the app.
+- `npm test` (vitest) and `npm run typecheck`.
+- After changing parameters, regenerate the mock's schema:
+  `tidefield_render --dump-schema ui/src/bridge/schema.json` (a ctest fails if stale).
+- Everything crosses one native function, `tidefield(method, ...args)` in
+  `src/app/web/WebUI.cpp`; state flows back as events (`telemetry`, `scenes`, `fx`,
+  `samples`, `midi`, `session`, `status`, `midiActivity`). Visuals read telemetry in
+  requestAnimationFrame loops and never re-render through React.
+- `--classic` or `TIDEFIELD_CLASSIC_UI=1` starts the JUCE fallback panel instead.
+
 ## Conventions
 
 - C++20, 4-space indent, `camelCase` functions and variables, `PascalCase` types,

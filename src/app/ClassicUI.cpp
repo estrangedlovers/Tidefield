@@ -1,8 +1,4 @@
-#include "MainComponent.h"
-
-#include <BinaryData.h>
-#include <io/AudioFileIO.h>
-#include <io/Session.h>
+#include "ClassicUI.h"
 
 namespace tf::app {
 
@@ -22,16 +18,11 @@ const char* fadeStateName(engine::FadeState s)
 
 } // namespace
 
-MainComponent::MainComponent(AudioHost& h)
-    : host(h), engine(h.getEngine()), scenes(h.getEngine()), fx(h.getEngine()), catcher(h.getEngine()), midi(h.getEngine()),
-      midiInputs(h.getEngine(), h.getSettings()), session(h.getEngine(), scenes, fx, &midi)
+ClassicUI::ClassicUI(AppCore& c) : core(c), engine(c.engine)
 {
-    knobContext().midi = &midi;
-    midi.onLearned = [this](const std::string& d) { showStatus("MIDI learned: " + juce::String(d)); };
-    loadRigMidi();
     // Default (not per-component) so every child copies the palette when it is built.
     juce::LookAndFeel::setDefaultLookAndFeel(&lookAndFeel);
-    fx.loadDefaultLayout();
+    knobContext().midi = &core.midi;
 
     for (auto* b : { &settingsButton, &fadeInButton, &fadeOutButton, &panicButton, &sessionButton, &catchButton })
         addAndMakeVisible(*b);
@@ -41,14 +32,6 @@ MainComponent::MainComponent(AudioHost& h)
     catchButton.onClick = [this] { engine.command(engine::Command::Catch); };
     sessionButton.onClick = [this] { showSessionMenu(); };
     sessionButton.setTooltip("New, open and save sessions (Cmd+N, Cmd+O, Cmd+S)");
-
-    catcher.onCaught = [this](int cloud, const std::string& name) {
-        showStatus("Caught into Cloud " + juce::String(cloud + 1) + " (" + juce::String(name) + ")");
-    };
-    catcher.onRejected = [this](const std::string& reason) { showStatus(reason, true); };
-    session.onStatus = [this](const juce::String& m) { showStatus(m); };
-    session.onSessionChanged = [this] { updateTitle(); };
-
     settingsButton.onClick = [this] { showDeviceSettings(); };
     fadeInButton.onClick = [this] { engine.command(engine::Command::FadeIn); };
     fadeOutButton.onClick = [this] { engine.command(engine::Command::FadeOut); };
@@ -64,66 +47,60 @@ MainComponent::MainComponent(AudioHost& h)
         tabs.addTab(name, theme::background, page, true);
         pages.push_back(page);
     };
-    perform = new PerformPage(engine, scenes);
+    perform = new PerformPage(engine, core.scenes);
     addPage("Perform", perform);
     addPage("Sources", new SourcesPage(engine));
     addPage("Mixer", new MixerPage(engine));
-    addPage("FX", new FxPage(engine, fx));
-    midiPage = new MidiPage(midi, midiInputs);
+    addPage("FX", new FxPage(engine, core.fx));
+    midiPage = new MidiPage(core.midi, core.midiInputs);
     addPage("MIDI", midiPage);
     tabs.setTabBarDepth(32);
     addAndMakeVisible(tabs);
 
+    core.onTelemetry = [this](const engine::TelemetryFrame& f) { onTelemetry(f); };
+    core.onMidiActivity = [this](const engine::RawMidi& m) { midiPage->noteActivity(m); };
+    core.onStatus = [this](const juce::String& m, bool warn) { showStatus(m, warn); };
+    core.onSessionChanged = [this] { updateTitle(); };
+
     setWantsKeyboardFocus(true);
     setSize(1380, 900);
-    loadFactoryContent();
     startTimerHz(30);
 }
 
-void MainComponent::loadFactoryContent()
+ClassicUI::~ClassicUI()
 {
-    // A first launch should make sound: Bloom gets the glass one-shot, Cloud 1 a pad.
-    auto decode = [](const void* data, int size, const char* name) -> std::shared_ptr<const dsp::SampleBuffer> {
-        juce::String error;
-        auto b = io::loadSample(std::make_unique<juce::MemoryInputStream>(data, static_cast<size_t>(size), false), name, error);
-        return std::shared_ptr<const dsp::SampleBuffer>(std::move(b));
-    };
-    engine.loadBloomSample(decode(BinaryData::glass_wav, BinaryData::glass_wavSize, "glass"));
-    engine.loadCloudSample(0, decode(BinaryData::chord_wav, BinaryData::chord_wavSize, "chord"));
-    engine.setParam(engine::P::BloomRoot, 81.0f); // glass.wav rings at A5
+    stopTimer();
+    core.onTelemetry = nullptr;
+    core.onMidiActivity = nullptr;
+    core.onStatus = nullptr;
+    core.onSessionChanged = nullptr;
+    knobContext().midi = nullptr;
+    tabs.clearTabs();
+    juce::LookAndFeel::setDefaultLookAndFeel(nullptr);
 }
 
-void MainComponent::loadRigMidi()
+void ClassicUI::onTelemetry(const engine::TelemetryFrame& f)
 {
-    // The controller mapping belongs to the rig: it persists in the app settings and
-    // only changes when a session that carries its own mapping is opened.
-    const auto stored = host.getSettings().getValue("midiMapping");
-    if (stored.isNotEmpty())
-        io::applyMidiJson(juce::JSON::parse(stored), midi, engine.getRegistry());
-    else
-        midi.loadDefaultLayout();
+    lastFrame = f;
+    for (auto* p : pages)
+        if (p->isShowing())
+            p->update(lastFrame);
 }
 
-void MainComponent::saveRigMidi()
-{
-    host.getSettings().setValue("midiMapping", juce::JSON::toString(io::midiToJson(midi, engine.getRegistry()), true));
-    host.getSettings().saveIfNeeded();
-}
-
-void MainComponent::showStatus(const juce::String& message, bool warning)
+void ClassicUI::showStatus(const juce::String& message, bool warning)
 {
     statusMessage = message;
     statusIsWarning = warning;
     statusUntil = juce::Time::getMillisecondCounter() + 4000;
 }
 
-void MainComponent::updateTitle()
+void ClassicUI::updateTitle()
 {
     if (auto* window = findParentComponentOfClass<juce::DocumentWindow>())
-        window->setName("Tidefield - " + session.getName());
+        window->setName("Tidefield - " + core.session.getName());
 }
 
-void MainComponent::showSessionMenu()
+void ClassicUI::showSessionMenu()
 {
     juce::PopupMenu menu;
     menu.addItem(1, "New session");
@@ -134,36 +111,27 @@ void MainComponent::showSessionMenu()
     menu.showMenuAsync(juce::PopupMenu::Options().withTargetComponent(&sessionButton), [this](int r) {
         switch (r)
         {
-            case 1: session.newSession(); break;
-            case 2: session.open(); break;
-            case 3: session.save(); break;
-            case 4: session.saveAs(); break;
+            case 1: core.session.newSession(); break;
+            case 2: core.session.open(); break;
+            case 3: core.session.save(); break;
+            case 4: core.session.saveAs(); break;
             default: break;
         }
     });
 }
 
-MainComponent::~MainComponent()
-{
-    stopTimer();
-    saveRigMidi();
-    knobContext().midi = nullptr;
-    tabs.clearTabs();
-    juce::LookAndFeel::setDefaultLookAndFeel(nullptr);
-}
-
-bool MainComponent::keyPressed(const juce::KeyPress& key)
+bool ClassicUI::keyPressed(const juce::KeyPress& key)
 {
     const auto c = juce::CharacterFunctions::toLowerCase(key.getTextCharacter());
     if (key.getModifiers().isCommandDown())
     {
         const auto code = juce::CharacterFunctions::toLowerCase(static_cast<juce::juce_wchar>(key.getKeyCode()));
         if (code == 's')
-            key.getModifiers().isShiftDown() ? session.saveAs() : session.save();
+            key.getModifiers().isShiftDown() ? core.session.saveAs() : core.session.save();
         else if (code == 'o')
-            session.open();
+            core.session.open();
         else if (code == 'n')
-            session.newSession();
+            core.session.newSession();
         else
             return false;
         return true;
@@ -185,19 +153,19 @@ bool MainComponent::keyPressed(const juce::KeyPress& key)
     return true;
 }
 
-void MainComponent::toggleFade()
+void ClassicUI::toggleFade()
 {
     using engine::FadeState;
     const bool goingUp = lastFrame.fadeState == FadeState::Silent || lastFrame.fadeState == FadeState::FadingOut;
     engine.command(goingUp ? engine::Command::FadeIn : engine::Command::FadeOut);
 }
 
-void MainComponent::togglePanic()
+void ClassicUI::togglePanic()
 {
     engine.command(lastFrame.panicActive ? engine::Command::ResumeFromPanic : engine::Command::Panic);
 }
 
-void MainComponent::updateHeader()
+void ClassicUI::updateHeader()
 {
     using engine::FadeState;
     const auto state = lastFrame.fadeState;
@@ -211,7 +179,7 @@ void MainComponent::updateHeader()
 
     // No usable output device (no default on this machine, or a remembered interface
     // that is unplugged): say so and highlight the settings button, without a modal.
-    if (host.getDeviceManager().getCurrentAudioDevice() == nullptr)
+    if (core.host.getDeviceManager().getCurrentAudioDevice() == nullptr)
     {
         statusLabel.setColour(juce::Label::textColourId, theme::warn);
         statusLabel.setText("No audio output is open. Choose a device in Audio Settings.", juce::dontSendNotification);
@@ -229,15 +197,15 @@ void MainComponent::updateHeader()
 
     const int liveCount = static_cast<int>(std::count_if(lastFrame.live.begin(), lastFrame.live.end(), [](auto v) { return v != 0; }));
     statusLabel.setText(juce::String::formatted("CPU %4.1f%%   xruns %d   master %s   limiter %4.1f dB   tide %.2fx   scenes %d   live %d   guard %u",
-                                                host.getCpuLoad() * 100.0, host.getXrunCount(), fadeStateName(lastFrame.fadeState),
-                                                juce::Decibels::gainToDecibels(lastFrame.limiterGain), lastFrame.tide, scenes.size(),
+                                                core.host.getCpuLoad() * 100.0, core.host.getXrunCount(), fadeStateName(lastFrame.fadeState),
+                                                juce::Decibels::gainToDecibels(lastFrame.limiterGain), lastFrame.tide, core.scenes.size(),
                                                 liveCount, lastFrame.guardTrips),
                         juce::dontSendNotification);
 }
 
-void MainComponent::showDeviceSettings()
+void ClassicUI::showDeviceSettings()
 {
-    auto selector = std::make_unique<juce::AudioDeviceSelectorComponent>(host.getDeviceManager(), 0, 2, 2, 2, false, false,
+    auto selector = std::make_unique<juce::AudioDeviceSelectorComponent>(core.host.getDeviceManager(), 0, 2, 2, 2, false, false,
                                                                            true, false);
     selector->setSize(520, 420);
 
@@ -250,52 +218,15 @@ void MainComponent::showDeviceSettings()
     options.launchAsync();
 }
 
-void MainComponent::timerCallback()
+void ClassicUI::timerCallback()
 {
-    scenes.tick();
-    fx.tick();
-    midi.tick();
-    engine.collectGarbage();
-
-    engine::RawMidi monitored;
-    while (engine.popMidiMonitor(monitored))
-    {
-        midi.handleMonitor(monitored);
-        midiPage->noteActivity(monitored);
-    }
-
-    engine::TelemetryFrame f;
-    bool got = false;
-    while (engine.popTelemetry(f))
-        got = true;
-    if (got)
-    {
-        lastFrame = f;
-        for (auto* p : pages)
-            if (p->isShowing())
-                p->update(lastFrame);
-    }
-
-    session.setLatest(lastFrame);
-    engine::EngineNotice notice;
-    while (engine.popNotice(notice))
-    {
-        if (notice.type == engine::EngineNotice::Type::GuardTripped)
-            showStatus("Safety guard tripped: a non-finite sample was caught and the engine reset.", true);
-        if (notice.type == engine::EngineNotice::Type::CaptureSceneRequest)
-            perform->captureScene();
-        catcher.handle(notice);
-        session.handleNotice(notice);
-    }
-
     meterL = std::max(lastFrame.peakL, meterL * 0.85f);
     meterR = std::max(lastFrame.peakR, meterR * 0.85f);
     updateHeader();
-
     repaint(meterArea);
 }
 
-void MainComponent::paint(juce::Graphics& g)
+void ClassicUI::paint(juce::Graphics& g)
 {
     g.fillAll(theme::background);
     g.setColour(theme::text);
@@ -314,7 +245,7 @@ void MainComponent::paint(juce::Graphics& g)
     bar(m.reduced(0, 1), meterR);
 }
 
-void MainComponent::resized()
+void ClassicUI::resized()
 {
     auto area = getLocalBounds().reduced(16, 10);
     auto top = area.removeFromTop(36);

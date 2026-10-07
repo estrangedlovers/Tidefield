@@ -1,0 +1,80 @@
+.fader {
+  display: flex;
+  flex-direction: column;
+  align-items: stretch;
+  gap: 8px;
+  min-width: 0;
+}
+
+.fader-body {
+  position: relative;
+  flex: 1;
+  min-height: 120px;
+  overflow: hidden;
+  border-radius: 14px;
+  background: var(--surface);
+  border: 1px solid var(--line);
+  cursor: ns-resize;
+  touch-action: none;
+}
+
+.fader-fill {
+  position: absolute;
+  inset: 0;
+  transform-origin: bottom;
+  background: linear-gradient(to top, var(--accent-dim), rgba(142, 201, 198, 0.05));
+  transition: transform 90ms linear;
+}
+
+.fader-line {
+  position: absolute;
+  left: 10px;
+  right: 10px;
+  height: 2px;
+  border-radius: 2px;
+  background: var(--accent);
+  box-shadow: 0 0 12px var(--accent);
+  transition: bottom 90ms linear, background var(--mid) var(--ease);
+}
+
+.fader-value {
+  position: absolute;
+  top: 10px;
+  left: 0;
+  right: 0;
+  text-align: center;
+  font-size: 13px;
+  font-weight: 500;
+}
+
+.fader-pickup {
+  position: absolute;
+  bottom: 8px;
+  left: 0;
+  right: 0;
+  text-align: center;
+  font-size: 9px;
+  color: var(--coral);
+}
+
+.fader-label {
+  text-align: center;
+  font-size: 11px;
+  color: var(--text-2);
+  letter-spacing: 0.02em;
+}
+
+.fader.live .fader-line {
+  background: var(--sand);
+  box-shadow: 0 0 12px var(--sand);
+}
+.fader.live .fader-fill {
+  background: linear-gradient(to top, var(--sand-dim), rgba(227, 198, 144, 0.04));
+}
+.fader.live .fader-label {
+  color: var(--sand);
+}
+.fader.learn .fader-body {
+  border-color: var(--coral);
+  animation: breathe 1.2s ease-in-out infinite;
+}

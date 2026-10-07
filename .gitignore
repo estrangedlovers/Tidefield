@@ -9,3 +9,4 @@ ui/dist/
 *.wav
 !resources/samples/*.wav
 !resources/**/*.wav
+ui/node_modules/

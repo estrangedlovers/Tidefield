@@ -11,18 +11,6 @@ namespace tf::dsp {
 
 namespace {
 
-void formatTime(float v, char* out, int n)
-{
-    const float ms = TapeDelay::timeMsFrom01(v);
-    if (ms >= 1000.0f)
-        std::snprintf(out, static_cast<size_t>(n), "%.2f s", ms * 0.001f);
-    else
-        std::snprintf(out, static_cast<size_t>(n), "%.0f ms", ms);
-}
-void formatFeedback(float v, char* out, int n) { std::snprintf(out, static_cast<size_t>(n), "%.0f%%", TapeDelay::feedbackFrom01(v) * 100.0f); }
-void formatTone(float v, char* out, int n) { std::snprintf(out, static_cast<size_t>(n), "%.0f Hz", TapeDelay::toneHzFrom01(v)); }
-void formatPercent(float v, char* out, int n) { std::snprintf(out, static_cast<size_t>(n), "%.0f%%", v * 100.0f); }
-
 /** Smooth saturator: linear for small signals, approaches +-1.2. */
 inline float saturate(float x) noexcept { return 1.2f * std::tanh(x * (1.0f / 1.2f)); }
 
@@ -30,14 +18,16 @@ constexpr float kMaxDelaySeconds = 2.2f;
 
 } // namespace
 
+using Curve = DisplayMap::Curve;
+
 const ProcessorInfo TapeDelay::kInfo {
     "tf.delay", "Tape Delay",
-    { { { "Time", 0.62f, formatTime },
-        { "Feedback", 0.45f, formatFeedback },
-        { "Tone", 0.55f, formatTone },
-        { "Spread", 0.35f, formatPercent },
-        { "Wobble", 0.25f, formatPercent },
-        { "Age", 0.25f, formatPercent } } },
+    { { { "Time", 0.62f, { Curve::Exp, 20.0f, 100.0f, "ms" } },
+        { "Feedback", 0.45f, { Curve::Linear, 0.0f, 110.0f, "%" } },
+        { "Tone", 0.55f, { Curve::Exp, 500.0f, 32.0f, "Hz" } },
+        { "Spread", 0.35f, { Curve::Linear, 0.0f, 100.0f, "%" } },
+        { "Wobble", 0.25f, { Curve::Linear, 0.0f, 100.0f, "%" } },
+        { "Age", 0.25f, { Curve::Linear, 0.0f, 100.0f, "%" } } } },
     true
 };
 

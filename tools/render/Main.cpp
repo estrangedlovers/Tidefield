@@ -15,6 +15,7 @@
 #include <engine/mix/FxManager.h>
 #include <io/AudioFileIO.h>
 #include <io/Session.h>
+#include <io/UiProtocol.h>
 
 #include <dsp/core/Random.h>
 
@@ -110,6 +111,28 @@ bool writeWav(const juce::File& file, const std::vector<std::vector<float>>& cha
 
 int main(int argc, char** argv)
 {
+    // `tidefield_render --dump-schema file.json` writes the UI schema (used by the web
+    // UI's browser mock so it always matches the engine).
+    // `--check-schema file.json` fails if that copy is stale (run as a ctest).
+    if (argc == 3 && (juce::String(argv[1]) == "--dump-schema" || juce::String(argv[1]) == "--check-schema"))
+    {
+        tf::engine::Engine engine;
+        engine.prepare(48000.0, 512);
+        const auto file = juce::File::getCurrentWorkingDirectory().getChildFile(argv[2]);
+        const auto text = juce::JSON::toString(tf::io::buildSchema(engine));
+        if (juce::String(argv[1]) == "--check-schema")
+        {
+            if (file.loadFileAsString() == text)
+                return 0;
+            std::cerr << file.getFullPathName() << " is out of date with the engine's parameters.\n"
+                      << "Regenerate: tidefield_render --dump-schema ui/src/bridge/schema.json\n";
+            return 1;
+        }
+        file.replaceWithText(text);
+        std::cout << file.getFullPathName() << "\n";
+        return 0;
+    }
+
     const auto options = parseArgs(argc, argv);
     if (! options)
     {

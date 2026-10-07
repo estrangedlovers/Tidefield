@@ -1,0 +1,36 @@
+/* Tidefield design tokens. One typeface family (Inter), one accent (sea glass), sand
+   for anything held in the live layer, coral for warnings, learn and panic. Motion is
+   slow and eased: nothing snaps unless the performer asked it to. */
+:root {
+  --bg: #0a0d11;
+  --bg-raised: #0e1217;
+  --surface: #131820;
+  --surface-2: #181e27;
+  --surface-3: #1e2530;
+  --line: rgba(255, 255, 255, 0.055);
+  --line-strong: rgba(255, 255, 255, 0.11);
+
+  --text: #dde3ea;
+  --text-2: #97a1af;
+  --text-3: #5b6574;
+
+  --accent: #8ec9c6;
+  --accent-2: #6aa9b0;
+  --accent-dim: rgba(142, 201, 198, 0.16);
+  --sand: #e3c690;
+  --sand-dim: rgba(227, 198, 144, 0.16);
+  --coral: #e5917f;
+  --coral-dim: rgba(229, 145, 127, 0.16);
+
+  --radius-sm: 6px;
+  --radius: 10px;
+  --radius-lg: 16px;
+  --shadow: 0 10px 30px rgba(0, 0, 0, 0.35);
+
+  --ease: cubic-bezier(0.22, 0.8, 0.24, 1);
+  --fast: 140ms;
+  --mid: 320ms;
+  --slow: 700ms;
+
+  --font: "Inter Variable", "Inter", system-ui, -apple-system, "Segoe UI", sans-serif;
+}

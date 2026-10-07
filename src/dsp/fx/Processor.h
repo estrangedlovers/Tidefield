@@ -3,9 +3,34 @@
 #include "../core/ProcessSpec.h"
 
 #include <array>
+#include <cmath>
+#include <cstdio>
 #include <memory>
 
 namespace tf::dsp {
+
+/** How a 0..1 control value is shown. Declarative so any front end (the JUCE panel,
+    the React UI) formats identically:
+      Linear  a + b * v
+      Exp     a * b^v        (b is the max/min ratio)
+      Power   a * v^b
+      Choice  choices[floor(v * count)]
+      Hidden  control unused by this processor */
+struct DisplayMap
+{
+    enum class Curve : unsigned char { Linear, Exp, Power, Choice, Hidden };
+    Curve curve = Curve::Linear;
+    float a = 0.0f;
+    float b = 1.0f;
+    const char* unit = "";
+    int decimals = 0;
+    const char* const* choices = nullptr;
+    int numChoices = 0;
+
+    float value(float v01) const noexcept;
+    /** Writes e.g. "2.4 s"; Exp values >= 1000 with unit "ms" print as seconds. */
+    void format(float v01, char* out, int outSize) const noexcept;
+};
 
 /** What a processor's six generic controls mean. Slots expose stable parameter IDs
     (`fx.<slot>.p1` ... `p6`, each 0..1) so scenes, MIDI and sessions never depend on
@@ -15,8 +40,7 @@ struct ProcessorControl
 {
     const char* name = "";
     float defaultValue = 0.5f;
-    /** Formats the processor's interpretation of a 0..1 value, e.g. "2.4 s". */
-    void (*format)(float value01, char* out, int outSize) = nullptr;
+    DisplayMap display {};
 };
 
 struct ProcessorInfo
@@ -56,5 +80,42 @@ public:
 };
 
 using ProcessorPtr = std::unique_ptr<Processor>;
+
+inline float DisplayMap::value(float v) const noexcept
+{
+    switch (curve)
+    {
+        case Curve::Linear: return a + b * v;
+        case Curve::Exp: return a * std::pow(b, v);
+        case Curve::Power: return a * std::pow(v, b);
+        case Curve::Choice:
+        case Curve::Hidden: return v;
+    }
+    return v;
+}
+
+inline void DisplayMap::format(float v, char* out, int outSize) const noexcept
+{
+    const auto n = static_cast<std::size_t>(outSize);
+    if (curve == Curve::Hidden)
+    {
+        std::snprintf(out, n, "-");
+        return;
+    }
+    if (curve == Curve::Choice && choices != nullptr && numChoices > 0)
+    {
+        int i = static_cast<int>(v * static_cast<float>(numChoices));
+        i = i < 0 ? 0 : (i >= numChoices ? numChoices - 1 : i);
+        std::snprintf(out, n, "%s", choices[i]);
+        return;
+    }
+    const float x = value(v);
+    if (unit[0] == 'm' && unit[1] == 's' && unit[2] == 0 && x >= 1000.0f)
+    {
+        std::snprintf(out, n, "%.2f s", static_cast<double>(x) * 0.001);
+        return;
+    }
+    std::snprintf(out, n, "%.*f%s%s", decimals, static_cast<double>(x), unit[0] == 0 || unit[0] == '%' ? "" : " ", unit);
+}
 
 } // namespace tf::dsp

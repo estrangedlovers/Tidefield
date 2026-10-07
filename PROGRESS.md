@@ -2,7 +2,7 @@
 
 Read `CLAUDE.md` (rules) and `docs/ARCHITECTURE.md` (design) first.
 
-## Status: phase 5 complete, phase 6 next
+## Status: phase 6 complete, phase 7 next
 
 ### Phase 1: skeleton, device settings, safety chain, drone, render harness
 
@@ -250,10 +250,43 @@ and zero allocations while handling a stream of CCs and notes.
 **Untested (needs the Mac and a controller)**: real devices, hot-plugging, CoreMIDI
 threading, how pickup feels in hand.
 
-## Next: phase 6
-React WebView UI: performance view first (terrain front and centre, few large
-controls, visuals driven by telemetry), then the edit view. Same contract as the
-placeholder panel: ControlEvents in, telemetry out, managers on the message thread.
+### Phase 6: React WebView UI
+
+**Built**
+- `AppCore` (managers + message-thread pump) shared by two front ends: `WebUI`
+  (the instrument's face) and `ClassicUI` (the former placeholder, now a fallback:
+  `--classic` / `TIDEFIELD_CLASSIC_UI=1`, or automatic when the built UI is missing).
+- `WebUI`: WebBrowserComponent with one native function and event pushes, resource
+  provider for the built UI (bundle `Resources/ui`, next to the binary, or the source
+  tree in dev builds), `TIDEFIELD_UI_DEV` for Vite hot reload, file choosers for
+  samples, audio settings dialog, sample peaks for waveforms.
+- `io/UiProtocol`: schema (params, strips, slots, processors with declarative display
+  maps, scales, names, limits) and a delta telemetry encoder (tested).
+- `dsp::DisplayMap` replaces per-processor format functions (C++ and TS format the
+  same way; tested on both sides).
+- `ui/`: Vite + React 19 + TypeScript, Inter variable font, tokens. Bridge (JUCE
+  protocol client) and a browser mock engine using the real schema. Store with
+  per-parameter subscriptions. Components: Knob, Fader, Choice (pills/tiles), Button,
+  Meter, Keyboard, Section, ContextMenu, Toasts. Visuals: TerrainView (living field),
+  Waveform with grains, pitch lanes. Views: Perform (with responsive rules for short
+  windows) and Edit (global, drone, clouds, resonator, Bloom, input, mixer, effects,
+  scenes, MIDI).
+- CMake builds the UI with npm (`tidefield_ui`) and copies it into the app; a ctest
+  guards the mock schema against drift.
+
+**Verified**: TypeScript strict typecheck, vitest (format/mapping parity with the
+engine), production build; screenshots of every page in the browser mock at 1440x900
+and 1100x720; the real app on Linux (WebKitGTK under Xvfb) loads the UI, completes the
+`hello` handshake and shows the engine's real state. 89 ctest tests pass.
+
+**Untested (needs the Mac)**: WKWebView specifics (first-mouse, keyboard focus,
+scrolling feel), live telemetry and visuals with real audio running (here the mock
+drove the visuals; the container has no sound device), text input focus inside the
+WebView for scene renaming, DPI on a Retina display.
+
+## Next: phase 7
+Recording the master (and optional stems) to disk, CPU guardrails (load measurement
+in the engine, degradation policy with hysteresis, voice/grain caps), and polish.
 
 ## How to run
 ```

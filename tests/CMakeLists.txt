@@ -6,11 +6,13 @@ add_executable(tidefield_tests
     dsp/FilterTests.cpp
     dsp/LimiterTests.cpp
     dsp/DroneTests.cpp
+    dsp/Phase3DspTests.cpp
     engine/SpscQueueTests.cpp
     engine/ParamTests.cpp
     engine/MasterChainTests.cpp
     engine/EngineTests.cpp
-    engine/TerrainTests.cpp)
+    engine/TerrainTests.cpp
+    engine/Phase3EngineTests.cpp)
 
 target_include_directories(tidefield_tests PRIVATE ${CMAKE_CURRENT_SOURCE_DIR})
 target_link_libraries(tidefield_tests PRIVATE tidefield_engine Catch2::Catch2WithMain)

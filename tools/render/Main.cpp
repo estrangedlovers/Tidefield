@@ -10,6 +10,8 @@
 #include "Score.h"
 
 #include <engine/Engine.h>
+#include <engine/mix/FxManager.h>
+#include <io/AudioFileIO.h>
 
 #include <dsp/core/Random.h>
 
@@ -117,6 +119,33 @@ int main(int argc, char** argv)
         tf::engine::Engine engine(config);
         engine.prepare(score.sampleRate, score.blockSize);
 
+        tf::engine::FxManager fx(engine);
+        if (score.defaultFx)
+            fx.loadDefaultLayout();
+        for (const auto& f : score.fx)
+            fx.setType(f.slot, f.type);
+
+        for (const auto& sm : score.samples)
+        {
+            juce::String error;
+            auto buffer = tf::io::loadSample(sm.file, error);
+            if (buffer == nullptr)
+                throw std::runtime_error(error.toStdString());
+            if (! engine.loadCloudSample(sm.cloud, std::move(buffer)))
+                throw std::runtime_error("Could not load sample into cloud " + std::to_string(sm.cloud));
+        }
+
+        std::unique_ptr<tf::dsp::SampleBuffer> input;
+        if (score.input != juce::File())
+        {
+            juce::String error;
+            input = tf::io::loadSample(score.input, error);
+            if (input == nullptr)
+                throw std::runtime_error(error.toStdString());
+        }
+        std::vector<float> inputBlock(static_cast<std::size_t>(score.blockSize));
+        std::size_t inputPos = 0;
+
         tf::engine::SceneManager scenes(engine);
         for (auto p : score.pins)
             scenes.setPinned(p, true);
@@ -144,9 +173,21 @@ int main(int argc, char** argv)
             block = static_cast<int>(std::min<std::uint64_t>(static_cast<std::uint64_t>(block), total - pos));
 
             float* ptrs[2] = { out[0].data() + pos, out[1].data() + pos };
-            engine.process(nullptr, 0, ptrs, 2, block);
+            if (input != nullptr)
+            {
+                for (int i = 0; i < block; ++i, ++inputPos)
+                    inputBlock[static_cast<std::size_t>(i)] = input->left[inputPos % input->size()];
+                const float* ins[2] = { inputBlock.data(), inputBlock.data() };
+                engine.process(ins, 2, ptrs, 2, block);
+            }
+            else
+            {
+                engine.process(nullptr, 0, ptrs, 2, block);
+            }
 
             scenes.tick();
+            fx.tick();
+            engine.collectGarbage();
             tf::engine::TelemetryFrame frame;
             while (engine.popTelemetry(frame)) {}
             tf::engine::EngineNotice notice;

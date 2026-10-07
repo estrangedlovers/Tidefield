@@ -79,6 +79,10 @@ public:
         return changed;
     }
 
+    /** Audio thread. True if a newer snapshot is waiting (lets the owner fade out
+        before acquire() swaps it in). */
+    bool hasPending() const noexcept { return toAudio.sizeApprox() > 0; }
+
     /** Audio thread. May be null before the first publish. */
     const T* current() const noexcept { return live; }
 

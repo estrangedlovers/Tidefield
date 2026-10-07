@@ -12,6 +12,7 @@ target_compile_definitions(tidefield_render PRIVATE
 
 target_link_libraries(tidefield_render PRIVATE
     tidefield_engine
+    tidefield_io
     juce::juce_core
     juce::juce_audio_basics
     juce::juce_audio_formats

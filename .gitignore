@@ -7,4 +7,5 @@ out/
 node_modules/
 ui/dist/
 *.wav
+!resources/samples/*.wav
 !resources/**/*.wav

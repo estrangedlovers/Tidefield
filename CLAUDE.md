@@ -20,6 +20,8 @@ before changing anything. Update `PROGRESS.md` at the end of every phase or sess
 4. **Denormal protection on all feedback paths.** The audio callback and the render
    harness both install `ScopedFlushDenormals`, and every recursive state (filters,
    delays, reverbs, resonators, envelopes) also calls `flushDenormal()` on its state.
+   High-Q float recursions can also settle into rounding limit cycles above the
+   denormal range; gate those explicitly (see `ResonatorBank`).
 5. **DSP is independent of the UI.** `src/dsp` and `src/engine` are plain C++20 with no
    JUCE dependency, so they build and unit-test headless. JUCE is used only in
    `src/app`, `src/io` and `tools/`.
@@ -34,6 +36,19 @@ dsp     <- engine <- io/app/tools/tests
 ```
 
 `dsp` must never include from `engine`. `engine` must never include from `app` or `io`.
+`tidefield_io` is a CMake INTERFACE library: each executable compiles it against its
+own JUCE modules, so JUCE module code is never linked twice.
+
+## Where things go
+
+- New sound source: DSP class in `src/dsp/sources/<name>`, a strip in
+  `engine/mix/Layout.h`, its parameters in `ParamDefs.h`, wiring in `Engine.cpp`.
+- New effect: implement `dsp::Processor` and register it in `ProcessorFactory`; it is
+  then loadable into any of the 22 FX slots with no engine changes. JUCE-based
+  effects (the imported shimmer and fuzz) live in a separate library and register
+  themselves at startup.
+- Anything that allocates or touches files: message thread or worker, handed to the
+  audio thread through `SnapshotChannel`, `FxSlot` or `SpscQueue`.
 
 ## Build
 
@@ -41,7 +56,8 @@ dsp     <- engine <- io/app/tools/tests
 cmake --preset dev            # Debug, tests + render harness (+ app on macOS)
 cmake --build --preset dev
 ctest --preset dev
-./build/dev/tools/render/tidefield_render scores/drone_basic.json -o out/drone_basic.wav
+./build/dev/tools/render/tidefield_render scores/ecosystem.json -o out/ecosystem.wav --strict
+python3 tools/scripts/spectrogram.py out/ecosystem.wav   # needs numpy + matplotlib
 ```
 
 Presets live in `CMakePresets.json`; CLion picks them up. JUCE 8 and Catch2 are fetched

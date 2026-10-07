@@ -26,7 +26,13 @@ include(cmake/Dependencies.cmake)
 # ---------------------------------------------------------------------------
 add_library(tidefield_dsp STATIC
     src/dsp/fx/Limiter.cpp
+    src/dsp/fx/ProcessorFactory.cpp
+    src/dsp/fx/delay/TapeDelay.cpp
+    src/dsp/fx/medium/Medium.cpp
+    src/dsp/fx/reverb/FdnReverb.cpp
     src/dsp/sources/drone/DroneGenerator.cpp
+    src/dsp/sources/granular/GranularCloud.cpp
+    src/dsp/sources/resonator/ResonatorBank.cpp
 )
 target_include_directories(tidefield_dsp PUBLIC src)
 tf_set_warnings(tidefield_dsp)
@@ -39,9 +45,20 @@ add_library(tidefield_engine STATIC
     src/engine/params/ParamRegistry.cpp
     src/engine/master/MasterChain.cpp
     src/engine/scene/SceneManager.cpp
+    src/engine/mix/FxManager.cpp
 )
 target_link_libraries(tidefield_engine PUBLIC tidefield_dsp)
 tf_set_warnings(tidefield_engine)
+
+# ---------------------------------------------------------------------------
+# tidefield_io: JUCE-based file and session code. An INTERFACE library: each
+# executable compiles these sources against its own JUCE modules, so JUCE module
+# code is never linked twice.
+# ---------------------------------------------------------------------------
+add_library(tidefield_io INTERFACE)
+target_sources(tidefield_io INTERFACE
+    ${CMAKE_CURRENT_SOURCE_DIR}/src/io/AudioFileIO.cpp)
+target_link_libraries(tidefield_io INTERFACE tidefield_engine)
 
 if(TIDEFIELD_BUILD_RENDER)
     add_subdirectory(tools/render)

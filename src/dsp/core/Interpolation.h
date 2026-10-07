@@ -1,0 +1,35 @@
+#pragma once
+
+#include <cstddef>
+
+namespace tf::dsp {
+
+/** 4-point, 3rd-order Hermite interpolation. x0 is the sample before the read
+    position, x1 the one at it; t is the fraction in [0, 1). */
+inline float hermite(float xm1, float x0, float x1, float x2, float t) noexcept
+{
+    const float c = 0.5f * (x1 - xm1);
+    const float v = x0 - x1;
+    const float w = c + v;
+    const float a = w + v + 0.5f * (x2 - x0);
+    const float b = w + a;
+    return ((a * t - b) * t + c) * t + x0;
+}
+
+/** Hermite read from a non-wrapping buffer; out-of-range neighbours read as zero. */
+inline float readHermite(const float* data, std::size_t size, double position) noexcept
+{
+    if (position < 0.0 || size < 2)
+        return 0.0f;
+    const auto i = static_cast<std::size_t>(position);
+    if (i >= size)
+        return 0.0f;
+    const float t = static_cast<float>(position - static_cast<double>(i));
+    const float xm1 = i > 0 ? data[i - 1] : 0.0f;
+    const float x0 = data[i];
+    const float x1 = i + 1 < size ? data[i + 1] : 0.0f;
+    const float x2 = i + 2 < size ? data[i + 2] : 0.0f;
+    return hermite(xm1, x0, x1, x2, t);
+}
+
+} // namespace tf::dsp

@@ -1,0 +1,38 @@
+{
+  "duration": 90,
+  "sampleRate": 48000,
+  "blockSize": 256,
+  "seed": 12,
+  "samples": [
+    { "cloud": 0, "file": "resources/samples/chord.wav" },
+    { "cloud": 1, "file": "resources/samples/glass.wav" }
+  ],
+  "input": "resources/samples/pluck.wav",
+  "events": [
+    { "t": 0,  "param": "master.fadeSeconds", "value": 6 },
+    { "t": 0,  "param": "drone.level", "value": -6 },
+    { "t": 0,  "param": "cloud1.density", "value": 18 },
+    { "t": 0,  "param": "cloud1.grainMs", "value": 420 },
+    { "t": 0,  "param": "cloud1.spray", "value": 0.4 },
+    { "t": 0,  "param": "cloud1.scan", "value": 0.3 },
+    { "t": 0,  "param": "cloud2.density", "value": 6 },
+    { "t": 0,  "param": "cloud2.pitch", "value": -12 },
+    { "t": 0,  "param": "cloud2.harmonize", "value": 0.7 },
+    { "t": 0,  "param": "cloud2.reverse", "value": 0.5 },
+    { "t": 0,  "param": "cloud2.level", "value": -8 },
+    { "t": 0,  "param": "res.rain", "value": 0.35 },
+    { "t": 0,  "param": "res.exciteInput", "value": 0.6 },
+    { "t": 0,  "param": "medium.type", "value": 1 },
+    { "t": 0,  "param": "medium.age", "value": 0.4 },
+    { "t": 0,  "cmd": "fadeIn" },
+    { "t": 20, "param": "input.armed", "value": 1 },
+    { "t": 20, "param": "input.level", "value": -10 },
+    { "t": 30, "param": "harmony.root", "value": 9 },
+    { "t": 30, "param": "harmony.morph", "value": 12 },
+    { "t": 45, "param": "tide.rate", "value": 4 },
+    { "t": 55, "param": "tide.rate", "value": 0.3 },
+    { "t": 60, "param": "medium.type", "value": 2 },
+    { "t": 70, "param": "medium.type", "value": 3 },
+    { "t": 80, "cmd": "fadeOut" }
+  ]
+}

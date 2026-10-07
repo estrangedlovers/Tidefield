@@ -1,5 +1,7 @@
 #include "Score.h"
 
+#include <engine/mix/FxManager.h>
+
 #include <algorithm>
 #include <stdexcept>
 
@@ -91,6 +93,34 @@ Score Score::load(const juce::File& file, const engine::ParamRegistry& registry)
             s.scenes.push_back(std::move(scene));
         }
     }
+
+    auto resolve = [&](const juce::String& path) {
+        const auto cwd = juce::File::getCurrentWorkingDirectory().getChildFile(path);
+        if (cwd.existsAsFile())
+            return cwd;
+        const auto rel = file.getParentDirectory().getChildFile(path);
+        if (rel.existsAsFile())
+            return rel;
+        throw std::runtime_error("File not found: " + path.toStdString());
+    };
+
+    if (const auto* samples = root.getProperty("samples", juce::var()).getArray())
+        for (const auto& sm : *samples)
+            s.samples.push_back({ static_cast<int>(sm.getProperty("cloud", 0)), resolve(sm.getProperty("file", "").toString()) });
+
+    if (const auto* fx = root.getProperty("fx", juce::var()).getArray())
+        for (const auto& f : *fx)
+        {
+            const auto slotId = f.getProperty("slot", "").toString().toStdString();
+            const int slot = engine::FxManager::findSlot(slotId);
+            if (slot < 0)
+                throw std::runtime_error("Unknown FX slot in score: " + slotId);
+            s.fx.push_back({ slot, f.getProperty("type", "").toString().toStdString() });
+        }
+
+    s.defaultFx = static_cast<bool>(root.getProperty("defaultFx", true));
+    if (root.hasProperty("input"))
+        s.input = resolve(root["input"].toString());
 
     if (const auto* pins = root.getProperty("pins", juce::var()).getArray())
         for (const auto& id : *pins)

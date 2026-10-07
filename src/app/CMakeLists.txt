@@ -12,7 +12,10 @@ target_sources(Tidefield PRIVATE
     Main.cpp
     AudioHost.cpp
     MainComponent.cpp
-    TerrainPad.cpp)
+    TerrainPad.cpp
+    ui/KnobPanel.cpp
+    ui/Pages.cpp
+    ui/ParamKnob.cpp)
 
 target_compile_definitions(Tidefield PRIVATE
     JUCE_WEB_BROWSER=0            # turned on in phase 6 for the React UI
@@ -22,6 +25,7 @@ target_compile_definitions(Tidefield PRIVATE
 
 target_link_libraries(Tidefield PRIVATE
     tidefield_engine
+    tidefield_io
     juce::juce_audio_utils
     juce::juce_audio_devices
     juce::juce_gui_extra

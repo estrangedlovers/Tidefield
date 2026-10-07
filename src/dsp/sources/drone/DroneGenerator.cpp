@@ -53,10 +53,12 @@ void DroneGenerator::prepare(const ProcessSpec& newSpec, std::uint64_t seed)
         v.filter.prepare(spec.sampleRate);
         v.interval = v.pendingInterval = kInitialIntervals[static_cast<size_t>(i)];
         v.basePan = (i % 2 == 0 ? -1.0f : 1.0f) * (0.2f + 0.15f * static_cast<float>(i / 2));
+        v.seed = (static_cast<float>(i) + 0.5f) / kMaxVoices; // voices migrate in a fixed order
         for (auto& ph : v.phase)
             ph = static_cast<double>(rng.nextFloat());
     }
     reset();
+    snapPitch = true;
 }
 
 void DroneGenerator::reset() noexcept
@@ -132,8 +134,13 @@ void DroneGenerator::updateControl(float dt) noexcept
             v.revoicing = v.pendingInterval != v.interval;
         }
 
-        // Pitch: root + interval + slow drift (up to +-12 cents) + oscillator detune.
-        const float note = p.rootNote + v.interval + depth * 0.12f * v.pitchDrift.getValue();
+        // Pitch: root + interval pulled toward the key, gliding to new targets (key
+        // changes, re-voicing), then slow drift (up to +-12 cents) and detune on top.
+        float target = p.rootNote + v.interval;
+        if (harmony != nullptr && p.gravity > 0.0f)
+            target = harmony->quantize(target, v.seed, p.gravity);
+        v.note = snapPitch ? target : v.note + (target - v.note) * std::min(1.0f, dt / 1.2f);
+        const float note = v.note + depth * 0.12f * v.pitchDrift.getValue();
         const double baseHz = static_cast<double>(midiToHz(note));
         const double detune = static_cast<double>(p.detuneCents) / 1200.0;
         constexpr std::array<double, 3> spreadFactor { -1.0, 0.0, 1.0 };
@@ -159,6 +166,7 @@ void DroneGenerator::updateControl(float dt) noexcept
         v.gainR = amp * gains.right;
         v.level = amp;
     }
+    snapPitch = false;
 }
 
 float DroneGenerator::renderVoiceSample(Voice& v) noexcept
@@ -229,6 +237,11 @@ float DroneGenerator::getVoiceLevel(int voice) const noexcept
 float DroneGenerator::getVoiceInterval(int voice) const noexcept
 {
     return voice >= 0 && voice < kMaxVoices ? voices[static_cast<size_t>(voice)].interval : 0.0f;
+}
+
+float DroneGenerator::getVoiceNote(int voice) const noexcept
+{
+    return voice >= 0 && voice < kMaxVoices ? voices[static_cast<size_t>(voice)].note : 0.0f;
 }
 
 } // namespace tf::dsp

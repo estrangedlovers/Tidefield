@@ -2,6 +2,7 @@
 
 #include "../../core/ProcessSpec.h"
 #include "../../core/Random.h"
+#include "../../harmony/HarmonicGravity.h"
 #include "../../filters/Svf.h"
 #include "../../mod/Drift.h"
 
@@ -36,12 +37,14 @@ public:
         float density = 3.0f;          // number of sounding voices, fractional
         float evolve = 0.3f;           // 0..1, how often voices re-voice
         float spread = 0.7f;           // stereo width of the ensemble
+        float gravity = 0.0f;          // pull toward the harmonic gravity scale
     };
 
     void prepare(const ProcessSpec& spec, std::uint64_t seed);
     void reset() noexcept;
 
     void setParams(const Params& p) noexcept { params = p; }
+    void setHarmony(const HarmonicGravity* h) noexcept { harmony = h; }
 
     /** Writes (does not add) numSamples of stereo output. timeScale multiplies all
         modulation and evolution rates. */
@@ -52,6 +55,9 @@ public:
 
     /** Current interval, in semitones from the root, of each voice. */
     float getVoiceInterval(int voice) const noexcept;
+
+    /** Current sounding pitch (MIDI note) of each voice, after gravity and glide. */
+    float getVoiceNote(int voice) const noexcept;
 
 private:
     struct Voice
@@ -68,6 +74,8 @@ private:
         bool fadingIn = false;
         float level = 0.0f;         // for telemetry
         float basePan = 0.0f;
+        float seed = 0.0f;          // stable, decides when this voice follows a key change
+        float note = 0.0f;          // gliding pitch (root + interval, pulled to the key)
 
         // Per-control-tick cached values.
         std::array<double, 3> increment {};
@@ -85,6 +93,8 @@ private:
     float sineMix = 0.3f;
     float noiseGain = 0.0f;
     int samplesUntilControl = 0;
+    const HarmonicGravity* harmony = nullptr;
+    bool snapPitch = true;
 };
 
 } // namespace tf::dsp

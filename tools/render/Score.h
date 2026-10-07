@@ -28,6 +28,11 @@ namespace tf::tools {
       "scenes": [ { "name": "Dawn", "x": 0.2, "y": 0.3,
                     "values": { "drone.cutoff": 400, "drone.density": 2 } } ]
       "pins": [ "drone.level" ]         parameters the terrain must not touch
+      "samples": [ { "cloud": 0, "file": "resources/samples/glass.wav" } ]
+      "fx": [ { "slot": "drone.fx1", "type": "tf.medium" } ]   (after the default layout)
+      "defaultFx": false                skip the default reverb/delay layout
+      "input": "path.wav"               loops a file into the live input
+    Relative paths resolve against the working directory, then the score's folder.
     Events may also be { "t": 5, "cmd": "releaseLive" }. */
 struct Score
 {
@@ -45,6 +50,13 @@ struct Score
     std::vector<TimedEvent> events; // sorted by sample
     std::vector<engine::Scene> scenes;
     std::vector<engine::ParamIndex> pins;
+
+    struct SampleLoad { int cloud = 0; juce::File file; };
+    struct FxLoad { int slot = 0; std::string type; };
+    std::vector<SampleLoad> samples;
+    std::vector<FxLoad> fx;
+    bool defaultFx = true;
+    juce::File input;
 
     /** Throws std::runtime_error with a readable message on bad input. */
     static Score load(const juce::File& file, const engine::ParamRegistry& registry);

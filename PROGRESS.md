@@ -2,7 +2,7 @@
 
 Read `CLAUDE.md` (rules) and `docs/ARCHITECTURE.md` (design) first.
 
-## Status: phase 2 complete, phase 3 next
+## Status: phase 3 complete, phase 4 next
 
 ### Phase 1: skeleton, device settings, safety chain, drone, render harness
 
@@ -113,10 +113,57 @@ allocations). `terrain_sweep` passes `--strict`. App compiles and the layout ren
 
 **Untested**: interaction feel of the pad on a real trackpad; how morphs sound.
 
-## Next: phase 3
-Granular cloud (4 slots), resonator bank, live input; mixer with sends A/B, FX
-chains with a `Processor` interface and factory, reverb and delay; Tide clock;
-harmonic gravity; the Medium stage on the master.
+### Phase 3: sources, mixer, buses, Tide, harmonic gravity, Medium
+
+**Built**
+- DSP (`src/dsp`, no JUCE): `SampleBuffer`, Hermite `DelayLine`, `Scale` (12
+  built-in scales) and `HarmonicGravity` (voice-by-voice key migration),
+  `GranularCloud` (96-grain pool, perc/Hann/Tukey windows, spray, scan, reverse,
+  harmonize, gravity), `ResonatorBank` (24 unity-gain two-pole modes: harmonic,
+  scale-chordal or bell tunings; rain self-excitation; -200 dB floor gate against
+  float limit cycles), `LiveInput` (channel, gain, low cut, soft gate), `Biquad`,
+  `Processor` interface + `ProcessorFactory`, `FdnReverb` (8-line Householder FDN,
+  modulated, lossless "Hold" freeze), `TapeDelay` (gliding time, wow/flutter, age,
+  saturated feedback up to 110%), `Medium` (Digital, Cassette, Vinyl, Noisy sampler;
+  3 ms common base delay so mix and 300 ms type crossfades are phase-coherent) and
+  `MediumProcessor` for FX slots.
+- Engine: fixed layout of 8 strips (drone, clouds 1-4, resonator, input, bloom) with
+  level/pan/width/2 post-fader sends; 22 FX slots (2 inserts per strip, 2 per bus, 2
+  on master) with generic `p1..p6 + mix` parameters whose meaning comes from the loaded
+  processor; `FxSlot` crossfades processor swaps (50 ms) and retires old ones to the
+  message thread; `FxManager` creates/prepares processors off the audio thread
+  (default layout: reverb on bus A, delay on bus B). Clouds receive samples through
+  per-cloud snapshot channels with a 30 ms fade-out/swap/fade-in. Tide scales every
+  modulation rate. Harmonic gravity drives drone voices, grains and resonator modes.
+  Medium sits on the master before the safety chain. Telemetry carries strip meters,
+  grains, mode levels, voice notes, input level, tide, key and morph progress.
+- `src/io` (JUCE, INTERFACE library): `loadSample` / `writeSample`.
+- Render harness: `samples`, `fx`, `defaultFx`, `input` in scores;
+  `scores/ecosystem.json` (90 s, every source, key change, tide, all Medium types).
+- `resources/samples/*.wav`: four original synthesized one-shots
+  (`tools/scripts/make_samples.py`). `tools/scripts/spectrogram.py` plots renders.
+- Placeholder app restructured: Perform / Sources / Mixer / FX tabs, shared
+  `ParamKnob` (follows telemetry, gold when live, Alt-click releases), sample loading
+  per cloud (decoded off the message thread), FX type menus with processor-specific
+  control names and value formatting; empty FX slots collapse. The modal "no device"
+  prompt was replaced by a status warning and highlighted Audio Settings button.
+
+**Verified**: 63 tests pass, including every factory processor allocation-free and
+finite, reverb tail reaching exact zero and Hold sustaining within 6 dB over 40 s
+without growing, delay self-oscillation bounded, resonator pitch accuracy and
+stability at 60 s decay, Medium bypass exactness and click-free type changes, FX
+hot-swap without clicks, cloud sample swaps, input arming, voice-by-voice key
+migration, Tide scaling, and a full engine (every slot loaded, all clouds, input,
+wander) with zero audio-thread allocations. All five scores pass `--strict`;
+ecosystem renders 90 s in 4.4 s on one container core.
+
+**Untested (needs the Mac)**: CPU on the M1 Pro with everything running; real
+instrument input; how Medium types, reverb hold and the key morph *sound*.
+
+## Next: phase 4
+Catch (40 s master ring buffer, capture to a cloud slot via the worker), sample
+import UI path, the Bloom one-shot keyboard (six transforms), session save/recall
+(`.tidefield` zip with JSON + FLAC, schema version, migrations).
 
 ## How to run
 ```

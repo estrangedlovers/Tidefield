@@ -20,6 +20,43 @@ inline constexpr unsigned kDiscrete = 1u << 4;      // integer choice; scenes pi
 // clang-format off
 // X(enumName, "stable.id", "Display Name", min, max, default, Taper, Smoothing, smoothSeconds, "unit", flags)
 // IDs are persisted in session files: never rename one without adding a migration.
+// Display names inside a strip/slot are short ("Level"): the UI shows the group name.
+
+#define TF_TB_ML (kTerrainBound | kMidiLearnable)
+
+/** Mixer strip: level, pan, width, post-fader sends to bus A (reverb) and B (delay). */
+#define TF_STRIP(X, Name, id, level, sendA, sendB)                                                                          \
+    X(Name##Level, id ".level", "Level",       -60.0f, 6.0f, level, Decibel, Linear, 0.05f, "dB", TF_TB_ML | kPerformance) \
+    X(Name##Pan,   id ".pan",   "Pan",          -1.0f, 1.0f,  0.0f, Linear,  Linear, 0.05f, "",   TF_TB_ML)                 \
+    X(Name##Width, id ".width", "Width",         0.0f, 2.0f,  1.0f, Linear,  Linear, 0.05f, "",   TF_TB_ML)                 \
+    X(Name##SendA, id ".sendA", "Reverb Send", -60.0f, 0.0f, sendA, Decibel, Linear, 0.05f, "dB", TF_TB_ML)                 \
+    X(Name##SendB, id ".sendB", "Delay Send",  -60.0f, 0.0f, sendB, Decibel, Linear, 0.05f, "dB", TF_TB_ML)
+
+/** FX slot: six generic controls (meaning set by the loaded processor) and mix. */
+#define TF_FX_SLOT(X, Name, id)                                                                               \
+    X(Name##P1,  id ".p1",  "Control 1", 0.0f, 1.0f, 0.5f, Linear, Exponential, 0.08f, "", TF_TB_ML)          \
+    X(Name##P2,  id ".p2",  "Control 2", 0.0f, 1.0f, 0.5f, Linear, Exponential, 0.08f, "", TF_TB_ML)          \
+    X(Name##P3,  id ".p3",  "Control 3", 0.0f, 1.0f, 0.5f, Linear, Exponential, 0.08f, "", TF_TB_ML)          \
+    X(Name##P4,  id ".p4",  "Control 4", 0.0f, 1.0f, 0.5f, Linear, Exponential, 0.08f, "", TF_TB_ML)          \
+    X(Name##P5,  id ".p5",  "Control 5", 0.0f, 1.0f, 0.5f, Linear, Exponential, 0.08f, "", TF_TB_ML)          \
+    X(Name##P6,  id ".p6",  "Control 6", 0.0f, 1.0f, 0.5f, Linear, Exponential, 0.08f, "", TF_TB_ML)          \
+    X(Name##Mix, id ".mix", "Mix",       0.0f, 1.0f, 1.0f, Linear, Linear,      0.05f, "", TF_TB_ML)
+
+/** Granular cloud slot. */
+#define TF_CLOUD(X, Name, id)                                                                                                      \
+    X(Name##Density,     id ".density",     "Density",      0.5f, 200.0f, 12.0f, Log,    LogExponential, 0.3f, "/s", TF_TB_ML | kPerformance) \
+    X(Name##GrainMs,     id ".grainMs",     "Grain Size",  10.0f, 2000.0f, 180.0f, Log,  LogExponential, 0.3f, "ms", TF_TB_ML)  \
+    X(Name##Position,    id ".position",    "Position",     0.0f, 1.0f,    0.3f, Linear, Exponential,    0.5f, "",   TF_TB_ML)  \
+    X(Name##Spray,       id ".spray",       "Spray",        0.0f, 1.0f,    0.15f, Linear, Exponential,   0.3f, "",   TF_TB_ML)  \
+    X(Name##Scan,        id ".scan",        "Scan",        -1.0f, 1.0f,    0.0f, Linear, Exponential,    0.5f, "",   TF_TB_ML | kTideScaled) \
+    X(Name##Pitch,       id ".pitch",       "Pitch",      -24.0f, 24.0f,   0.0f, Linear, Exponential,    0.3f, "st", TF_TB_ML)  \
+    X(Name##PitchSpread, id ".pitchSpread", "Detune",       0.0f, 1.0f,    0.1f, Linear, Exponential,    0.3f, "",   TF_TB_ML)  \
+    X(Name##Harmonize,   id ".harmonize",   "Harmonize",    0.0f, 1.0f,    0.0f, Linear, Exponential,    0.3f, "",   TF_TB_ML)  \
+    X(Name##Reverse,     id ".reverse",     "Reverse",      0.0f, 1.0f,    0.0f, Linear, Exponential,    0.3f, "",   TF_TB_ML)  \
+    X(Name##Shape,       id ".shape",       "Envelope",     0.0f, 1.0f,    0.5f, Linear, Exponential,    0.3f, "",   TF_TB_ML)  \
+    X(Name##Stereo,      id ".stereo",      "Stereo",       0.0f, 1.0f,    0.7f, Linear, Exponential,    0.3f, "",   TF_TB_ML)  \
+    X(Name##Gravity,     id ".gravity",     "Gravity",      0.0f, 1.0f,    0.0f, Linear, Exponential,    0.3f, "",   TF_TB_ML)
+
 #define TF_PARAM_LIST(X)                                                                                                         \
     X(MasterLevel,      "master.level",       "Master Level",    -60.0f,   6.0f,    0.0f, Decibel, Linear,         0.05f, "dB", kMidiLearnable | kPerformance) \
     X(MasterFadeSecs,   "master.fadeSeconds", "Fade Length",       0.5f, 120.0f,    8.0f, Log,     Linear,         0.0f,  "s",  kMidiLearnable | kPerformance) \
@@ -31,20 +68,71 @@ inline constexpr unsigned kDiscrete = 1u << 4;      // integer choice; scenes pi
     X(TerrainWander,    "terrain.wander",     "Wander",            0.0f,   1.0f,    0.0f, Linear,  Exponential,    0.5f,  "",   kMidiLearnable | kPerformance) \
     X(TerrainWanderRate,"terrain.wanderRate", "Wander Rate",       0.002f, 0.5f,    0.03f, Log,    LogExponential, 0.5f,  "Hz", kMidiLearnable | kTideScaled) \
     X(TerrainWanderStyle,"terrain.wanderStyle","Wander Style",     0.0f,   2.0f,    0.0f, Linear,  Linear,         0.0f,  "",   kMidiLearnable | kDiscrete) \
-    X(DroneLevel,       "drone.level",        "Drone Level",     -60.0f,   6.0f,    0.0f, Decibel, Linear,         0.05f, "dB", kTerrainBound | kMidiLearnable | kPerformance) \
-    X(DronePan,         "drone.pan",          "Drone Pan",        -1.0f,   1.0f,    0.0f, Linear,  Linear,         0.05f, "",   kTerrainBound | kMidiLearnable) \
-    X(DroneWidth,       "drone.width",        "Drone Width",       0.0f,   2.0f,    1.0f, Linear,  Linear,         0.05f, "",   kTerrainBound | kMidiLearnable) \
-    X(DroneRoot,        "drone.root",         "Root Note",        24.0f,  72.0f,   38.0f, Linear,  Exponential,    0.8f,  "st", kTerrainBound | kMidiLearnable) \
-    X(DroneDetune,      "drone.detune",       "Detune",            0.0f,  50.0f,    8.0f, Linear,  Exponential,    0.3f,  "ct", kTerrainBound | kMidiLearnable) \
-    X(DroneShape,       "drone.shape",        "Shape",             0.0f,   1.0f,    0.3f, Linear,  Exponential,    0.3f,  "",   kTerrainBound | kMidiLearnable) \
-    X(DroneCutoff,      "drone.cutoff",       "Brightness",       60.0f, 12000.0f, 900.0f, Log,    LogExponential, 0.3f,  "Hz", kTerrainBound | kMidiLearnable | kPerformance) \
-    X(DroneResonance,   "drone.resonance",    "Resonance",         0.0f,   0.95f,   0.2f, Linear,  Exponential,    0.2f,  "",   kTerrainBound | kMidiLearnable) \
-    X(DroneNoise,       "drone.noise",        "Breath",            0.0f,   1.0f,    0.1f, Linear,  Exponential,    0.2f,  "",   kTerrainBound | kMidiLearnable) \
-    X(DroneDriftDepth,  "drone.driftDepth",   "Drift Depth",       0.0f,   1.0f,    0.5f, Linear,  Exponential,    0.5f,  "",   kTerrainBound | kMidiLearnable) \
-    X(DroneDriftRate,   "drone.driftRate",    "Drift Rate",        0.005f, 2.0f,    0.05f, Log,    LogExponential, 0.5f,  "Hz", kTerrainBound | kMidiLearnable | kTideScaled) \
-    X(DroneDensity,     "drone.density",      "Density",           1.0f,   6.0f,    3.0f, Linear,  Exponential,    0.5f,  "",   kTerrainBound | kMidiLearnable | kPerformance) \
-    X(DroneEvolve,      "drone.evolve",       "Evolve",            0.0f,   1.0f,    0.3f, Linear,  Exponential,    0.5f,  "",   kTerrainBound | kMidiLearnable) \
-    X(DroneSpread,      "drone.spread",       "Spread",            0.0f,   1.0f,    0.7f, Linear,  Exponential,    0.3f,  "",   kTerrainBound | kMidiLearnable)
+    X(TideRate,         "tide.rate",          "Tide",              0.05f,  8.0f,    1.0f, Log,     LogExponential, 1.5f,  "x",  kMidiLearnable | kPerformance | kTerrainBound) \
+    X(HarmonyRoot,      "harmony.root",       "Key",               0.0f,  11.0f,    2.0f, Linear,  Linear,         0.0f,  "",   TF_TB_ML | kDiscrete | kPerformance) \
+    X(HarmonyScale,     "harmony.scale",      "Scale",             0.0f,  11.0f,    1.0f, Linear,  Linear,         0.0f,  "",   TF_TB_ML | kDiscrete | kPerformance) \
+    X(HarmonyGravity,   "harmony.gravity",    "Gravity",           0.0f,   1.0f,    0.6f, Linear,  Exponential,    0.5f,  "",   TF_TB_ML | kPerformance) \
+    X(HarmonyMorph,     "harmony.morph",      "Key Morph",         0.5f,  60.0f,    8.0f, Log,     Linear,         0.0f,  "s",  kMidiLearnable) \
+    X(MediumType,       "medium.type",        "Medium",            0.0f,   3.0f,    0.0f, Linear,  Linear,         0.0f,  "",   TF_TB_ML | kDiscrete | kPerformance) \
+    X(MediumAge,        "medium.age",         "Age",               0.0f,   1.0f,    0.3f, Linear,  Exponential,    0.3f,  "",   TF_TB_ML) \
+    X(MediumNoise,      "medium.noise",       "Noise",             0.0f,   1.0f,    0.4f, Linear,  Exponential,    0.3f,  "",   TF_TB_ML) \
+    X(MediumWobble,     "medium.wobble",      "Wobble",            0.0f,   1.0f,    0.3f, Linear,  Exponential,    0.3f,  "",   TF_TB_ML) \
+    X(MediumDrive,      "medium.drive",       "Drive",             0.0f,   1.0f,    0.3f, Linear,  Exponential,    0.3f,  "",   TF_TB_ML) \
+    X(MediumMix,        "medium.mix",         "Medium Mix",        0.0f,   1.0f,    1.0f, Linear,  Linear,         0.05f, "",   TF_TB_ML) \
+    X(BusALevel,        "busA.level",         "Reverb Return",   -60.0f,   6.0f,    0.0f, Decibel, Linear,         0.05f, "dB", TF_TB_ML | kPerformance) \
+    X(BusBLevel,        "busB.level",         "Delay Return",    -60.0f,   6.0f,    0.0f, Decibel, Linear,         0.05f, "dB", TF_TB_ML | kPerformance) \
+    X(DroneRoot,        "drone.root",         "Root Note",        24.0f,  72.0f,   38.0f, Linear,  Exponential,    0.8f,  "st", TF_TB_ML) \
+    X(DroneDetune,      "drone.detune",       "Detune",            0.0f,  50.0f,    8.0f, Linear,  Exponential,    0.3f,  "ct", TF_TB_ML) \
+    X(DroneShape,       "drone.shape",        "Shape",             0.0f,   1.0f,    0.3f, Linear,  Exponential,    0.3f,  "",   TF_TB_ML) \
+    X(DroneCutoff,      "drone.cutoff",       "Brightness",       60.0f, 12000.0f, 900.0f, Log,    LogExponential, 0.3f,  "Hz", TF_TB_ML | kPerformance) \
+    X(DroneResonance,   "drone.resonance",    "Resonance",         0.0f,   0.95f,   0.2f, Linear,  Exponential,    0.2f,  "",   TF_TB_ML) \
+    X(DroneNoise,       "drone.noise",        "Breath",            0.0f,   1.0f,    0.1f, Linear,  Exponential,    0.2f,  "",   TF_TB_ML) \
+    X(DroneDriftDepth,  "drone.driftDepth",   "Drift Depth",       0.0f,   1.0f,    0.5f, Linear,  Exponential,    0.5f,  "",   TF_TB_ML) \
+    X(DroneDriftRate,   "drone.driftRate",    "Drift Rate",        0.005f, 2.0f,    0.05f, Log,    LogExponential, 0.5f,  "Hz", TF_TB_ML | kTideScaled) \
+    X(DroneDensity,     "drone.density",      "Density",           1.0f,   6.0f,    3.0f, Linear,  Exponential,    0.5f,  "",   TF_TB_ML | kPerformance) \
+    X(DroneEvolve,      "drone.evolve",       "Evolve",            0.0f,   1.0f,    0.3f, Linear,  Exponential,    0.5f,  "",   TF_TB_ML) \
+    X(DroneSpread,      "drone.spread",       "Spread",            0.0f,   1.0f,    0.7f, Linear,  Exponential,    0.3f,  "",   TF_TB_ML) \
+    X(DroneGravity,     "drone.gravity",      "Gravity",           0.0f,   1.0f,    1.0f, Linear,  Exponential,    0.3f,  "",   TF_TB_ML) \
+    TF_STRIP(X, Drone,     "drone",     0.0f,  -14.0f, -60.0f) \
+    TF_CLOUD(X, Cloud1, "cloud1") \
+    TF_CLOUD(X, Cloud2, "cloud2") \
+    TF_CLOUD(X, Cloud3, "cloud3") \
+    TF_CLOUD(X, Cloud4, "cloud4") \
+    TF_STRIP(X, Cloud1,    "cloud1",    -3.0f, -10.0f, -24.0f) \
+    TF_STRIP(X, Cloud2,    "cloud2",    -3.0f, -10.0f, -24.0f) \
+    TF_STRIP(X, Cloud3,    "cloud3",    -3.0f, -10.0f, -24.0f) \
+    TF_STRIP(X, Cloud4,    "cloud4",    -3.0f, -10.0f, -24.0f) \
+    X(ResRoot,          "res.root",           "Root Note",        24.0f,  84.0f,   50.0f, Linear,  Exponential,    0.8f,  "st", TF_TB_ML) \
+    X(ResModes,         "res.modes",          "Modes",             1.0f,  24.0f,   16.0f, Linear,  Linear,         0.0f,  "",   TF_TB_ML | kDiscrete) \
+    X(ResStructure,     "res.structure",      "Structure",         0.0f,   1.0f,    0.5f, Linear,  Exponential,    0.8f,  "",   TF_TB_ML | kPerformance) \
+    X(ResDecay,         "res.decay",          "Decay",             0.1f,  60.0f,    6.0f, Log,     LogExponential, 0.5f,  "s",  TF_TB_ML) \
+    X(ResBrightness,    "res.brightness",     "Brightness",        0.0f,   1.0f,    0.5f, Linear,  Exponential,    0.3f,  "",   TF_TB_ML) \
+    X(ResRain,          "res.rain",           "Rain",              0.0f,   1.0f,    0.25f, Linear, Exponential,    0.5f,  "",   TF_TB_ML | kTideScaled | kPerformance) \
+    X(ResRainColour,    "res.rainColour",     "Rain Colour",       0.0f,   1.0f,    0.5f, Linear,  Exponential,    0.3f,  "",   TF_TB_ML) \
+    X(ResSpread,        "res.spread",         "Spread",            0.0f,   1.0f,    0.7f, Linear,  Exponential,    0.3f,  "",   TF_TB_ML) \
+    X(ResGravity,       "res.gravity",        "Gravity",           0.0f,   1.0f,    1.0f, Linear,  Exponential,    0.3f,  "",   TF_TB_ML) \
+    X(ResExciteInput,   "res.exciteInput",    "From Input",        0.0f,   1.0f,    0.0f, Linear,  Exponential,    0.1f,  "",   TF_TB_ML) \
+    X(ResExciteDrone,   "res.exciteDrone",    "From Drone",        0.0f,   1.0f,    0.0f, Linear,  Exponential,    0.1f,  "",   TF_TB_ML) \
+    X(ResExciteClouds,  "res.exciteClouds",   "From Clouds",       0.0f,   1.0f,    0.0f, Linear,  Exponential,    0.1f,  "",   TF_TB_ML) \
+    TF_STRIP(X, Res,       "res",       -4.0f,  -8.0f, -30.0f) \
+    X(InputChannel,     "input.channel",      "Channel",           0.0f,   2.0f,    0.0f, Linear,  Linear,         0.0f,  "",   kDiscrete) \
+    X(InputGain,        "input.gain",         "Input Gain",      -24.0f,  24.0f,    0.0f, Linear,  Linear,         0.05f, "dB", kMidiLearnable) \
+    X(InputHighPass,    "input.highPass",     "Low Cut",          20.0f, 400.0f,   40.0f, Log,     LogExponential, 0.1f,  "Hz", kMidiLearnable) \
+    X(InputGate,        "input.gate",         "Gate",            -90.0f, -20.0f,  -70.0f, Linear,  Linear,         0.05f, "dB", kMidiLearnable) \
+    X(InputArmed,       "input.armed",        "Monitor",           0.0f,   1.0f,    0.0f, Linear,  Linear,         0.03f, "",   kMidiLearnable | kDiscrete | kPerformance) \
+    TF_STRIP(X, Input,     "input",     0.0f, -14.0f, -18.0f) \
+    TF_STRIP(X, Bloom,     "bloom",     0.0f,  -6.0f, -14.0f) \
+    TF_FX_SLOT(X, DroneFx1,  "drone.fx1")  TF_FX_SLOT(X, DroneFx2,  "drone.fx2")  \
+    TF_FX_SLOT(X, Cloud1Fx1, "cloud1.fx1") TF_FX_SLOT(X, Cloud1Fx2, "cloud1.fx2") \
+    TF_FX_SLOT(X, Cloud2Fx1, "cloud2.fx1") TF_FX_SLOT(X, Cloud2Fx2, "cloud2.fx2") \
+    TF_FX_SLOT(X, Cloud3Fx1, "cloud3.fx1") TF_FX_SLOT(X, Cloud3Fx2, "cloud3.fx2") \
+    TF_FX_SLOT(X, Cloud4Fx1, "cloud4.fx1") TF_FX_SLOT(X, Cloud4Fx2, "cloud4.fx2") \
+    TF_FX_SLOT(X, ResFx1,    "res.fx1")    TF_FX_SLOT(X, ResFx2,    "res.fx2")    \
+    TF_FX_SLOT(X, InputFx1,  "input.fx1")  TF_FX_SLOT(X, InputFx2,  "input.fx2")  \
+    TF_FX_SLOT(X, BloomFx1,  "bloom.fx1")  TF_FX_SLOT(X, BloomFx2,  "bloom.fx2")  \
+    TF_FX_SLOT(X, BusAFx1,   "busA.fx1")   TF_FX_SLOT(X, BusAFx2,   "busA.fx2")   \
+    TF_FX_SLOT(X, BusBFx1,   "busB.fx1")   TF_FX_SLOT(X, BusBFx2,   "busB.fx2")   \
+    TF_FX_SLOT(X, MasterFx1, "master.fx1") TF_FX_SLOT(X, MasterFx2, "master.fx2")
 // clang-format on
 
 enum class P : ParamIndex

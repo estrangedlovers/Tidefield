@@ -235,9 +235,12 @@ them can be added without changing the core.
 - **Session**: one `.tidefield` zip (`session.json` + `audio/*.flac`), schema version
   plus a migration per version step. Loads on the worker; swap is crossfaded via the
   master fade.
-- **Recording**: master tap (post-Medium) and optional per-strip stems into
-  `AudioFormatWriter::ThreadedWriter` (lock-free FIFO, background writes), 32-bit
-  float WAV.
+- **Recording** (phase 7): the engine pushes the master (post-Medium, post-limiter)
+  and, for a stem take, each strip post-fader plus both bus returns into
+  `RecordTap`, a preallocated SPSC ring with an Idle/Running/Stopping/Stopped
+  handshake. `io::Recorder` drains it on its own thread into 32-bit float WAVs
+  (`master.wav`, `stems/<strip>.wav`). JUCE's `ThreadedWriter` was not used: it
+  needs a lock to swap writers safely, and one ring keeps every file sample-aligned.
 
 ## 12. MIDI (phase 5)
 
@@ -250,11 +253,16 @@ new map. Notes go to pitched sources and Bloom. The default 8-knob layout is
 `resources/default_midi_map.json`: terrain X, terrain Y, Tide, wander, gravity
 amount, reverb send trim, cloud density, master level.
 
-## 13. CPU guardrails (phase 7)
+## 13. CPU guardrails (phase 7, built)
 
-`AudioProcessLoadMeasurer` in the host (phase 1, displayed). A `DegradationPolicy`
-with hysteresis steps down: grain cap -> resonator modes -> reverb quality -> drone
-voices -> Bloom polyphony, and steps back up slowly. Hard caps apply regardless.
+The engine times each block itself (so a plugin build gets the same behaviour) when
+guardrails are enabled; the app enables them, renders do not. `DegradationPolicy`
+smooths the load (fast rise, slow fall), steps down after 0.35 s above 80 % or at once
+on a block over budget, and steps up after 6 s below 50 %, doubling that hold when it
+pumps. Six levels (`kGuardLevels`) cap cloud grains, then resonator modes, drone
+voices and Bloom polyphony together. Every cut is gentle: grains finish, modes ring
+out over 80 ms, voices release. Reverb quality is not on the ladder (effects are
+opaque processors). Hard caps (pool sizes) apply regardless.
 
 ## 14. UI (phase 6)
 
@@ -284,6 +292,7 @@ four-octave Bloom keyboard. Edit view: global, every source, mixer, effects, sce
 MIDI. Knobs: drag, Shift fine, wheel, double-click default, Alt-click release,
 right-click learn/forget/release/reset; sand = live layer, coral = learning, arrows
 = soft takeover. Shortcuts: Space fade, Esc panic, K catch, C capture, R release,
+Shift+R record,
 Tab switch view, Cmd+N/O/S sessions.
 
 ## 15. Extension points for later features
@@ -307,5 +316,5 @@ Tab switch view, Cmd+N/O/S sessions.
 4. Catch, **sample import + Bloom keyboard**, session save/recall. **(done)**
 5. MIDI learn, soft takeover, note input. **(done)**
 6. React WebView UI: performance view, then edit view. **(done)**
-7. Recording to disk, CPU guardrails, polish.
+7. Recording to disk, CPU guardrails, polish. **(done)**
 8. Ambient feature pack: the approved items from section 10.

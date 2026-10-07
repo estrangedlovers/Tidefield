@@ -48,7 +48,13 @@ own JUCE modules, so JUCE module code is never linked twice.
   effects (the imported shimmer and fuzz) live in a separate library and register
   themselves at startup.
 - Anything that allocates or touches files: message thread or worker, handed to the
-  audio thread through `SnapshotChannel`, `FxSlot` or `SpscQueue`.
+  audio thread through `SnapshotChannel`, `FxSlot` or `SpscQueue`. Audio going the
+  other way (recording) goes through `engine/record/RecordTap`.
+- A new expensive voice or grain pool: give it a limit setter and add a column to
+  `kGuardLevels` in `engine/guard/DegradationPolicy.h`, applied in
+  `Engine::applyGuardLimits`.
+- Renders and tests must stay deterministic: anything that reads a clock (like the
+  guardrails) is off unless the app turns it on.
 
 ## Build
 

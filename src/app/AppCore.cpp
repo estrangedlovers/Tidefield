@@ -21,8 +21,10 @@ AppCore::AppCore(AudioHost& h)
     catcher.onRejected = [this](const std::string& reason) { status(reason, true); };
     midi.onLearned = [this](const std::string& d) { status("MIDI learned: " + juce::String(d)); };
     session.onStatus = [this](const juce::String& m) { status(m); };
-    recorder.onFinished = [this](const juce::File& folder, bool ok) {
-        juce::MessageManager::callAsync([this, folder, ok] {
+    recorder.onFinished = [this, weak = std::weak_ptr<bool>(alive)](const juce::File& folder, bool ok) {
+        juce::MessageManager::callAsync([this, weak, folder, ok] {
+            if (weak.expired())
+                return;
             if (ok)
                 status("Recording saved: " + folder.getFileName());
             else

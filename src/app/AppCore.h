@@ -13,6 +13,7 @@
 #include <juce_events/juce_events.h>
 
 #include <functional>
+#include <memory>
 
 namespace tf::app {
 
@@ -67,6 +68,7 @@ private:
 
     engine::TelemetryFrame lastFrame;
     double recordingRate = 0.0;
+    std::shared_ptr<bool> alive = std::make_shared<bool>(true); // for callbacks posted from other threads
     int lastGuardLevel = 0;
 };
 

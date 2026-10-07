@@ -2,7 +2,7 @@
 
 Read `CLAUDE.md` (rules) and `docs/ARCHITECTURE.md` (design) first.
 
-## Status: phase 6 complete, phase 7 next
+## Status: phase 7 complete, phase 8 (ambient feature pack) next
 
 ### Phase 1: skeleton, device settings, safety chain, drone, render harness
 
@@ -284,15 +284,67 @@ scrolling feel), live telemetry and visuals with real audio running (here the mo
 drove the visuals; the container has no sound device), text input focus inside the
 WebView for scene renaming, DPI on a Retina display.
 
-## Next: phase 7
-Recording the master (and optional stems) to disk, CPU guardrails (load measurement
-in the engine, degradation policy with hysteresis, voice/grain caps), and polish.
+### Phase 7: recording to disk, CPU guardrails, polish
+
+**Built**
+- `engine/record/RecordTap`: the engine's output into a preallocated SPSC ring (4 s
+  at full stem width) with an Idle / Running / Stopping / Stopped state machine. The
+  audio thread latches the channel count per block, drops a whole block rather than
+  letting channels slip if the writer stalls, and never resets the write index (a new
+  take moves the reader instead), so start and stop never race the producer.
+- Stems: `ChannelStrip::processAdd` can also write its post-fader signal; the engine
+  fills strip and bus-return stems only while a stem take runs. Channel layout:
+  master (post-Medium, post-limiter: what the speakers get), the 8 strips, send A
+  and send B returns. The stems sum to the mix before the master chain.
+- `io/Recorder`: background writer thread, 32-bit float WAV, `master.wav` plus
+  `stems/<strip>.wav` in `~/Music/Tidefield/<date> <session>/` (folder choosable).
+  Ends a take cleanly on a write failure (full disk) and when the sample rate changes;
+  reports dropped frames; a stop with no audio running is forced after 1 s.
+- App: record controls in `AppCore` (stems preference and folder in the app
+  settings), a MIDI action "Record" (footswitch), web UI record button with timer,
+  stems marker and right-click menu (stems, folder, reveal), Shift+R; classic panel
+  button with the same menu. Render harness `--stems <dir>` writes a take offline
+  through the same tap.
+- `engine/guard/DegradationPolicy`: smoothed load (fast rise, slow fall), steps down
+  after 0.35 s above 80 % or at once on a block over budget, steps back up after 6 s
+  below 50 %, doubling that hold (to 60 s) when it has to step down again soon after
+  stepping up. Six levels trim cloud grains (96 to 6), resonator modes (24 to 6),
+  drone voices (6 to 2) and Bloom polyphony (8 to 3).
+- The engine times each `process()` (steady clock) when guardrails are enabled (the
+  app enables them; renders and tests leave them off so output stays deterministic).
+  Load and level go out in telemetry; the top bar shows the load and a "lite" badge,
+  and a toast says when quality is reduced and restored.
+- Polish found on the way: lowering the resonator's mode count (by hand or by the
+  guardrails) used to cut ringing modes dead, an audible click; removed modes now
+  stop taking excitation and ring out over 80 ms. Bloom gained a voice limit that
+  releases surplus voices over half a second.
+
+**Verified**: 98 ctest tests pass. New: tap state machine and whole-block dropping;
+the recorded master equals the engine output bit for bit; stems present, silent when
+their source is, and summing to within 3 dB of the master; zero allocations while
+recording stems with guardrails on; policy thresholds, hold times, back-off, spike
+response, NaN rejection; engine levels follow forced load and reset when disabled;
+resonator mode cuts ring out. io test: the recorder's master.wav is bit-exact with
+the output across a background-thread and synchronous drain, stems exist and match
+in length, back-to-back takes. `tidefield_render --stems` on `ecosystem` produces a
+master identical to the render's WAV. Web UI typecheck and build; the record button
+checked in the browser mock; the classic panel under Xvfb.
+
+**Untested (needs the Mac)**: real disk throughput while recording stems at 96 kHz
+(22 channels, about 8 MB/s), the guardrails against real CPU load (thresholds may
+want tuning once heard), reveal-in-Finder, the folder chooser in the WebView app.
+Reverb quality is not part of the degradation ladder: effects are opaque
+`Processor`s; if the FDN shows up in profiles it can grow a quality control.
+
+## Next: phase 8
+The ambient feature pack (ARCHITECTURE.md section 10), all items approved.
 
 ## How to run
 ```
 cmake --preset headless && cmake --build --preset headless
 ./build/headless/tests/tidefield_tests
 ./build/headless/tools/render/tidefield_render scores/drone_basic.json -o out/drone_basic.wav --strict
+./build/headless/tools/render/tidefield_render scores/ecosystem.json -o out/eco.wav --stems out/eco_take
 # macOS app:
 cmake --preset dev && cmake --build --preset dev   # app in build/dev/src/app/Tidefield_artefacts/
 ```

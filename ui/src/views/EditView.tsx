@@ -30,6 +30,16 @@ const PAGES: { group: string; items: { id: string; label: string }[] }[] = [
       { id: "input", label: "Live input" },
     ],
   },
+  {
+    group: "Performance",
+    items: [
+      { id: "gestures", label: "Gestures" },
+      { id: "looper", label: "Looper" },
+      { id: "loops", label: "Loops" },
+      { id: "weather", label: "Weather" },
+      { id: "seasons", label: "Seasons" },
+    ],
+  },
   { group: "Mix", items: [{ id: "mixer", label: "Mixer" }, { id: "fx", label: "Effects" }] },
   { group: "Setup", items: [{ id: "scenes", label: "Scenes" }, { id: "midi", label: "MIDI" }] },
 ];
@@ -210,9 +220,209 @@ function InputPage() {
           </div>
         </Section>
         <Section title="Conditioning">{knobs(["input.gain", "input.highPass", "input.gate"])}</Section>
+        <Section title="Spectral hold">
+          <div className="wide">
+            <Choice param={idx("input.freeze")} label="Hold the input (I)" />
+          </div>
+          {knobs(["input.freezeLevel", "input.freezeDrift"])}
+          <p className="note">Freezes the sound of the input as a wide spectral pad that sustains on its own, heard even when the monitor is off.</p>
+        </Section>
       </div>
       <p className="note">The input always feeds the resonator (From Input) and can be caught (Catch, From: Live input), even while it is not heard.</p>
       <StripSection stripId="input" />
+    </Page>
+  );
+}
+
+function GesturesPage() {
+  return (
+    <Page title="Gestures" subtitle="Moves for a whole room at once: hold to swell, freeze the moment, hold the input.">
+      <div className="grid-3">
+        <Section title="Swell (hold S)">
+          {knobs(["swell.depth", "swell.attack", "swell.release"])}
+          <p className="note">While held, every send blooms, the drone, resonator and Bloom open up and the clouds thicken. The ebb follows Tide.</p>
+        </Section>
+        <Section title="Freeze all (F)">
+          {knobs(["freeze.duck", "freeze.texture"])}
+          <p className="note">Holds the last two seconds of the mix as a granular cloud. Duck sets how far everything else steps back underneath.</p>
+        </Section>
+        <Section title="Hold input (I)">
+          {knobs(["input.freezeLevel", "input.freezeDrift"])}
+        </Section>
+      </div>
+      <StripSection stripId="freeze" />
+    </Page>
+  );
+}
+
+const LOOPER_STATES = ["Empty", "Recording", "Playing", "Overdubbing", "Clearing"];
+
+function LooperPage() {
+  useKey("telemetry");
+  const [state, pos, seconds, passes] = store.telemetry?.perf.looper ?? [0, 0, 0, 0];
+  return (
+    <Page title="Looper" subtitle="A disintegrating tape loop. Every pass rewrites the tape a little worse: darker, quieter, flaking.">
+      <div className="looper-status">
+        <div className="looper-bar" style={{ transform: `scaleX(${pos})` }} />
+        <span>
+          {LOOPER_STATES[state]}
+          {state >= 2 && `: ${seconds.toFixed(1)} s, pass ${passes}`}
+        </span>
+      </div>
+      <div className="row">
+        <Button tone="accent" onClick={() => store.command("loopRecord")}>
+          {["Record", "Close the loop", "Overdub", "Stop overdubbing", "Record"][state]}
+        </Button>
+        <Button onClick={() => store.command("loopClear")}>Clear</Button>
+      </div>
+      <div className="grid-2">
+        <Section title="Tape">
+          <div className="wide">
+            <Choice param={idx("loop.source")} label="Records" />
+          </div>
+          {knobs(["loop.erosion", "loop.flakes", "loop.overdub"])}
+          <p className="note">Erosion 0 repeats the loop exactly. Flakes are moments where the oxide comes away for good.</p>
+        </Section>
+        <StripSection stripId="loop" />
+      </div>
+    </Page>
+  );
+}
+
+function LoopsPage() {
+  useKey("telemetry");
+  const [phases, notes, flashes] = store.telemetry?.perf.loops ?? [[], [], []];
+  const count = Math.round(store.value("loops.count"));
+  const names = store.schema!.noteNames;
+  return (
+    <Page title="Loops" subtitle="Music for Airports: each voice repeats one note on its own long cycle, so the pattern never comes round the same way twice.">
+      <div className="loops-lanes">
+        {Array.from({ length: count }, (_, k) => (
+          <div className="loops-lane" key={k}>
+            <span className="loops-note">{names[Math.round(notes[k] ?? 0) % 12] ?? ""}{Math.floor(Math.round(notes[k] ?? 0) / 12) - 1}</span>
+            <div className="loops-track">
+              <div className="loops-head" style={{ left: `${(phases[k] ?? 0) * 100}%`, opacity: 0.4 + (flashes[k] ?? 0) * 0.6 }} />
+            </div>
+          </div>
+        ))}
+      </div>
+      <div className="grid-2">
+        <Section title="Voices">
+          <div className="wide">
+            <Choice param={idx("loops.on")} label="Playing (E)" />
+          </div>
+          {knobs(["loops.count", "loops.rate", "loops.density", "loops.velocity"])}
+        </Section>
+        <Section title="Notes">
+          {knobs(["loops.register", "loops.spread", "loops.pattern"])}
+          <div className="wide">
+            <Choice param={idx("loops.target")} label="Play into" />
+          </div>
+        </Section>
+      </div>
+    </Page>
+  );
+}
+
+function WeatherPage() {
+  return (
+    <Page title="Weather" subtitle="Wind, rain and surf from shaped noise. Never loops, never repeats.">
+      <div className="grid-2">
+        <Section title="Elements">{knobs(["weather.wind", "weather.rain", "weather.surf"])}</Section>
+        <Section title="Character">{knobs(["weather.gust", "weather.tone", "weather.distance"])}</Section>
+      </div>
+      <StripSection stripId="weather" />
+    </Page>
+  );
+}
+
+const PERIODS = [30, 60, 120, 300, 600, 1200, 1800, 3600];
+/** What "Add a season" proposes next: things that change a piece slowly and well,
+ *  on staggered cycles so they never line up. */
+const SEASON_SUGGESTIONS: [string, number, number][] = [
+  ["drone.cutoff", 0.25, 300],
+  ["cloud1.position", 0.3, 600],
+  ["res.brightness", 0.3, 1200],
+  ["medium.age", 0.35, 1800],
+  ["busA.level", 0.15, 600],
+  ["drone.density", 0.3, 1200],
+  ["bloom.tone", 0.25, 300],
+  ["weather.wind", 0.3, 1800],
+];
+const SHAPES = ["Sine", "Triangle", "Drift"];
+
+function paramLabel(i: number) {
+  const schema = store.schema!;
+  const p = schema.params[i];
+  const slot = schema.fxSlots.find((s) => i >= s.first && i < s.first + 7);
+  if (slot) return `${slot.name}: ${p.name}`;
+  const prefix = p.id.split(".")[0];
+  const strip = schema.strips.find((s) => s.id === prefix);
+  const group = strip ? strip.name : prefix.charAt(0).toUpperCase() + prefix.slice(1);
+  return `${group}: ${p.name}`;
+}
+
+function SeasonsPage() {
+  const { seasons, schema } = useSlice("seasons");
+  useKey("telemetry");
+  const values = store.telemetry?.perf.seasons ?? [];
+  const options = schema!.params.filter((p) => !p.discrete);
+  const update = (k: number, patch: Partial<(typeof seasons)[number]>) => void store.call("season.set", k, { ...seasons[k], ...patch });
+  return (
+    <Page title="Seasons" subtitle="Very slow curves, minutes long, that move a parameter for you. The whole piece changes like weather over an afternoon.">
+      <div className="season-list">
+        {seasons.map((s, k) => (
+          <div className="season-row" key={k}>
+            <select value={s.param} onChange={(e) => update(k, { param: Number(e.target.value) })}>
+              {options.map((p) => (
+                <option key={p.i} value={p.i}>
+                  {paramLabel(p.i)}
+                </option>
+              ))}
+            </select>
+            <label className="field">
+              Depth
+              <input type="range" min={-100} max={100} value={Math.round(s.depth * 100)} onChange={(e) => update(k, { depth: Number(e.target.value) / 100 })} />
+              <span className="season-num">{Math.round(s.depth * 100)}%</span>
+            </label>
+            <select value={PERIODS.reduce((a, b) => (Math.abs(b - s.period) < Math.abs(a - s.period) ? b : a))} onChange={(e) => update(k, { period: Number(e.target.value) })}>
+              {PERIODS.map((p) => (
+                <option key={p} value={p}>
+                  {p < 60 ? `${p} s` : `${p / 60} min`} cycle
+                </option>
+              ))}
+            </select>
+            <select value={s.shape} onChange={(e) => update(k, { shape: Number(e.target.value) })}>
+              {SHAPES.map((name, v) => (
+                <option key={v} value={v}>
+                  {name}
+                </option>
+              ))}
+            </select>
+            <div className="season-meter">
+              <div className="season-meter-dot" style={{ left: `${50 + (values[k] ?? 0) * 50 * Math.sign(s.depth || 1)}%` }} />
+            </div>
+            <button className="x" onClick={() => void store.call("season.remove", k)} title="Remove">
+              ×
+            </button>
+          </div>
+        ))}
+        {seasons.length === 0 && <p className="note">No seasons yet. Add one, pick what it moves, and let it run for the length of the piece.</p>}
+      </div>
+      <div className="row">
+        <Button
+          tone="accent"
+          disabled={seasons.length >= 8}
+          onClick={() => {
+            const used = new Set(seasons.map((s) => s.param));
+            const pick = SEASON_SUGGESTIONS.find(([id]) => !used.has(store.index(id))) ?? SEASON_SUGGESTIONS[0];
+            void store.call("season.set", seasons.length, { param: store.index(pick[0]), depth: pick[1], period: pick[2], shape: seasons.length % 3, phase: 0 });
+          }}
+        >
+          Add a season
+        </Button>
+        <Knob param={idx("seasons.depth")} label="All seasons" size="sm" />
+      </div>
     </Page>
   );
 }
@@ -367,6 +577,10 @@ function MidiPage() {
     ["releaseLive", "Release live layer"],
     ["captureScene", "Capture scene"],
     ["recordToggle", "Record"],
+    ["loopRecord", "Loop record"],
+    ["loopClear", "Loop clear"],
+    ["freezeToggle", "Freeze all"],
+    ["inputFreezeToggle", "Hold input"],
   ];
   return (
     <Page title="MIDI" subtitle="Right-click any control to learn it. Controllers pick up softly: an arrow shows which way to turn until they catch the value.">
@@ -458,6 +672,11 @@ function Content({ page }: { page: string }) {
   if (page === "res") return <ResonatorPage />;
   if (page === "bloom") return <BloomPage />;
   if (page === "input") return <InputPage />;
+  if (page === "gestures") return <GesturesPage />;
+  if (page === "looper") return <LooperPage />;
+  if (page === "loops") return <LoopsPage />;
+  if (page === "weather") return <WeatherPage />;
+  if (page === "seasons") return <SeasonsPage />;
   if (page === "mixer") return <MixerPage />;
   if (page === "fx") return <FxPage />;
   if (page === "scenes") return <ScenesPage />;

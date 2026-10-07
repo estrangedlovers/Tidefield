@@ -88,12 +88,38 @@ export interface TelemetryMessage {
   clouds: { loaded: boolean; count: number; grains: [number, number, number][] }[];
   modes: [number, number][];
   bloom: { loaded: boolean; voices: [boolean, number, number][] };
-  input: [number, boolean];
+  /** level, gate open, frozen pad gain */
+  input: [number, boolean, number];
+  perf: PerfTelemetry;
   terrain: { cursor: [number, number]; pos: [number, number]; n: number; version: number; w: number[] };
   full?: boolean;
   p?: [number, number][];
   live?: [number, number][];
   pickup?: [number, number][];
+}
+
+/** Looper: Empty, Recording, Playing, Overdubbing, Clearing. */
+export type LooperState = 0 | 1 | 2 | 3 | 4;
+
+export interface PerfTelemetry {
+  swell: number;
+  freeze: number;
+  seasons: number[];
+  /** phases, notes, flashes (8 each) */
+  loops: [number[], number[], number[]];
+  /** state, position 0..1, seconds, passes */
+  looper: [LooperState, number, number, number];
+  /** gust, wave */
+  weather: [number, number];
+}
+
+export interface SeasonInfo {
+  param: number;
+  depth: number;
+  period: number;
+  /** 0 sine, 1 triangle, 2 drift */
+  shape: number;
+  phase: number;
 }
 
 export interface SceneInfo {

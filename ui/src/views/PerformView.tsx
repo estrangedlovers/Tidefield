@@ -5,6 +5,7 @@ import { Choice } from "../components/Choice";
 import { Knob } from "../components/Knob";
 import { Keyboard } from "../components/Keyboard";
 import { Button } from "../components/Button";
+import { GestureBar } from "./GestureBar";
 import "./PerformView.css";
 
 const MEDIUM_CAPTIONS = ["clean", "hiss, wow, warmth", "crackle, dust", "grit, steps"];
@@ -101,6 +102,7 @@ export function PerformView() {
           <SceneStrip />
           <Choice param={idx("terrain.wanderStyle")} label="" variant="pills" />
         </div>
+        <GestureBar />
       </main>
 
       <aside className="perform-right">

@@ -3,6 +3,7 @@ import type {
   MidiActivity,
   MidiState,
   RecordState,
+  SeasonInfo,
   Schema,
   SceneInfo,
   SamplesInfo,
@@ -39,6 +40,7 @@ class Store {
   samples: SamplesInfo = { clouds: [], bloom: null };
   midi: MidiState = { bindings: [], learning: false, learnParam: null, noteChannel: -1, notesToDrone: false, devices: [] };
   session: SessionInfo = { name: "Untitled", busy: false, device: "", sampleRate: 0, blockSize: 0, cpu: 0, xruns: 0 };
+  seasons: SeasonInfo[] = [];
   record: RecordState = { state: "idle", seconds: 0, stems: false, dropped: 0, folder: "", last: "" };
   toasts: Toast[] = [];
   lastMidi: MidiActivity | null = null;
@@ -73,6 +75,7 @@ class Store {
     transport.on("midi", (m: MidiState) => this.set("midi", m));
     transport.on("session", (s: SessionInfo) => this.set("session", s));
     transport.on("record", (r: RecordState) => this.set("record", r));
+    transport.on("seasons", (s: SeasonInfo[]) => this.set("seasons", s));
     transport.on("status", (s: StatusMessage) => this.toast(s.message, s.warning));
     transport.on("midiActivity", (m: MidiActivity) => {
       this.lastMidi = m;
@@ -88,7 +91,7 @@ class Store {
     this.notify("schema");
   }
 
-  private set<K extends "scenes" | "fx" | "samples" | "midi" | "session" | "record">(key: K, value: Store[K]) {
+  private set<K extends "scenes" | "fx" | "samples" | "midi" | "session" | "record" | "seasons">(key: K, value: Store[K]) {
     (this as any)[key] = value;
     this.notify(key);
   }
@@ -185,7 +188,7 @@ export function useParamId(id: string) {
 }
 
 export function useSlice<
-  K extends "scenes" | "fx" | "samples" | "midi" | "session" | "record" | "toasts" | "view" | "schema" | "midiActivity",
+  K extends "scenes" | "fx" | "samples" | "midi" | "session" | "record" | "seasons" | "toasts" | "view" | "schema" | "midiActivity",
 >(key: K) {
   useKey(key);
   return store;

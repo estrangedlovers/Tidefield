@@ -232,3 +232,9 @@
     display: none;
   }
 }
+
+/* The terrain takes whatever the scene strip and gesture bar leave. */
+.perform-center > .terrain {
+  flex: 1 1 0;
+  height: auto;
+}

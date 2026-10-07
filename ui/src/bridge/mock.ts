@@ -1,5 +1,5 @@
 import schemaJson from "./schema.json";
-import type { FadeState, MidiState, RecordState, Schema, SceneInfo, SessionInfo, TelemetryMessage, Transport } from "./types";
+import type { FadeState, LooperState, MidiState, RecordState, Schema, SceneInfo, SeasonInfo, SessionInfo, TelemetryMessage, Transport } from "./types";
 
 // A stand-in engine for developing the UI in a plain browser (npm run dev). It uses
 // the real schema (dumped by `tidefield_render --dump-schema`) and imitates the
@@ -37,6 +37,14 @@ class MockEngine {
   };
   session: SessionInfo = { name: "Untitled", busy: false, device: "Browser mock", sampleRate: 48000, blockSize: 256, cpu: 0.11, xruns: 0 };
 
+  seasons: SeasonInfo[] = [];
+  seasonPhase = [0, 0, 0, 0, 0, 0, 0, 0];
+  swell = 0;
+  freeze = 0;
+  inputFreeze = 0;
+  looper = { state: 0 as LooperState, pos: 0, seconds: 0, passes: 0 };
+  loopPhase = [0.1, 0.5, 0.8, 0.3, 0.65, 0.2, 0.9, 0.45];
+  loopFlash = [0, 0, 0, 0, 0, 0, 0, 0];
   record: RecordState = { state: "idle", seconds: 0, stems: false, dropped: 0, folder: "~/Music/Tidefield", last: "" };
   recordTimer: ReturnType<typeof setInterval> | null = null;
 
@@ -238,6 +246,17 @@ class MockEngine {
         this.emit("record", this.record);
         return null;
       }
+      case "season.set": {
+        const [i, s] = args as [number, SeasonInfo];
+        if (i === this.seasons.length && this.seasons.length < 8) this.seasons.push(s);
+        else if (i < this.seasons.length) this.seasons[i] = s;
+        this.emit("seasons", [...this.seasons]);
+        return null;
+      }
+      case "season.remove":
+        this.seasons.splice(args[0] as number, 1);
+        this.emit("seasons", [...this.seasons]);
+        return null;
       case "record.setStems":
         this.record = { ...this.record, stems: Boolean(args[0]) };
         this.emit("record", this.record);
@@ -277,6 +296,17 @@ class MockEngine {
         this.panic = false;
         this.fadeState = 1;
         break;
+      case "loopRecord": {
+        const l = this.looper;
+        if (l.state === 0 || l.state === 4) Object.assign(l, { state: 1, pos: 0, seconds: 0, passes: 0 });
+        else if (l.state === 1) l.state = l.seconds < 0.25 ? 0 : 2;
+        else l.state = l.state === 2 ? 3 : 2;
+        break;
+      }
+      case "loopClear":
+        if (this.looper.state === 1) this.looper.state = 0;
+        else if (this.looper.state >= 2) this.looper.state = 4;
+        break;
       case "catch":
         this.catchCount++;
         this.samples.clouds[Math.min(3, this.catchCount)] = `Catch ${this.catchCount}`;
@@ -298,6 +328,7 @@ class MockEngine {
     this.emit("midi", this.midi);
     this.emit("session", this.session);
     this.emit("record", this.record);
+    this.emit("seasons", this.seasons);
   }
 
   tick(dt: number) {
@@ -406,6 +437,38 @@ class MockEngine {
     });
     this.voices = this.voices.filter((v) => v.level > 0.002 || v.age < 0.2);
 
+    // Performance layer.
+    const towards = (v: number, target: number, seconds: number) => v + (target - v) * Math.min(1, (3 * dt) / Math.max(0.01, seconds));
+    this.swell = towards(this.swell, t[P("swell.hold")], t[P("swell.hold")] > this.swell ? t[P("swell.attack")] : t[P("swell.release")] / tide);
+    this.freeze = t[P("freeze.on")] > 0.5 ? Math.min(1, this.freeze + dt / 0.4) : Math.max(0, this.freeze - dt / 1.5);
+    this.inputFreeze = t[P("input.freeze")] > 0.5 ? Math.min(1, this.inputFreeze + dt / 0.3) : Math.max(0, this.inputFreeze - dt / 2);
+    const l = this.looper;
+    if (l.state === 1) l.seconds = Math.min(60, l.seconds + dt);
+    else if (l.state >= 2) {
+      l.pos += dt / Math.max(0.25, l.seconds);
+      if (l.pos >= 1) (l.pos -= 1), l.passes++;
+      if (l.state === 4) l.state = 0;
+    }
+    const periods = [17, 19.7, 23.3, 26.3, 29.9, 31.7, 37.1, 41.3];
+    const count = Math.round(t[P("loops.count")]);
+    for (let k = 0; k < 8; k++) {
+      this.loopFlash[k] *= Math.exp(-dt / 0.4);
+      if (k >= count) continue;
+      this.loopPhase[k] += (dt * t[P("loops.rate")] * tide) / periods[k];
+      if (this.loopPhase[k] >= 1) {
+        this.loopPhase[k] -= 1;
+        if (t[P("loops.on")] > 0.5 && Math.random() < t[P("loops.density")]) this.loopFlash[k] = 1;
+      }
+    }
+    const seasonValues = this.seasonPhase.map((ph, k) => {
+      const s = this.seasons[k];
+      if (!s) return 0;
+      this.seasonPhase[k] = (ph + (dt * tide) / s.period) % 1;
+      const p = (this.seasonPhase[k] + s.phase) % 1;
+      return s.shape === 1 ? 1 - 4 * Math.abs(p - 0.5) : Math.sin(2 * Math.PI * p);
+    });
+    const reg = t[P("loops.register")];
+
     const loud = audible * (0.35 + 0.1 * Math.sin(this.time * 0.7) + this.voices.length * 0.04);
     const msg: TelemetryMessage = {
       t: Math.round(this.time * 48000),
@@ -430,7 +493,19 @@ class MockEngine {
           return v ? ([true, v.note, v.level * audible] as [boolean, number, number]) : ([false, 0, 0] as [boolean, number, number]);
         }),
       },
-      input: [0, false],
+      input: [0, false, this.inputFreeze],
+      perf: {
+        swell: this.swell,
+        freeze: this.freeze,
+        seasons: seasonValues,
+        loops: [
+          [...this.loopPhase],
+          this.loopPhase.map((_, k) => reg + ((k * 5) % 12)),
+          [...this.loopFlash],
+        ],
+        looper: [l.state, l.state === 1 ? l.seconds / 60 : l.pos, l.seconds, l.passes],
+        weather: [0.5 + 0.4 * Math.sin(this.time * 0.21), Math.max(0, Math.sin((this.time * Math.PI) / 9))],
+      },
       terrain: { cursor: [this.cursor[0], this.cursor[1]], pos: [this.pos[0], this.pos[1]], n: this.scenes.length, version: 0, w: this.weights },
     };
 

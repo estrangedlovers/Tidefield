@@ -254,7 +254,7 @@ juce::var WebUI::hello()
 {
     pageReady = true;
     encoder.reset();
-    lastScenes = lastFx = lastSamples = lastMidi = lastSession = lastRecord = {};
+    lastScenes = lastFx = lastSamples = lastMidi = lastSession = lastRecord = lastSeasons = {};
     auto* o = new juce::DynamicObject();
     o->setProperty("schema", io::buildSchema(core.engine));
     o->setProperty("version", JUCE_APPLICATION_VERSION_STRING);
@@ -271,6 +271,7 @@ void WebUI::timerCallback()
     pushIfChanged("midi", describeMidi(), lastMidi);
     pushIfChanged("session", describeSession(), lastSession);
     pushIfChanged("record", describeRecording(), lastRecord);
+    pushIfChanged("seasons", io::describeSeasons(core.seasons), lastSeasons);
 }
 
 void WebUI::chooseSample(int slot)
@@ -463,6 +464,25 @@ juce::var WebUI::call(const juce::String& method, const juce::Array<juce::var>& 
         const auto id = a[0].toString();
         const bool enabled = static_cast<bool>(a[1]);
         juce::MessageManager::callAsync([this, id, enabled] { core.midiInputs.setEnabled(id, enabled); });
+    }
+    // Seasons.
+    else if (method == "season.set")
+    {
+        const auto& o = a[1];
+        engine::Season s;
+        s.param = static_cast<engine::ParamIndex>(std::clamp(static_cast<int>(o.getProperty("param", 0)), 0, static_cast<int>(engine::kNumParams) - 1));
+        s.depth = static_cast<float>(static_cast<double>(o.getProperty("depth", 0.2)));
+        s.periodSeconds = static_cast<float>(static_cast<double>(o.getProperty("period", 300.0)));
+        s.shape = static_cast<engine::Season::Shape>(std::clamp(static_cast<int>(o.getProperty("shape", 0)), 0, 2));
+        s.phase = static_cast<float>(static_cast<double>(o.getProperty("phase", 0.0)));
+        if (! core.seasons.set(argInt(a, 0, 0), s))
+            core.status("That parameter cannot have a season (it is a switch), or all 8 are in use.", true);
+        lastSeasons.clear();
+    }
+    else if (method == "season.remove")
+    {
+        core.seasons.remove(argInt(a, 0, -1));
+        lastSeasons.clear();
     }
     // Recording.
     else if (method == "record.toggle")

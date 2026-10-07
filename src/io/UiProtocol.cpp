@@ -7,6 +7,7 @@
 #include <engine/Engine.h>
 #include <engine/midi/MidiTypes.h>
 #include <engine/mix/FxManager.h>
+#include <engine/mod/SeasonManager.h>
 #include <engine/scene/SceneManager.h>
 
 #include <cmath>
@@ -195,6 +196,22 @@ juce::var describeFx(const engine::FxManager& fx)
     return list;
 }
 
+juce::var describeSeasons(const engine::SeasonManager& seasons)
+{
+    juce::Array<juce::var> list;
+    for (const auto& s : seasons.getSeasons())
+    {
+        auto* o = new juce::DynamicObject();
+        o->setProperty("param", static_cast<int>(s.param));
+        o->setProperty("depth", s.depth);
+        o->setProperty("period", s.periodSeconds);
+        o->setProperty("shape", static_cast<int>(s.shape));
+        o->setProperty("phase", s.phase);
+        list.add(juce::var(o));
+    }
+    return list;
+}
+
 juce::var describeSamples(const engine::Engine& engine)
 {
     juce::Array<juce::var> clouds;
@@ -266,7 +283,25 @@ juce::var TelemetryEncoder::encode(const engine::TelemetryFrame& f)
         voices.add(arr({ v.active, q(v.note, 100.0), q(v.level, 1000.0) }));
     bloom->setProperty("voices", voices);
     o->setProperty("bloom", juce::var(bloom));
-    o->setProperty("input", arr({ q(f.inputLevel, 1000.0), f.inputGateOpen }));
+    o->setProperty("input", arr({ q(f.inputLevel, 1000.0), f.inputGateOpen, q(f.inputFreeze) }));
+
+    // Performance layer: swell, seasons, incommensurate loops, looper, weather, freeze.
+    auto* perf = new juce::DynamicObject();
+    perf->setProperty("swell", q(f.swell));
+    perf->setProperty("freeze", q(f.freezeGain));
+    juce::Array<juce::var> seasonValues, loopPhase, loopNote, loopFlash;
+    for (std::size_t k = 0; k < f.seasonValue.size(); ++k)
+    {
+        seasonValues.add(q(f.seasonValue[k]));
+        loopPhase.add(q(f.loopPhase[k]));
+        loopNote.add(q(f.loopNote[k], 10.0));
+        loopFlash.add(q(f.loopFlash[k]));
+    }
+    perf->setProperty("seasons", seasonValues);
+    perf->setProperty("loops", arr({ juce::var(loopPhase), juce::var(loopNote), juce::var(loopFlash) }));
+    perf->setProperty("looper", arr({ f.loopState, q(f.loopPosition), q(f.loopSeconds, 100.0), f.loopPasses }));
+    perf->setProperty("weather", arr({ q(f.weatherGust), q(f.weatherWave) }));
+    o->setProperty("perf", juce::var(perf));
 
     auto* terrain = new juce::DynamicObject();
     terrain->setProperty("cursor", arr({ q(f.cursor.x), q(f.cursor.y) }));

@@ -2,7 +2,7 @@
 
 Read `CLAUDE.md` (rules) and `docs/ARCHITECTURE.md` (design) first.
 
-## Status: phase 7 complete, phase 8 (ambient feature pack) next
+## Status: phase 8 complete; auto master, more gestures, optimisation and review next
 
 ### Phase 1: skeleton, device settings, safety chain, drone, render harness
 
@@ -336,8 +336,68 @@ want tuning once heard), reveal-in-Finder, the folder chooser in the WebView app
 Reverb quality is not part of the degradation ladder: effects are opaque
 `Processor`s; if the FDN shows up in profiles it can grow a quality control.
 
-## Next: phase 8
-The ambient feature pack (ARCHITECTURE.md section 10), all items approved.
+### Phase 8: the ambient feature pack
+
+**Built**
+- Three new mixer strips (each with level, pan, width, sends and two inserts):
+  - **Loop**: `Disintegrator`, a looper-pedal tape loop (record, close, overdub,
+    clear; up to 60 s) whose every pass is rewritten through an erosion chain:
+    narrowing band, saturation, level loss, hiss, and random permanent "oxide
+    flakes". Records the live input or the mix itself (read one prepared block back
+    from the catch ring, so it stays block-size independent).
+  - **Weather**: `WeatherBed`, procedural wind (gust process, whistle, rumble),
+    rain (hiss plus individual rising drops) and surf (7-13 s waves panned across).
+  - **Freeze**: freeze all, the last two seconds of the pre-Medium mix held as a
+    granular cloud while the rest of the mix ducks underneath.
+- **Hold input**: `SpectralFreeze` (new radix-2 `Fft`) holds the live input as a
+  wide spectral pad, audible whether or not the input monitor is on.
+- **Modulation layer** in `ParamState`: normalised offsets on top of the smoothed
+  value, never on targets. Used by:
+  - **Swell** (hold S, or a pedal): sends bloom, filters open, clouds thicken;
+    rises over Swell Rise, ebbs over Swell Ebb / Tide.
+  - **Seasons**: up to eight minutes-long sine, triangle or drift curves on any
+    continuous parameter, scaled together by `seasons.depth`, following Tide.
+    `SeasonManager` publishes them; sessions store them.
+- **Loops**: incommensurate note loops (17-41 s periods, one note each, snapped to
+  the key) played into Bloom and/or struck on the resonator.
+- Effects: **Ensemble**, **Spectral Blur** (blur, smear, drift, shimmer, tilt,
+  freeze; identity at rest), **Worn Echo** (a full Medium inside the feedback loop),
+  **Sympathetic Strings** (Karplus-Strong strings tuned to the key through
+  `ModContext::harmony`).
+- **Your shimmer and fuzz**: `src/fx_juce/AudioProcessorEffect.h` hosts any
+  `juce::AudioProcessor` in an FX slot (parameters set from a message-thread timer,
+  so the audio thread takes no locks). Add the sources and one line each in
+  `src/fx_juce/UserEffects.cpp`.
+- MIDI actions: Loop record, Loop clear, Freeze all, Hold input.
+- UI: a gesture bar under the terrain (Swell, Freeze all, Looper with ring and pass
+  count, Hold input, Loops with flashing voices, Wind/Rain/Surf), keys S (hold), F,
+  L, Shift+L, I, E; Edit pages Gestures, Looper, Loops (lanes per voice), Weather,
+  Seasons (editor with live curve readout and suggested targets).
+- CI: `.github/workflows/macos.yml` builds, tests, renders and packages the app on
+  Apple Silicon (macos-14) for every push and uploads `Tidefield-macOS-arm64.zip`.
+
+**Verified**: 116 ctest tests pass. New: FFT round trip and bin accuracy; spectral
+freeze holds a note within 6 dB after it stops, releases, and is decorrelated L/R;
+looper pedal states, loop length, erosion wearing a loop down over 40 passes while
+erosion 0 repeats it bit for bit; each weather element in a usable level range and
+bounded; freeze all holding with the source gone and fully ducked; looper recording
+the mix in the engine; input pad sounding unarmed; zero allocations with every new
+source running; modulation offsets, clamping and discrete exclusion; swell timing
+without moving targets; seasons hitting peaks and troughs on schedule and speeding up
+with Tide; loops firing in key into Bloom; seasons through a session; every processor
+fuzzed for finiteness, bounds and zero allocations; blur identity at rest (< -60 dB
+error); strings tuned to D minor and ringing 8x more for an in-key note than a
+quarter-tone off; worn echo timing and decay; a JUCE AudioProcessor hosted and
+driven through the adapter. The macOS CI build passed (tests and strict renders on
+arm64). UI checked in the browser mock at 1440x900.
+
+**Untested (needs the Mac and ears)**: how all of it sounds; looper levels with a
+real instrument; whether swell's targets and depths feel right; spectral freeze on
+a real cello; the user's own JUCE plugins inside the adapter.
+
+## Next
+Auto master, more performance methods, an optimisation pass, a debugging pass, a
+professional review build, and the downloadable Mac app.
 
 ## How to run
 ```

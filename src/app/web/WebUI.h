@@ -53,7 +53,7 @@ private:
     io::TelemetryEncoder encoder;
     std::unique_ptr<juce::WebBrowserComponent> browser;
     std::unique_ptr<juce::FileChooser> chooser;
-    juce::String lastScenes, lastFx, lastSamples, lastMidi, lastSession, lastRecord;
+    juce::String lastScenes, lastFx, lastSamples, lastMidi, lastSession, lastRecord, lastSeasons;
     juce::String lastActivity;
     bool pageReady = false;
     int slowTick = 0;

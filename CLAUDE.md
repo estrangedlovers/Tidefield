@@ -50,6 +50,10 @@ own JUCE modules, so JUCE module code is never linked twice.
 - Anything that allocates or touches files: message thread or worker, handed to the
   audio thread through `SnapshotChannel`, `FxSlot` or `SpscQueue`. Audio going the
   other way (recording) goes through `engine/record/RecordTap`.
+- Your own JUCE effects (shimmer, fuzz): `src/fx_juce/UserEffects.cpp` (instructions
+  inside); they become FX types like the built-in ones.
+- A performance gesture that moves many parameters at once: add offsets in
+  `Engine::updateModulation` (never set targets for this).
 - A new expensive voice or grain pool: give it a limit setter and add a column to
   `kGuardLevels` in `engine/guard/DegradationPolicy.h`, applied in
   `Engine::applyGuardLimits`.

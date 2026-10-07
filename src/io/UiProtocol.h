@@ -10,6 +10,7 @@ namespace tf::engine {
 class Engine;
 class FxManager;
 class SceneManager;
+class SeasonManager;
 } // namespace tf::engine
 
 namespace tf::io {
@@ -22,6 +23,7 @@ juce::var buildSchema(const engine::Engine& engine);
 juce::var describeScenes(const engine::SceneManager& scenes);
 juce::var describeFx(const engine::FxManager& fx);
 juce::var describeSamples(const engine::Engine& engine);
+juce::var describeSeasons(const engine::SeasonManager& seasons);
 
 class TelemetryEncoder
 {

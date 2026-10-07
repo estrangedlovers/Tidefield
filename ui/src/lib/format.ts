@@ -41,7 +41,15 @@ export function choicesFor(spec: ParamSpec, schema: Schema): string[] | null {
     case "input.channel":
       return ["Input 1", "Input 2", "1 + 2"];
     case "input.armed":
+    case "input.freeze":
+    case "freeze.on":
+    case "loops.on":
+    case "swell.hold":
       return ["Off", "On"];
+    case "loop.source":
+      return ["Live input", "The mix"];
+    case "loops.target":
+      return ["Bloom", "Resonator", "Both"];
   }
   return null;
 }
@@ -53,7 +61,7 @@ function trim(n: number, decimals: number) {
 export function formatParam(spec: ParamSpec, v: number, schema: Schema): string {
   const choices = choicesFor(spec, schema);
   if (choices) return choices[Math.max(0, Math.min(choices.length - 1, Math.round(v)))] ?? "";
-  if (spec.id.endsWith(".root")) return noteName(v, schema.noteNames);
+  if (spec.id.endsWith(".root") || spec.id === "loops.register") return noteName(v, schema.noteNames);
   if (spec.discrete) return String(Math.round(v));
 
   switch (spec.unit) {
@@ -65,6 +73,8 @@ export function formatParam(spec: ParamSpec, v: number, schema: Schema): string 
       return v >= 1000 ? `${trim(v / 1000, 2)} s` : `${Math.round(v)} ms`;
     case "dB":
       return v <= spec.min + 0.05 && spec.min <= -59 ? "Off" : `${v > 0 ? "+" : ""}${trim(v, 1)} dB`;
+    case "oct":
+      return `${trim(v, 1)} oct`;
     case "st":
       return `${v > 0 ? "+" : ""}${trim(v, 1)} st`;
     case "ct":

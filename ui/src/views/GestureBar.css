@@ -1,0 +1,214 @@
+.gestures {
+  display: flex;
+  gap: 8px;
+  overflow-x: auto;
+  scrollbar-width: none;
+}
+
+.gestures::-webkit-scrollbar {
+  display: none;
+}
+
+.gesture {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  gap: 2px;
+  flex: 0 0 auto;
+  min-width: 84px;
+  height: 84px;
+  padding: 0 14px;
+  overflow: hidden;
+  border: 1px solid var(--line);
+  border-radius: 12px;
+  background: var(--surface);
+  color: var(--text-2);
+  text-align: left;
+  cursor: pointer;
+  user-select: none;
+  transition: border-color var(--mid) var(--ease), color var(--mid) var(--ease), background var(--mid) var(--ease);
+}
+
+.gesture:hover {
+  color: var(--text);
+  border-color: var(--line-strong);
+}
+
+.gesture-title {
+  position: relative;
+  font-size: 13px;
+  font-weight: 560;
+  color: inherit;
+}
+
+.gesture-sub {
+  position: relative;
+  font-size: 10.5px;
+  color: var(--text-3);
+  font-variant-numeric: tabular-nums;
+}
+
+.gesture-sub.hint {
+  color: var(--text-3);
+  opacity: 0.7;
+}
+
+.gesture-fill {
+  position: absolute;
+  inset: 0;
+  background: linear-gradient(to top, var(--accent-dim), transparent);
+  transform-origin: bottom;
+  transform: scaleY(0);
+}
+
+.gesture.swell:active {
+  border-color: var(--accent);
+  color: var(--text);
+}
+
+.gesture-glow {
+  position: absolute;
+  inset: 0;
+  background: radial-gradient(circle at 30% 50%, var(--accent-dim), transparent 75%);
+  opacity: 0;
+}
+
+.gesture.toggle.on,
+.gesture.loops.on {
+  color: var(--text);
+  border-color: var(--accent);
+}
+
+/* Looper */
+.gesture.looper {
+  flex-direction: row;
+  align-items: center;
+  gap: 10px;
+  padding: 0 8px 0 6px;
+  cursor: default;
+}
+
+.looper-main {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  height: 100%;
+  border: 0;
+  background: none;
+  color: inherit;
+  cursor: pointer;
+  text-align: left;
+}
+
+.looper-text {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  min-width: 86px;
+}
+
+.looper-side {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.looper-clear {
+  padding: 4px 8px;
+  border: 1px solid var(--line);
+  border-radius: 999px;
+  background: none;
+  color: var(--text-3);
+  font-size: 10.5px;
+  cursor: pointer;
+}
+
+.looper-clear:hover {
+  color: var(--coral);
+  border-color: var(--coral);
+}
+
+.ring-track {
+  fill: none;
+  stroke: var(--line);
+  stroke-width: 2.5;
+}
+
+.ring-fill {
+  fill: none;
+  stroke: var(--accent);
+  stroke-width: 2.5;
+  stroke-linecap: round;
+}
+
+.ring-dot {
+  fill: var(--text-3);
+  transition: fill var(--mid) var(--ease);
+}
+
+.looper.state-1 .ring-dot,
+.looper.state-3 .ring-dot {
+  fill: var(--coral);
+}
+
+.looper.state-1 .ring-fill,
+.looper.state-3 .ring-fill {
+  stroke: var(--coral);
+}
+
+.looper.state-2 .ring-dot {
+  fill: var(--accent);
+}
+
+.looper.state-1,
+.looper.state-3 {
+  border-color: var(--coral);
+  color: var(--text);
+}
+
+/* Loops */
+.loop-dots {
+  position: relative;
+  display: flex;
+  gap: 5px;
+  margin-top: 4px;
+}
+
+.loop-dot {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: var(--line-strong);
+  box-shadow: 0 0 calc(var(--f) * 10px) var(--accent);
+  transform: scale(calc(0.7 + var(--f) * 0.6));
+  opacity: calc(0.45 + var(--p) * 0.4 + var(--f) * 0.4);
+}
+
+.gesture.loops.on .loop-dot {
+  background: var(--accent);
+}
+
+/* Weather */
+.gesture.weather {
+  flex-direction: row;
+  align-items: center;
+  gap: 4px;
+  padding: 0 8px;
+  cursor: default;
+}
+
+@media (max-height: 760px) {
+  .gesture {
+    height: 76px;
+  }
+}
+
+.gesture.weather {
+  gap: 0;
+  padding: 0 2px;
+}
+
+.gesture.weather .knob-sm {
+  width: 54px;
+}

@@ -190,7 +190,7 @@ on-screen keyboard (performance view), MIDI note input, or the Eno loop generato
 This brings sample import into scope earlier than first planned; it shares the
 worker-thread decode path with Catch.
 
-## 10. Ambient feature catalogue (approved in full)
+## 10. Ambient feature catalogue (approved in full; built in phase 8)
 
 Each item is either a `Source`, a `Processor` or a control-layer feature, so any of
 them can be added without changing the core.
@@ -316,4 +316,4 @@ Shift+R record, Tab switch view, Cmd+N/O/S sessions.
 5. MIDI learn, soft takeover, note input. **(done)**
 6. React WebView UI: performance view, then edit view. **(done)**
 7. Recording to disk, CPU guardrails, polish. **(done)**
-8. Ambient feature pack: the approved items from section 10.
+8. Ambient feature pack: the approved items from section 10. **(done)**

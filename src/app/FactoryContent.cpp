@@ -3,6 +3,8 @@
 #include <BinaryData.h>
 #include <io/AudioFileIO.h>
 
+#include <map>
+
 namespace tf::app {
 
 const std::vector<FactorySound>& factorySounds()
@@ -121,6 +123,86 @@ io::SessionData makeStarterSession(const engine::Engine& engine)
     s.params["terrain.x"] = 0.5f;
     s.params["terrain.y"] = 0.62f;
     return s;
+}
+
+std::string presetPrefix(const std::string& kind)
+{
+    static const std::map<std::string, std::string> prefixes {
+        { "drone", "drone." }, { "cloud", "cloud1." }, { "resonator", "res." }, { "bloom", "bloom." }, { "weather", "weather." },
+        { "medium", "medium." }, { "loops", "loops." }, { "looper", "loop." }, { "input", "input." },
+    };
+    if (const auto it = prefixes.find(kind); it != prefixes.end())
+        return it->second;
+    return {};
+}
+
+void addFactoryPresets(io::PresetLibrary& library)
+{
+    using V = std::map<std::string, float>;
+    auto add = [&](const char* kind, const char* name, V values) { library.addFactory({ name, kind, std::move(values), true }); };
+    auto drone = [](float root, float density, float shape, float detune, float cutoff, float res, float noise, float evolve, float driftDepth,
+                    float driftRate, float spread, float gravity) {
+        return V { { "root", root }, { "density", density }, { "shape", shape }, { "detune", detune }, { "cutoff", cutoff }, { "resonance", res },
+                   { "noise", noise }, { "evolve", evolve }, { "driftDepth", driftDepth }, { "driftRate", driftRate }, { "spread", spread }, { "gravity", gravity } };
+    };
+    add("drone", "Low hum", drone(31, 3, 0.15f, 6, 380, 0.15f, 0.05f, 0.2f, 0.4f, 0.03f, 0.6f, 1.0f));
+    add("drone", "Bright organ", drone(43, 5, 0.6f, 4, 3200, 0.1f, 0.02f, 0.35f, 0.3f, 0.05f, 0.8f, 1.0f));
+    add("drone", "Breathing reed", drone(38, 4, 0.45f, 12, 1300, 0.45f, 0.4f, 0.5f, 0.6f, 0.08f, 0.7f, 0.8f));
+    add("drone", "Wide shimmer", drone(50, 6, 0.3f, 20, 6000, 0.25f, 0.1f, 0.7f, 0.7f, 0.12f, 1.0f, 0.9f));
+
+    auto cloud = [](float density, float grainMs, float position, float spray, float scan, float pitch, float detune, float harmonize, float reverse,
+                    float envelope, float stereo, float gravity) {
+        return V { { "density", density }, { "grainMs", grainMs }, { "position", position }, { "spray", spray }, { "scan", scan }, { "pitch", pitch },
+                   { "pitchSpread", detune }, { "harmonize", harmonize }, { "reverse", reverse }, { "shape", envelope }, { "stereo", stereo },
+                   { "gravity", gravity } };
+    };
+    add("cloud", "Slow smear", cloud(6, 900, 0.3f, 0.2f, 0.05f, 0, 0.05f, 0, 0.1f, 0.7f, 0.8f, 0));
+    add("cloud", "Glass dust", cloud(60, 70, 0.5f, 0.8f, 0, 12, 0.2f, 0.3f, 0, 0.2f, 1.0f, 0.5f));
+    add("cloud", "Reverse swells", cloud(4, 1600, 0.4f, 0.3f, -0.1f, 0, 0.1f, 0, 1.0f, 0.9f, 0.7f, 0));
+    add("cloud", "Octave choir", cloud(18, 350, 0.35f, 0.35f, 0.02f, 0, 0.15f, 1.0f, 0.2f, 0.55f, 0.9f, 1.0f));
+    add("cloud", "Frozen point", cloud(30, 220, 0.5f, 0.02f, 0, 0, 0.03f, 0, 0.5f, 0.5f, 0.6f, 0));
+
+    auto res = [](float root, float modes, float structure, float decay, float brightness, float rain, float rainColour, float spread) {
+        return V { { "root", root }, { "modes", modes }, { "structure", structure }, { "decay", decay }, { "brightness", brightness },
+                   { "rain", rain }, { "rainColour", rainColour }, { "spread", spread }, { "gravity", 1.0f } };
+    };
+    add("resonator", "Bowed bells", res(62, 16, 0.85f, 12, 0.6f, 0.15f, 0.7f, 0.7f));
+    add("resonator", "Strings in rain", res(50, 20, 0.2f, 6, 0.45f, 0.55f, 0.4f, 0.8f));
+    add("resonator", "Deep gong", res(38, 12, 1.0f, 30, 0.3f, 0.05f, 0.2f, 0.5f));
+
+    auto bloom = [](float transform, float amount, float length, float attack, float release, float tone, float spread, float random, float position) {
+        return V { { "transform", transform }, { "amount", amount }, { "length", length }, { "attack", attack }, { "release", release }, { "pitch", 0.0f },
+                   { "tone", tone }, { "spread", spread }, { "random", random }, { "position", position }, { "gravity", 1.0f } };
+    };
+    add("bloom", "Slow bloom", bloom(0, 0.6f, 12, 0.8f, 5, 0.6f, 0.7f, 0.2f, 0.2f));
+    add("bloom", "Smeared glass", bloom(1, 0.7f, 10, 0.05f, 4, 0.8f, 0.8f, 0.4f, 0.3f));
+    add("bloom", "Frozen breath", bloom(2, 0.8f, 20, 0.3f, 8, 0.5f, 0.9f, 0.3f, 0.4f));
+    add("bloom", "Ghost notes", bloom(3, 0.6f, 8, 0.02f, 3, 0.6f, 0.6f, 0.5f, 0.3f));
+    add("bloom", "Constellation", bloom(4, 0.7f, 14, 0.01f, 6, 0.85f, 1.0f, 0.6f, 0.25f));
+    add("bloom", "Old tape", bloom(5, 0.6f, 9, 0.05f, 3, 0.4f, 0.5f, 0.3f, 0.3f));
+
+    auto weather = [](float wind, float rain, float surf, float gust, float tone, float distance) {
+        return V { { "wind", wind }, { "rain", rain }, { "surf", surf }, { "gust", gust }, { "tone", tone }, { "distance", distance } };
+    };
+    add("weather", "Still air", weather(0, 0, 0, 0.5f, 0.5f, 0.3f));
+    add("weather", "Light rain", weather(0.05f, 0.35f, 0, 0.3f, 0.6f, 0.4f));
+    add("weather", "Coast", weather(0.25f, 0, 0.6f, 0.5f, 0.45f, 0.5f));
+    add("weather", "Distant storm", weather(0.6f, 0.5f, 0.1f, 0.9f, 0.35f, 0.85f));
+
+    auto medium = [](float type, float age, float noise, float wobble, float drive) {
+        return V { { "type", type }, { "age", age }, { "noise", noise }, { "wobble", wobble }, { "drive", drive }, { "mix", 1.0f } };
+    };
+    add("medium", "Clean", medium(0, 0, 0, 0, 0));
+    add("medium", "Worn cassette", medium(1, 0.6f, 0.5f, 0.5f, 0.4f));
+    add("medium", "Dusty vinyl", medium(2, 0.5f, 0.6f, 0.25f, 0.2f));
+    add("medium", "Crunchy sampler", medium(3, 0.5f, 0.4f, 0.1f, 0.6f));
+
+    auto loops = [](float count, float rate, float density, float reg, float spread, float velocity) {
+        return V { { "count", count }, { "rate", rate }, { "density", density }, { "register", reg }, { "spread", spread }, { "velocity", velocity } };
+    };
+    add("loops", "Airports", loops(5, 1, 0.85f, 60, 1.5f, 0.6f));
+    add("loops", "Sparse bells", loops(3, 0.5f, 0.6f, 72, 1.0f, 0.5f));
+    add("loops", "Busy shore", loops(8, 2, 0.95f, 55, 2.5f, 0.7f));
 }
 
 } // namespace tf::app

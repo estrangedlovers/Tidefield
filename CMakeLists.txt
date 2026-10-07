@@ -76,6 +76,7 @@ tf_set_warnings(tidefield_engine)
 add_library(tidefield_io INTERFACE)
 target_sources(tidefield_io INTERFACE
     ${CMAKE_CURRENT_SOURCE_DIR}/src/io/AudioFileIO.cpp
+    ${CMAKE_CURRENT_SOURCE_DIR}/src/io/Presets.cpp
     ${CMAKE_CURRENT_SOURCE_DIR}/src/io/Recorder.cpp
     ${CMAKE_CURRENT_SOURCE_DIR}/src/io/Session.cpp
     ${CMAKE_CURRENT_SOURCE_DIR}/src/io/UiProtocol.cpp)

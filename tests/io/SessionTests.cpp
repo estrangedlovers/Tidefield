@@ -5,6 +5,7 @@
 #include <engine/perform/GestureManager.h>
 #include <engine/scene/PathManager.h>
 #include <engine/scene/SceneManager.h>
+#include <io/Presets.h>
 #include <io/Session.h>
 
 #include <catch2/catch_approx.hpp>
@@ -366,4 +367,33 @@ TEST_CASE("A gesture take round-trips through a session", "[session][gesture]")
 
     io::applySession(io::defaultSession(e2), e2, scenes2, fx2, true, nullptr, nullptr, nullptr, &gestures2);
     CHECK_FALSE(gestures2.hasTake());
+}
+
+TEST_CASE("Presets save, list after the factory ones, and delete", "[presets]")
+{
+    const auto dir = juce::File::getSpecialLocation(juce::File::tempDirectory).getChildFile("tidefield-preset-test");
+    dir.deleteRecursively();
+    io::PresetLibrary lib(dir);
+    lib.addFactory({ "Zeta", "cloud", { { "density", 5.0f } }, true });
+    lib.addFactory({ "Alpha", "cloud", { { "density", 9.0f } }, true });
+    lib.addFactory({ "Other kind", "drone", { { "root", 40.0f } }, true });
+
+    juce::String error;
+    REQUIRE(lib.save({ "My: dusty/cloud", "cloud", { { "density", 33.0f }, { "pitch", -12.0f } }, false }, error));
+    REQUIRE(lib.save({ "Bright", "fx:tf.reverb", { { "p1", 0.8f }, { "mix", 0.4f } }, false }, error));
+
+    const auto clouds = lib.list("cloud");
+    REQUIRE(clouds.size() == 3);
+    CHECK(clouds[0].name == "Alpha"); // factory first, by name
+    CHECK(clouds[1].name == "Zeta");
+    CHECK_FALSE(clouds[2].factory);
+    CHECK(clouds[2].name == "My: dusty/cloud"); // the name survives an unsafe file name
+    CHECK(clouds[2].values.at("pitch") == Approx(-12.0f));
+    REQUIRE(lib.list("fx:tf.reverb").size() == 1);
+    CHECK(lib.list("fx:tf.reverb")[0].values.at("mix") == Approx(0.4f));
+
+    CHECK_FALSE(lib.remove(clouds[0])); // factory presets cannot be deleted
+    CHECK(lib.remove(clouds[2]));
+    CHECK(lib.list("cloud").size() == 2);
+    dir.deleteRecursively();
 }

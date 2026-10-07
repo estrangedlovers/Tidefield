@@ -128,6 +128,11 @@ private:
             }
         }
         knobs[6]->setVisible(info != nullptr);
+        const auto first = engine::idx(engine::kFxSlots[static_cast<std::size_t>(slot)].firstParam);
+        std::vector<P> ps;
+        for (engine::ParamIndex k = 0; k < 7; ++k)
+            ps.push_back(static_cast<P>(first + k));
+        setPresets(shownType.empty() ? std::string() : "fx:" + shownType, std::string(engine::kFxSlots[static_cast<std::size_t>(slot)].id) + ".", ps);
         title = info != nullptr ? juce::String(info->name) : juce::String(engine::kFxSlots[static_cast<std::size_t>(slot)].name);
         repaint();
     }
@@ -719,7 +724,7 @@ int Device::preferredWidth(int height) const
     }
     width += colW;
     width = std::max(width, top.c != nullptr ? top.w : 0);
-    return std::max(width, 120) + 2 * (metric::pad - 2);
+    return std::max(width, presetKind.empty() ? 120 : 200) + 2 * (metric::pad - 2); // room for the title and Presets
 }
 
 void Device::resized()
@@ -763,6 +768,143 @@ void Device::paint(juce::Graphics& g)
     for (const auto& it : items)
         if (auto* c = dynamic_cast<Choice*>(it.c); c != nullptr && c->isVisible())
             g.drawText(model.name(c->getParam()), c->getX(), c->getY() - 16, c->getWidth(), 14, juce::Justification::centredLeft);
+
+    if (! presetKind.empty())
+    {
+        const auto b = presetButton().toFloat();
+        g.setColour(presetHover ? colour::panelHi.brighter(0.1f) : colour::panelHi);
+        g.fillRoundedRectangle(b, metric::radius);
+        g.setColour(presetHover ? colour::text : colour::textDim);
+        g.setFont(font(10.5f, 600));
+        g.drawText(juce::String::fromUTF8("Presets \xe2\x96\xbe"), b, juce::Justification::centred);
+    }
+}
+
+void Device::setPresets(std::string kind, std::string prefix, std::vector<engine::P> params)
+{
+    presetKind = std::move(kind);
+    presetPrefix = std::move(prefix);
+    presetParams = std::move(params);
+    repaint();
+}
+
+juce::Rectangle<int> Device::presetButton() const
+{
+    return { getWidth() - 74, 3, 68, metric::header - 6 };
+}
+
+void Device::mouseDown(const juce::MouseEvent& e)
+{
+    if (! presetKind.empty() && presetButton().contains(e.getPosition()))
+        showPresetMenu();
+}
+
+void Device::mouseMove(const juce::MouseEvent& e)
+{
+    const bool h = ! presetKind.empty() && presetButton().contains(e.getPosition());
+    if (h != presetHover)
+    {
+        presetHover = h;
+        repaint(presetButton());
+        if (h && model.onHover)
+            model.onHover("Presets: load a starting point for " + title + ", or save what you have");
+    }
+}
+
+void Device::mouseExit(const juce::MouseEvent&)
+{
+    if (presetHover)
+    {
+        presetHover = false;
+        repaint(presetButton());
+    }
+}
+
+void Device::showPresetMenu()
+{
+    auto& library = model.core.presets;
+    const auto list = library.list(presetKind);
+    juce::PopupMenu m, del;
+    m.addSectionHeader(title + " presets");
+    bool anyUser = false;
+    for (std::size_t i = 0; i < list.size(); ++i)
+    {
+        if (! list[i].factory && ! anyUser)
+        {
+            anyUser = true;
+            m.addSeparator();
+        }
+        m.addItem(static_cast<int>(i) + 1, juce::String(list[i].name));
+        if (! list[i].factory)
+            del.addItem(10000 + static_cast<int>(i), juce::String(list[i].name));
+    }
+    if (list.empty())
+        m.addItem(-1, "No presets yet", false);
+    m.addSeparator();
+    m.addItem(9000, "Save as preset...");
+    m.addSubMenu("Delete", del, del.getNumItems() > 0);
+    m.addItem(9001, "Show presets folder");
+    juce::Component::SafePointer<Device> safe(this);
+    m.showMenuAsync(juce::PopupMenu::Options().withTargetComponent(this), [safe, list](int r) {
+        if (safe == nullptr || r == 0)
+            return;
+        auto& lib = safe->model.core.presets;
+        if (r > 0 && r <= static_cast<int>(list.size()))
+        {
+            safe->applyPreset(list[static_cast<std::size_t>(r - 1)]);
+            safe->model.core.status("Loaded " + juce::String(list[static_cast<std::size_t>(r - 1)].name) + " into " + safe->title);
+        }
+        else if (r >= 10000 && r - 10000 < static_cast<int>(list.size()))
+            lib.remove(list[static_cast<std::size_t>(r - 10000)]);
+        else if (r == 9001)
+        {
+            const auto dir = lib.folderFor(safe->presetKind);
+            dir.createDirectory();
+            dir.revealToUser();
+        }
+        else if (r == 9000)
+        {
+            auto* w = new juce::AlertWindow("Save preset", "A name for this " + safe->title + " preset:", juce::MessageBoxIconType::NoIcon);
+            w->addTextEditor("name", "My " + safe->title);
+            w->addButton("Save", 1, juce::KeyPress(juce::KeyPress::returnKey));
+            w->addButton("Cancel", 0, juce::KeyPress(juce::KeyPress::escapeKey));
+            w->enterModalState(true, juce::ModalCallbackFunction::create([safe, w](int ok) {
+                                   if (ok != 1 || safe == nullptr)
+                                       return;
+                                   const auto name = w->getTextEditorContents("name").trim();
+                                   if (name.isEmpty())
+                                       return;
+                                   juce::String error;
+                                   if (safe->model.core.presets.save(safe->capturePreset(name.toStdString()), error))
+                                       safe->model.core.status("Saved preset " + name);
+                                   else
+                                       safe->model.core.status(error, true);
+                               }),
+                               true);
+        }
+    });
+}
+
+void Device::applyPreset(const io::Preset& p)
+{
+    for (const auto& [key, value] : p.values)
+        if (const auto index = model.registry.find(presetPrefix + key))
+            model.set(static_cast<engine::P>(*index), value);
+}
+
+io::Preset Device::capturePreset(const std::string& name) const
+{
+    io::Preset p;
+    p.name = name;
+    p.kind = presetKind;
+    for (auto param : presetParams)
+    {
+        std::string id = model.spec(param).id;
+        if (id.rfind(presetPrefix, 0) == 0)
+            id = id.substr(presetPrefix.size());
+        p.values[id] = model.value(param);
+    }
+    return p;
 }
 
 // --- DeviceView -----------------------------------------------------------------------
@@ -929,6 +1071,8 @@ void DeviceView::build()
             params(d, { P::DroneRoot, P::DroneDensity, P::DroneShape, P::DroneDetune, P::DroneCutoff, P::DroneResonance, P::DroneNoise, P::DroneEvolve });
             auto& m = device("Motion", sceneTint(0));
             params(m, { P::DroneDriftDepth, P::DroneDriftRate, P::DroneSpread, P::DroneGravity });
+            d.setPresets("drone", "drone.", { P::DroneRoot, P::DroneDensity, P::DroneShape, P::DroneDetune, P::DroneCutoff, P::DroneResonance, P::DroneNoise,
+                                              P::DroneEvolve, P::DroneDriftDepth, P::DroneDriftRate, P::DroneSpread, P::DroneGravity });
             strip(static_cast<int>(engine::StripId::Drone), sceneTint(0));
             break;
         }
@@ -939,8 +1083,13 @@ void DeviceView::build()
                 auto& d = device("Cloud " + juce::String(c + 1), tint);
                 sample(d, c, tint);
                 const auto first = engine::idx(engine::kCloudFirstParam[static_cast<std::size_t>(c)]);
+                std::vector<P> cloudParams;
                 for (engine::ParamIndex k = 0; k < 12; ++k)
+                {
                     d.add(static_cast<P>(first + k));
+                    cloudParams.push_back(static_cast<P>(first + k));
+                }
+                d.setPresets("cloud", "cloud" + std::to_string(c + 1) + ".", cloudParams);
                 auto& s = device("Cloud " + juce::String(c + 1) + " strip", tint);
                 const auto& info = engine::kStrips[static_cast<std::size_t>(c + 1)];
                 s.add(std::make_unique<FaderMeter>(model, info.level, c + 1, "Level"), 64, 0);
@@ -955,6 +1104,8 @@ void DeviceView::build()
             params(d, { P::ResRoot, P::ResModes, P::ResStructure, P::ResDecay, P::ResBrightness, P::ResSpread, P::ResGravity });
             auto& r = device("Rain", sceneTint(2));
             params(r, { P::ResRain, P::ResRainColour });
+            d.setPresets("resonator", "res.", { P::ResRoot, P::ResModes, P::ResStructure, P::ResDecay, P::ResBrightness, P::ResSpread, P::ResGravity,
+                                                P::ResRain, P::ResRainColour });
             auto& x = device("Excite from", sceneTint(2));
             x.addKnob(P::ResExciteInput, "Input");
             x.addKnob(P::ResExciteDrone, "Drone");
@@ -969,6 +1120,8 @@ void DeviceView::build()
             sample(d, engine::kNumClouds, sceneTint(3));
             params(d, { P::BloomTransform, P::BloomAmount, P::BloomLength, P::BloomAttack, P::BloomRelease, P::BloomPitch, P::BloomTone, P::BloomSpread,
                         P::BloomRandom, P::BloomPosition, P::BloomGravity, P::BloomRoot });
+            d.setPresets("bloom", "bloom.", { P::BloomTransform, P::BloomAmount, P::BloomLength, P::BloomAttack, P::BloomRelease, P::BloomPitch, P::BloomTone,
+                                              P::BloomSpread, P::BloomRandom, P::BloomPosition, P::BloomGravity });
             auto& k = device("Play", sceneTint(3));
             k.add(std::make_unique<KeyboardStrip>(model), 420, 120);
             strip(static_cast<int>(engine::StripId::Bloom), sceneTint(3));
@@ -994,6 +1147,7 @@ void DeviceView::build()
             auto& d = device("Disintegration looper", sceneTint(5));
             d.add(std::make_unique<LooperView>(model), 260, 0);
             params(d, { P::LoopSource, P::LoopErosion, P::LoopFlakes, P::LoopOverdub });
+            d.setPresets("looper", "loop.", { P::LoopErosion, P::LoopFlakes, P::LoopOverdub });
             strip(static_cast<int>(engine::StripId::Loop), sceneTint(5));
             break;
         }
@@ -1001,6 +1155,7 @@ void DeviceView::build()
         {
             auto& d = device("Weather", sceneTint(6));
             params(d, { P::WeatherWind, P::WeatherRain, P::WeatherSurf, P::WeatherGust, P::WeatherTone, P::WeatherDistance });
+            d.setPresets("weather", "weather.", { P::WeatherWind, P::WeatherRain, P::WeatherSurf, P::WeatherGust, P::WeatherTone, P::WeatherDistance });
             strip(static_cast<int>(engine::StripId::Weather), sceneTint(6));
             break;
         }
@@ -1016,6 +1171,7 @@ void DeviceView::build()
             params(t, { P::TerrainWanderStyle, P::TerrainGlide, P::TerrainFocus, P::TerrainWander, P::TerrainWanderRate, P::TideRate, P::HarmonyMorph });
             auto& m = device("Medium", colour::live);
             params(m, { P::MediumType, P::MediumAge, P::MediumNoise, P::MediumWobble, P::MediumDrive, P::MediumMix });
+            m.setPresets("medium", "medium.", { P::MediumType, P::MediumAge, P::MediumNoise, P::MediumWobble, P::MediumDrive, P::MediumMix });
             strip(static_cast<int>(engine::StripId::Freeze), colour::tide);
             break;
         }
@@ -1024,6 +1180,7 @@ void DeviceView::build()
             auto& d = device("Incommensurate loops", sceneTint(7));
             params(d, { P::LoopsOn, P::LoopsTarget, P::LoopsCount, P::LoopsPattern, P::LoopsRate, P::LoopsDensity, P::LoopsRegister, P::LoopsSpread,
                         P::LoopsVelocity });
+            d.setPresets("loops", "loops.", { P::LoopsCount, P::LoopsRate, P::LoopsDensity, P::LoopsRegister, P::LoopsSpread, P::LoopsVelocity, P::LoopsPattern });
             auto& t = device("Tempo", colour::tide);
             params(t, { P::SyncOn, P::SyncBpm });
             break;

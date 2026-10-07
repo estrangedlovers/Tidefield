@@ -49,6 +49,19 @@ int runSelfTest()
         for (const auto& [id, value] : sc.values)
             idsKnown = idsKnown && engine.getRegistry().find(id).has_value();
     check(starter.scenes.size() >= 6 && idsKnown, "starter session: " + juce::String(static_cast<int>(starter.scenes.size())) + " scenes, all parameters known");
+    {
+        io::PresetLibrary library(juce::File::getSpecialLocation(juce::File::tempDirectory).getChildFile("tidefield-selftest-presets"));
+        addFactoryPresets(library);
+        int presets = 0, unknown = 0;
+        for (const char* kind : { "drone", "cloud", "resonator", "bloom", "weather", "medium", "loops" })
+            for (const auto& p : library.list(kind))
+            {
+                ++presets;
+                for (const auto& [key, value] : p.values)
+                    unknown += engine.getRegistry().find(presetPrefix(kind) + key).has_value() ? 0 : 1;
+            }
+        check(presets >= 25 && unknown == 0, "factory presets: " + juce::String(presets) + ", every value names a parameter");
+    }
     check(starter.samples.count("cloud1") == 1 && starter.samples.count("bloom") == 1, "starter session loads its sounds");
     engine::FxManager fx(engine);
     fx.loadDefaultLayout();

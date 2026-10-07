@@ -2,6 +2,7 @@
 
 #include <dsp/core/SampleBuffer.h>
 #include <engine/Engine.h>
+#include <io/Presets.h>
 #include <io/Session.h>
 
 #include <memory>
@@ -27,5 +28,12 @@ std::shared_ptr<const dsp::SampleBuffer> loadFactorySound(const FactorySound& so
 /** What a new session starts as: the defaults, factory sounds in Cloud 1 and Bloom,
     and a terrain of starter scenes so the surface plays from the first touch. */
 io::SessionData makeStarterSession(const engine::Engine& engine);
+
+/** The parameter-ID prefix a preset kind's keys belong under ("cloud" -> "cloud1.",
+    any cloud works); empty for unknown kinds. */
+std::string presetPrefix(const std::string& kind);
+
+/** Built-in presets for the sound sources, the recording medium and the loops. */
+void addFactoryPresets(io::PresetLibrary& library);
 
 } // namespace tf::app

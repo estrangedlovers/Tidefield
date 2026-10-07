@@ -10,6 +10,7 @@
 #include <engine/perform/GestureManager.h>
 #include <engine/scene/PathManager.h>
 #include <engine/scene/SceneManager.h>
+#include <io/Presets.h>
 #include <io/Recorder.h>
 
 #include <juce_events/juce_events.h>
@@ -38,6 +39,7 @@ public:
     engine::SeasonManager seasons;
     engine::PathManager paths;
     engine::GestureManager gestures;
+    io::PresetLibrary presets;
     /** Hardware MIDI inputs: the standalone app opens them itself; in a DAW, MIDI
         arrives with the audio and this is null. */
     std::unique_ptr<MidiInputs> midiInputs;

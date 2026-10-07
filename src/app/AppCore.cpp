@@ -22,6 +22,7 @@ AppCore::AppCore(Host& h)
     fxjuce::registerUserEffects(); // before any slot or session asks for an FX type
     fx.loadDefaultLayout();
     loadRigMidi();
+    addFactoryPresets(presets);
     loadFactoryContent();
 
     catcher.onCaught = [this](int cloud, const std::string& name) {

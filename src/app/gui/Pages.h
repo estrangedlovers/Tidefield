@@ -2,6 +2,8 @@
 
 #include "Widgets.h"
 
+#include <io/Presets.h>
+
 #include <memory>
 #include <vector>
 
@@ -40,6 +42,13 @@ public:
     int preferredWidth(int height) const;
     void paint(juce::Graphics& g) override;
     void resized() override;
+    void mouseDown(const juce::MouseEvent& e) override;
+    void mouseMove(const juce::MouseEvent& e) override;
+    void mouseExit(const juce::MouseEvent& e) override;
+
+    /** Gives the device a Presets menu in its title bar: presets of `kind`, whose keys
+        are these parameters' IDs without `prefix`. */
+    void setPresets(std::string kind, std::string prefix, std::vector<engine::P> params);
 
 protected:
     struct Item
@@ -54,6 +63,15 @@ protected:
     std::vector<Item> items;
     Item top;
     std::vector<std::unique_ptr<juce::Component>> owned;
+
+    // Presets.
+    juce::Rectangle<int> presetButton() const;
+    virtual void showPresetMenu();
+    virtual void applyPreset(const io::Preset& p);
+    virtual io::Preset capturePreset(const std::string& name) const;
+    std::string presetKind, presetPrefix;
+    std::vector<engine::P> presetParams;
+    bool presetHover = false;
 };
 
 /** The bottom panel: a row of tabs (Drone, Clouds, ... MIDI) and the selected page's

@@ -1,4 +1,5 @@
 #include <engine/Engine.h>
+#include <engine/midi/MidiManager.h>
 #include <engine/mix/FxManager.h>
 #include <engine/scene/SceneManager.h>
 #include <io/Session.h>
@@ -133,6 +134,48 @@ TEST_CASE("A session round-trips through a .tidefield file with its audio")
     REQUIRE(b.fx.getType(engine::kMasterSlot) == "tf.medium");
     REQUIRE(b.scenes.isPinned(engine::idx(engine::P::DroneLevel)));
     file.deleteFile();
+}
+
+TEST_CASE("MIDI mappings round-trip through a session; sessions without MIDI keep the rig's mapping")
+{
+    engine::Engine e;
+    e.prepare(kFs, 512);
+    engine::SceneManager scenes(e);
+    engine::FxManager fx(e);
+    engine::MidiManager midi(e);
+    midi.loadDefaultLayout();
+    engine::MidiBinding pad;
+    pad.source = engine::MidiBinding::Source::Note;
+    pad.channel = 9;
+    pad.cc = 36;
+    pad.action = engine::MidiAction::Catch;
+    midi.addBinding(pad);
+    midi.setNotesToDrone(true);
+    midi.setNoteChannel(2);
+
+    engine::TelemetryFrame frame;
+    auto s = io::captureSession(e, frame, scenes, fx, &midi);
+    juce::String error;
+    auto parsed = io::sessionFromJson(juce::JSON::parse(juce::JSON::toString(io::sessionToJson(s))), error);
+    REQUIRE(parsed.has_value());
+
+    engine::Engine e2;
+    e2.prepare(kFs, 512);
+    engine::SceneManager scenes2(e2);
+    engine::FxManager fx2(e2);
+    engine::MidiManager midi2(e2);
+    REQUIRE(io::applySession(*parsed, e2, scenes2, fx2, true, &midi2).empty());
+    REQUIRE(midi2.getBindings().size() == 9);
+    REQUIRE(midi2.getBindings().back().action == engine::MidiAction::Catch);
+    REQUIRE(midi2.getBindings().back().source == engine::MidiBinding::Source::Note);
+    REQUIRE(midi2.getBindings()[7].high == Approx(midi.getBindings()[7].high));
+    REQUIRE(midi2.getNotesToDrone());
+    REQUIRE(midi2.getNoteChannel() == 2);
+
+    // A session saved without MIDI leaves the current mapping untouched.
+    io::SessionData bare;
+    io::applySession(bare, e2, scenes2, fx2, true, &midi2);
+    REQUIRE(midi2.getBindings().size() == 9);
 }
 
 TEST_CASE("Sessions from the future are refused; unknown IDs become warnings")

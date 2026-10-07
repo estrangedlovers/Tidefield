@@ -1,6 +1,7 @@
 #pragma once
 
 #include <engine/Engine.h>
+#include <engine/midi/MidiManager.h>
 
 #include <juce_gui_basics/juce_gui_basics.h>
 
@@ -8,10 +9,24 @@
 
 namespace tf::app {
 
+/** Shared services every knob may use (set once by the main window). */
+struct KnobContext
+{
+    engine::MidiManager* midi = nullptr;
+};
+
+inline KnobContext& knobContext()
+{
+    static KnobContext context;
+    return context;
+}
+
 /** A rotary control bound to one engine parameter. It writes through Engine::post,
     follows the parameter's target from telemetry (so it moves with the terrain), and
     turns gold while the parameter is held in the live layer. Double-click resets to
-    the default; Alt-click releases it back to the terrain. */
+    the default; Alt-click releases it back to the terrain; right-click for MIDI learn.
+    While MIDI soft takeover waits for a controller, an arrow shows which way to turn
+    it. */
 class ParamKnob final : public juce::Component
 {
 public:
@@ -29,9 +44,16 @@ public:
 private:
     engine::Engine& engine;
     engine::P param;
+    void showMenu();
+    void refreshLabel();
+
     juce::Slider slider;
     juce::Label label;
+    juce::String name;
     bool wasLive = false;
+    bool wasLearning = false;
+    std::int8_t pickup = 0;
+    bool liveNow = false;
 };
 
 } // namespace tf::app

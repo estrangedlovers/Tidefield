@@ -20,6 +20,7 @@ target_sources(Tidefield PRIVATE
     Main.cpp
     AudioHost.cpp
     MainComponent.cpp
+    MidiInputs.cpp
     SessionController.cpp
     TerrainPad.cpp
     ui/KnobPanel.cpp

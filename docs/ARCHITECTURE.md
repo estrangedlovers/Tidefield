@@ -241,7 +241,8 @@ them can be added without changing the core.
 
 ## 12. MIDI (phase 5)
 
-MIDI thread -> its own SPSC queue -> audio thread. `MidiMap` is a snapshot of CC
+Each MIDI device -> its own SPSC queue (one per port, so each has a single
+producer) -> audio thread. `MidiMap` is a snapshot of CC
 bindings (range, curve) to any learnable parameter. Soft takeover is per binding on
 the audio thread (pickup with tolerance; "waiting to catch" goes out in telemetry).
 Learn: the audio thread forwards the next CC as a notice; the message thread builds a
@@ -284,7 +285,7 @@ JUCE placeholder panel that talks to the engine through exactly the same contrac
 3. Granular, resonator, live input; mixer and send buses; Tide; harmonic gravity;
    **Medium stage**. **(done)**
 4. Catch, **sample import + Bloom keyboard**, session save/recall. **(done)**
-5. MIDI learn, soft takeover, note input.
+5. MIDI learn, soft takeover, note input. **(done)**
 6. React WebView UI: performance view, then edit view.
 7. Recording to disk, CPU guardrails, polish.
 8. Ambient feature pack: the approved items from section 10.

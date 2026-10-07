@@ -1,11 +1,13 @@
 #pragma once
 
 #include "AudioHost.h"
+#include "MidiInputs.h"
 #include "SessionController.h"
 #include "ui/Pages.h"
 #include "ui/Theme.h"
 
 #include <engine/capture/CatchManager.h>
+#include <engine/midi/MidiManager.h>
 #include <engine/mix/FxManager.h>
 #include <engine/scene/SceneManager.h>
 
@@ -38,6 +40,8 @@ private:
     void showStatus(const juce::String& message, bool warning = false);
     void loadFactoryContent();
     void updateTitle();
+    void loadRigMidi();
+    void saveRigMidi();
 
     AudioHost& host;
     engine::Engine& engine;
@@ -45,6 +49,8 @@ private:
     engine::SceneManager scenes;
     engine::FxManager fx;
     engine::CatchManager catcher;
+    engine::MidiManager midi;
+    MidiInputs midiInputs;
     SessionController session;
 
     juce::TextButton settingsButton { "Audio Settings" };
@@ -58,6 +64,7 @@ private:
 
     juce::TabbedComponent tabs { juce::TabbedButtonBar::TabsAtTop };
     PerformPage* perform = nullptr;
+    MidiPage* midiPage = nullptr;
     std::vector<Page*> pages;
 
     engine::TelemetryFrame lastFrame;

@@ -2,6 +2,7 @@
 
 #include <dsp/core/SampleBuffer.h>
 #include <engine/control/Telemetry.h>
+#include <engine/params/ParamRegistry.h>
 
 #include <juce_core/juce_core.h>
 
@@ -14,6 +15,7 @@
 namespace tf::engine {
 class Engine;
 class FxManager;
+class MidiManager;
 class SceneManager;
 } // namespace tf::engine
 
@@ -48,13 +50,18 @@ struct SessionData
 
 /** Message thread: snapshot the running state. `latest` provides parameter targets. */
 SessionData captureSession(const engine::Engine& engine, const engine::TelemetryFrame& latest, const engine::SceneManager& scenes,
-                           const engine::FxManager& fx);
+                           const engine::FxManager& fx, const engine::MidiManager* midi = nullptr);
 
 /** Message thread: apply a session. With `snap` true, parameters jump (use while the
     master is faded out); otherwise they glide through their smoothers. The live layer
     is released. Returns warnings. */
 std::vector<std::string> applySession(const SessionData& session, engine::Engine& engine, engine::SceneManager& scenes,
-                                      engine::FxManager& fx, bool snap);
+                                      engine::FxManager& fx, bool snap, engine::MidiManager* midi = nullptr);
+
+/** MIDI mapping <-> JSON. A session without a "midi" object leaves the current mapping
+    alone (a controller setup usually belongs to the rig, not the piece). */
+juce::var midiToJson(const engine::MidiManager& midi, const engine::ParamRegistry& registry);
+std::vector<std::string> applyMidiJson(const juce::var& json, engine::MidiManager& midi, const engine::ParamRegistry& registry);
 
 /** The default state: every parameter at its default, no scenes, default FX, no samples. */
 SessionData defaultSession(const engine::Engine& engine);

@@ -2,10 +2,12 @@
 
 #include "KnobPanel.h"
 
+#include "../MidiInputs.h"
 #include "../TerrainPad.h"
 
 #include <juce_audio_utils/juce_audio_utils.h>
 
+#include <engine/midi/MidiManager.h>
 #include <engine/mix/FxManager.h>
 #include <engine/scene/SceneManager.h>
 
@@ -112,6 +114,39 @@ private:
 
     engine::FxManager& fx;
     std::array<juce::ComboBox, engine::kNumFxSlots> typeMenus;
+};
+
+} // namespace tf::app
+
+namespace tf::app {
+
+/** MIDI setup: input devices, learn for actions, the binding list, note routing. */
+class MidiPage final : public Page, private juce::ListBoxModel
+{
+public:
+    MidiPage(engine::MidiManager& midi, MidiInputs& inputs);
+    void update(const engine::TelemetryFrame& frame) override;
+    void resized() override;
+    void paint(juce::Graphics&) override;
+    void noteActivity(const engine::RawMidi& m);
+    void refreshBindings();
+
+private:
+    int getNumRows() override;
+    void paintListBoxItem(int row, juce::Graphics&, int width, int height, bool selected) override;
+    void deleteKeyPressed(int lastRowSelected) override;
+    void rebuildDevices();
+
+    engine::MidiManager& midi;
+    MidiInputs& inputs;
+    juce::OwnedArray<juce::ToggleButton> deviceToggles;
+    std::array<juce::TextButton, 5> actionButtons;
+    juce::TextButton defaultsButton { "Default 8-knob layout" }, clearButton { "Clear all" }, removeButton { "Remove selected" };
+    juce::ComboBox noteChannel;
+    juce::ToggleButton notesToDrone { "Notes also set the drone root" };
+    juce::Label activity, learnStatus, devicesTitle, bindingsTitle, notesTitle, hint;
+    juce::ListBox bindingList { "MIDI bindings", this };
+    std::size_t shownBindings = 0;
 };
 
 } // namespace tf::app

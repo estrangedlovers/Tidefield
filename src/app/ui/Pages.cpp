@@ -292,3 +292,168 @@ void FxPage::refreshSlot(int slot)
 void FxPage::update(const engine::TelemetryFrame& frame) { ScrollingPanel::update(frame); }
 
 } // namespace tf::app
+
+namespace tf::app {
+
+MidiPage::MidiPage(engine::MidiManager& m, MidiInputs& in) : midi(m), inputs(in)
+{
+    auto title = [this](juce::Label& l, const juce::String& text) {
+        l.setText(text.toUpperCase(), juce::dontSendNotification);
+        l.setColour(juce::Label::textColourId, theme::textDim);
+        l.setFont(juce::FontOptions(12.5f));
+        addAndMakeVisible(l);
+    };
+    title(devicesTitle, "Input devices");
+    title(bindingsTitle, "Controller mappings");
+    title(notesTitle, "Notes and actions");
+
+    const engine::MidiAction actions[5] = { engine::MidiAction::Catch, engine::MidiAction::FadeToggle, engine::MidiAction::Panic,
+                                            engine::MidiAction::ReleaseLive, engine::MidiAction::CaptureScene };
+    for (std::size_t i = 0; i < actionButtons.size(); ++i)
+    {
+        auto action = actions[i];
+        actionButtons[i].setButtonText(juce::String("Learn ") + engine::MidiManager::actionName(action));
+        actionButtons[i].onClick = [this, action] { midi.learnAction(action); };
+        actionButtons[i].setTooltip("Then press a button or pad on your controller");
+        addAndMakeVisible(actionButtons[i]);
+    }
+
+    defaultsButton.onClick = [this] { midi.loadDefaultLayout(); refreshBindings(); };
+    clearButton.onClick = [this] { midi.clearAll(); refreshBindings(); };
+    removeButton.onClick = [this] { deleteKeyPressed(bindingList.getSelectedRow()); };
+    for (auto* b : { &defaultsButton, &clearButton, &removeButton })
+        addAndMakeVisible(*b);
+
+    noteChannel.addItem("Notes: any channel", 1);
+    for (int ch = 1; ch <= 16; ++ch)
+        noteChannel.addItem("Notes: channel " + juce::String(ch), ch + 1);
+    noteChannel.setSelectedId(midi.getNoteChannel() + 2, juce::dontSendNotification);
+    noteChannel.onChange = [this] { midi.setNoteChannel(noteChannel.getSelectedId() - 2); };
+    addAndMakeVisible(noteChannel);
+
+    notesToDrone.setToggleState(midi.getNotesToDrone(), juce::dontSendNotification);
+    notesToDrone.onClick = [this] { midi.setNotesToDrone(notesToDrone.getToggleState()); };
+    addAndMakeVisible(notesToDrone);
+
+    for (auto* l : { &activity, &learnStatus, &hint })
+    {
+        l->setColour(juce::Label::textColourId, theme::textDim);
+        addAndMakeVisible(*l);
+    }
+    hint.setText("Right-click any knob to learn it. Moved controllers pick up softly: the arrow on a knob shows which way to turn "
+                 "until it catches the current value. The sustain pedal (CC 64) holds Bloom notes.",
+                 juce::dontSendNotification);
+    hint.setJustificationType(juce::Justification::topLeft);
+    activity.setText("No MIDI received yet", juce::dontSendNotification);
+
+    bindingList.setColour(juce::ListBox::backgroundColourId, theme::panel);
+    bindingList.setRowHeight(24);
+    addAndMakeVisible(bindingList);
+
+    inputs.onDevicesChanged = [this] { rebuildDevices(); };
+    rebuildDevices();
+    refreshBindings();
+}
+
+void MidiPage::rebuildDevices()
+{
+    deviceToggles.clear();
+    for (const auto& d : inputs.getDevices())
+    {
+        auto* t = deviceToggles.add(new juce::ToggleButton(d.info.name + (d.enabled && ! d.open ? " (could not open)" : "")));
+        t->setToggleState(d.enabled, juce::dontSendNotification);
+        const auto id = d.info.identifier;
+        t->onClick = [this, t, id] { juce::MessageManager::callAsync([this, id, on = t->getToggleState()] { inputs.setEnabled(id, on); }); };
+        addAndMakeVisible(t);
+    }
+    if (deviceToggles.isEmpty())
+    {
+        auto* t = deviceToggles.add(new juce::ToggleButton("No MIDI inputs found. Plug in a controller; it appears here."));
+        t->setEnabled(false);
+        addAndMakeVisible(t);
+    }
+    resized();
+}
+
+void MidiPage::refreshBindings()
+{
+    shownBindings = midi.getBindings().size();
+    bindingList.updateContent();
+    bindingList.repaint();
+}
+
+int MidiPage::getNumRows() { return static_cast<int>(midi.getBindings().size()); }
+
+void MidiPage::paintListBoxItem(int row, juce::Graphics& g, int width, int height, bool selected)
+{
+    if (row < 0 || row >= getNumRows())
+        return;
+    if (selected)
+        g.fillAll(theme::panelRaised);
+    g.setColour(theme::text);
+    g.setFont(juce::FontOptions(14.0f));
+    g.drawText(midi.describe(midi.getBindings()[static_cast<std::size_t>(row)]), 10, 0, width - 20, height, juce::Justification::centredLeft);
+}
+
+void MidiPage::deleteKeyPressed(int row)
+{
+    midi.removeBinding(row);
+    refreshBindings();
+}
+
+void MidiPage::noteActivity(const engine::RawMidi& m)
+{
+    juce::String text;
+    if (m.isCc())
+        text = "CC " + juce::String(m.data1) + " = " + juce::String(m.data2);
+    else if (m.isNoteOn())
+        text = "Note on " + format::midiNote(m.data1) + " velocity " + juce::String(m.data2);
+    else if (m.isNoteOff())
+        text = "Note off " + format::midiNote(m.data1);
+    else
+        text = "Status 0x" + juce::String::toHexString(m.status);
+    activity.setText("Last: " + text + " (ch " + juce::String(m.channel() + 1) + ", port " + juce::String(m.port + 1) + ")",
+                     juce::dontSendNotification);
+}
+
+void MidiPage::update(const engine::TelemetryFrame&)
+{
+    if (midi.getBindings().size() != shownBindings)
+        refreshBindings();
+    learnStatus.setColour(juce::Label::textColourId, midi.isLearning() ? theme::warn : theme::textDim);
+    learnStatus.setText(midi.isLearning() ? "Learning: move a controller (or press a pad for an action)" : "", juce::dontSendNotification);
+}
+
+void MidiPage::paint(juce::Graphics&) {}
+
+void MidiPage::resized()
+{
+    auto b = getLocalBounds().reduced(4);
+    auto left = b.removeFromLeft(b.getWidth() / 2).reduced(0, 0);
+    b.removeFromLeft(16);
+
+    devicesTitle.setBounds(left.removeFromTop(24));
+    for (auto* t : deviceToggles)
+        t->setBounds(left.removeFromTop(28));
+    left.removeFromTop(16);
+    notesTitle.setBounds(left.removeFromTop(24));
+    noteChannel.setBounds(left.removeFromTop(30).withWidth(240));
+    left.removeFromTop(6);
+    notesToDrone.setBounds(left.removeFromTop(28));
+    left.removeFromTop(10);
+    for (auto& a : actionButtons)
+        a.setBounds(left.removeFromTop(34).withWidth(260).reduced(0, 3));
+    left.removeFromTop(10);
+    learnStatus.setBounds(left.removeFromTop(24));
+    activity.setBounds(left.removeFromTop(24));
+    hint.setBounds(left.removeFromTop(80));
+
+    bindingsTitle.setBounds(b.removeFromTop(24));
+    auto buttons = b.removeFromBottom(36);
+    defaultsButton.setBounds(buttons.removeFromLeft(190).reduced(3));
+    removeButton.setBounds(buttons.removeFromLeft(150).reduced(3));
+    clearButton.setBounds(buttons.removeFromLeft(110).reduced(3));
+    bindingList.setBounds(b.reduced(0, 4));
+}
+
+} // namespace tf::app

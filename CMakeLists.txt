@@ -48,6 +48,7 @@ add_library(tidefield_engine STATIC
     src/engine/scene/SceneManager.cpp
     src/engine/mix/FxManager.cpp
     src/engine/capture/CatchManager.cpp
+    src/engine/midi/MidiManager.cpp
 )
 target_link_libraries(tidefield_engine PUBLIC tidefield_dsp)
 tf_set_warnings(tidefield_engine)

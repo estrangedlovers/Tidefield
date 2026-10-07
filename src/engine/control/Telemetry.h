@@ -72,12 +72,18 @@ struct TelemetryFrame
     // which parameters are held in the live layer.
     std::array<float, kNumParams> paramTargets {};
     std::array<std::uint8_t, kNumParams> live {};
+
+    /** Soft takeover: for parameters with a MIDI binding that has not caught up yet,
+        +1 if the controller is above the value, -1 if below; 0 otherwise. */
+    std::array<std::int8_t, kNumParams> midiPickup {};
+    bool sustainPedal = false;
 };
 
 /** Discrete things the UI should hear about once. */
 struct EngineNotice
 {
-    enum class Type : std::uint8_t { FadeInComplete, FadeOutComplete, PanicSilent, GuardTripped, ControlQueueOverflow, CatchReady };
+    enum class Type : std::uint8_t { FadeInComplete, FadeOutComplete, PanicSilent, GuardTripped, ControlQueueOverflow, CatchReady,
+                                     CaptureSceneRequest };
     Type type = Type::FadeInComplete;
     std::uint64_t sampleTime = 0;
 

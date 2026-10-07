@@ -3,6 +3,7 @@
 #include "AudioFileIO.h"
 
 #include <engine/Engine.h>
+#include <engine/midi/MidiManager.h>
 #include <engine/mix/FxManager.h>
 #include <engine/scene/SceneManager.h>
 
@@ -59,8 +60,74 @@ std::map<std::string, float> varToMap(const juce::var& v)
 
 } // namespace
 
+juce::var midiToJson(const engine::MidiManager& midi, const engine::ParamRegistry& registry)
+{
+    auto* root = new juce::DynamicObject();
+    root->setProperty("noteChannel", midi.getNoteChannel());
+    root->setProperty("notesToDrone", midi.getNotesToDrone());
+    juce::Array<juce::var> list;
+    for (const auto& b : midi.getBindings())
+    {
+        auto* o = new juce::DynamicObject();
+        o->setProperty("source", b.source == engine::MidiBinding::Source::Cc ? "cc" : "note");
+        o->setProperty("channel", b.channel);
+        o->setProperty("number", b.cc);
+        if (b.action != engine::MidiAction::None)
+            o->setProperty("action", static_cast<int>(b.action));
+        else
+            o->setProperty("param", juce::String(registry.spec(b.param).id));
+        o->setProperty("low", b.low);
+        o->setProperty("high", b.high);
+        o->setProperty("curve", b.curve);
+        o->setProperty("pickup", b.pickup);
+        list.add(juce::var(o));
+    }
+    root->setProperty("bindings", list);
+    return juce::var(root);
+}
+
+std::vector<std::string> applyMidiJson(const juce::var& json, engine::MidiManager& midi, const engine::ParamRegistry& registry)
+{
+    std::vector<std::string> warnings;
+    if (json.getDynamicObject() == nullptr)
+        return warnings;
+    std::vector<engine::MidiBinding> list;
+    if (const auto* arr = json.getProperty("bindings", juce::var()).getArray())
+        for (const auto& v : *arr)
+        {
+            engine::MidiBinding b;
+            b.source = v.getProperty("source", "cc").toString() == "note" ? engine::MidiBinding::Source::Note : engine::MidiBinding::Source::Cc;
+            b.channel = static_cast<int>(v.getProperty("channel", -1));
+            b.cc = static_cast<int>(v.getProperty("number", 0));
+            b.low = static_cast<float>(static_cast<double>(v.getProperty("low", 0.0)));
+            b.high = static_cast<float>(static_cast<double>(v.getProperty("high", 1.0)));
+            b.curve = static_cast<float>(static_cast<double>(v.getProperty("curve", 0.0)));
+            b.pickup = static_cast<bool>(v.getProperty("pickup", true));
+            if (v.hasProperty("action"))
+            {
+                b.action = static_cast<engine::MidiAction>(std::clamp(static_cast<int>(v["action"]), 0, 5));
+            }
+            else
+            {
+                const auto id = v.getProperty("param", "").toString().toStdString();
+                const auto index = registry.find(id);
+                if (! index)
+                {
+                    warnings.push_back("MIDI binding to unknown parameter '" + id + "'");
+                    continue;
+                }
+                b.param = *index;
+            }
+            list.push_back(b);
+        }
+    midi.setNoteChannel(static_cast<int>(json.getProperty("noteChannel", -1)));
+    midi.setNotesToDrone(static_cast<bool>(json.getProperty("notesToDrone", false)));
+    midi.setBindings(std::move(list));
+    return warnings;
+}
+
 SessionData captureSession(const engine::Engine& engine, const engine::TelemetryFrame& latest, const engine::SceneManager& scenes,
-                           const engine::FxManager& fx)
+                           const engine::FxManager& fx, const engine::MidiManager* midi)
 {
     const auto& reg = engine.getRegistry();
     SessionData s;
@@ -88,6 +155,8 @@ SessionData captureSession(const engine::Engine& engine, const engine::Telemetry
             s.samples["cloud" + std::to_string(k + 1)] = b;
     if (auto b = engine.getBloomSample())
         s.samples["bloom"] = b;
+    if (midi != nullptr)
+        s.midi = midiToJson(*midi, reg);
     return s;
 }
 
@@ -106,7 +175,7 @@ SessionData defaultSession(const engine::Engine& engine)
 }
 
 std::vector<std::string> applySession(const SessionData& session, engine::Engine& engine, engine::SceneManager& scenes,
-                                      engine::FxManager& fx, bool snap)
+                                      engine::FxManager& fx, bool snap, engine::MidiManager* midi)
 {
     const auto& reg = engine.getRegistry();
     std::vector<std::string> warnings = session.warnings;
@@ -166,6 +235,10 @@ std::vector<std::string> applySession(const SessionData& session, engine::Engine
     }
     const auto bloom = session.samples.find("bloom");
     engine.loadBloomSample(bloom != session.samples.end() ? bloom->second : nullptr);
+
+    if (midi != nullptr)
+        for (auto& w : applyMidiJson(session.midi, *midi, reg))
+            warnings.push_back(std::move(w));
     return warnings;
 }
 

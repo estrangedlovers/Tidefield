@@ -7,6 +7,7 @@
 #include "master/MasterChain.h"
 #include "mix/ChannelStrip.h"
 #include "mix/FxSlot.h"
+#include "midi/MidiTypes.h"
 #include "mix/Layout.h"
 #include "params/ParamRegistry.h"
 #include "params/ParamState.h"
@@ -103,6 +104,13 @@ public:
         overwritten (the notice was handled more than ~10 s late). */
     bool copyCatch(const EngineNotice& notice, dsp::SampleBuffer& out) const;
 
+    /** MIDI from a device. Each port has its own queue (one producer per queue: the
+        thread that delivers that device's messages). */
+    bool postMidi(int port, const RawMidi& message) noexcept;
+    bool publishMidiMap(std::unique_ptr<MidiMap> map) { return midiMapChannel.publish(std::move(map)); }
+    /** Message thread: every MIDI message the engine received, for learn and activity. */
+    bool popMidiMonitor(RawMidi& out) noexcept { return midiMonitor.pop(out); }
+
     /** FX slots are fed by FxManager; see there. */
     bool sendProcessor(int slot, dsp::ProcessorPtr processor);
     int collectProcessors(int slot);
@@ -143,6 +151,9 @@ private:
     void resetFeedback() noexcept;
     void processChunk(const float* const* inputs, int numInputs, int inputOffset, int offset, int numSamples) noexcept;
     void notify(EngineNotice::Type type) noexcept;
+    void handleMidi(const RawMidi& m) noexcept;
+    void applyMidiBinding(std::size_t index, const MidiBinding& b, int value) noexcept;
+    void fireMidiAction(MidiAction action) noexcept;
     void accumulateTelemetry(const float* l, const float* r, int n) noexcept;
     bool terrainActive() const noexcept;
     float mixRamp(P mixParam, int tickPos) const noexcept;
@@ -157,6 +168,22 @@ private:
     SpscQueue<TelemetryFrame> telemetryQueue;
     SpscQueue<EngineNotice> noticeQueue;
     SnapshotChannel<SceneSet> sceneChannel;
+
+    // MIDI.
+    std::array<std::unique_ptr<SpscQueue<RawMidi>>, kMaxMidiPorts> midiQueues;
+    SpscQueue<RawMidi> midiMonitor { 512 };
+    SnapshotChannel<MidiMap> midiMapChannel { 4 };
+    struct Pickup
+    {
+        bool caught = false;
+        bool hasLast = false;
+        float lastController = 0.0f;
+        float lastSent = -1.0f;
+        bool buttonDown = false;
+    };
+    std::array<Pickup, kMaxMidiBindings> pickups {};
+    std::vector<std::int8_t> midiPickup;
+    bool sustainPedal = false;
 
     double sampleRate = 48000.0;
     int maxBlock = 0;

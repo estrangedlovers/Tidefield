@@ -39,6 +39,9 @@ Engine::Engine(const Config& c)
     for (const auto& s : registry.all())
         paramFlags.push_back(s.flags);
     live.assign(registry.size(), 0);
+    midiPickup.assign(registry.size(), 0);
+    for (auto& q : midiQueues)
+        q = std::make_unique<SpscQueue<RawMidi>>(1024);
 }
 
 void Engine::prepare(double newSampleRate, int maxBlockSize)
@@ -233,6 +236,7 @@ int Engine::collectProcessors(int slot)
 void Engine::collectGarbage()
 {
     sceneChannel.collectGarbage();
+    midiMapChannel.collectGarbage();
     bloomBuffers.collectGarbage();
     for (auto& c : clouds)
         c.buffers.collectGarbage();
@@ -249,14 +253,165 @@ bool Engine::terrainActive() const noexcept
     return set != nullptr && set->numScenes > 0;
 }
 
+bool Engine::postMidi(int port, const RawMidi& message) noexcept
+{
+    if (port < 0 || port >= kMaxMidiPorts)
+        return false;
+    auto m = message;
+    m.port = static_cast<std::uint8_t>(port);
+    return midiQueues[static_cast<std::size_t>(port)]->push(m);
+}
+
 void Engine::drainControl() noexcept
 {
     sceneChannel.acquire();
+    if (midiMapChannel.acquire())
+    {
+        // A new map: every binding must pick up again.
+        pickups.fill({});
+        std::fill(midiPickup.begin(), midiPickup.end(), std::int8_t { 0 });
+    }
     for (auto& slot : fxSlots)
         slot.acquire();
     ControlEvent e;
     while (controlQueue.pop(e))
         applyEvent(e);
+    RawMidi m;
+    for (auto& q : midiQueues)
+        while (q->pop(m))
+            handleMidi(m);
+}
+
+void Engine::fireMidiAction(MidiAction action) noexcept
+{
+    switch (action)
+    {
+        case MidiAction::Catch: requestCatch(); break;
+        case MidiAction::Panic: master.isPanicActive() ? applyCommand(Command::ResumeFromPanic) : applyCommand(Command::Panic); break;
+        case MidiAction::ReleaseLive: applyCommand(Command::ReleaseLiveLayer); break;
+        case MidiAction::FadeToggle:
+        {
+            const auto st = master.getFadeState();
+            applyCommand(st == FadeState::Silent || st == FadeState::FadingOut ? Command::FadeIn : Command::FadeOut);
+            break;
+        }
+        case MidiAction::CaptureScene: notify(EngineNotice::Type::CaptureSceneRequest); break; // needs the message thread
+        case MidiAction::None: break;
+    }
+}
+
+void Engine::applyMidiBinding(std::size_t index, const MidiBinding& b, int value) noexcept
+{
+    auto& st = pickups[index];
+
+    if (b.action != MidiAction::None)
+    {
+        const bool down = value >= 64;
+        if (down && ! st.buttonDown)
+            fireMidiAction(b.action);
+        st.buttonDown = down;
+        return;
+    }
+    if (b.param >= registry.size())
+        return;
+
+    // Controller position -> normalised parameter position, through range and curve.
+    const float v = static_cast<float>(value) / 127.0f;
+    float shaped = v;
+    if (b.curve > 0.0f)
+        shaped = std::pow(v, 1.0f + 3.0f * b.curve);
+    else if (b.curve < 0.0f)
+        shaped = 1.0f - std::pow(1.0f - v, 1.0f - 3.0f * b.curve);
+    const float wanted = b.low + (b.high - b.low) * shaped;
+
+    const auto& spec = registry.spec(b.param);
+    const float current = spec.toNormalised(params.target(b.param));
+    constexpr float kTolerance = 0.025f;
+
+    if (b.pickup)
+    {
+        // Something else (terrain, UI, a scene) moved the parameter: pick up again.
+        if (st.caught && std::fabs(current - st.lastSent) > kTolerance)
+            st.caught = false;
+        if (! st.caught)
+        {
+            const bool near = std::fabs(wanted - current) < kTolerance;
+            const bool crossed = st.hasLast && (st.lastController - current) * (wanted - current) <= 0.0f;
+            st.caught = near || crossed;
+        }
+    }
+    st.lastController = wanted;
+    st.hasLast = true;
+
+    if (! b.pickup || st.caught)
+    {
+        applyEvent(ControlEvent::setParam(b.param, spec.fromNormalised(wanted), ControlSource::Midi));
+        st.lastSent = wanted;
+        midiPickup[b.param] = 0;
+    }
+    else
+    {
+        midiPickup[b.param] = wanted > current ? 1 : -1;
+    }
+}
+
+void Engine::handleMidi(const RawMidi& m) noexcept
+{
+    midiMonitor.push(m); // for learn and activity; dropped if the UI is behind
+
+    const auto* map = midiMapChannel.current();
+    const int ch = m.channel();
+
+    if (m.isCc() || m.isNoteOn() || m.isNoteOff())
+    {
+        const int src = m.isCc() ? 0 : 1;
+        if (map != nullptr)
+        {
+            const auto s = static_cast<std::size_t>(src), c = static_cast<std::size_t>(ch), n = static_cast<std::size_t>(m.data1 & 127);
+            const int count = map->count[s][c][n];
+            const int first = map->start[s][c][n];
+            const int value = m.isCc() ? m.data2 : (m.isNoteOn() ? 127 : 0);
+            for (int i = 0; i < count; ++i)
+            {
+                const auto bi = map->targets[static_cast<std::size_t>(first + i)];
+                if (bi < kMaxMidiBindings)
+                    applyMidiBinding(bi, map->bindings[bi], value);
+            }
+            if (src == 1 && count > 0)
+                return; // a pad bound to an action does not also play Bloom
+        }
+        if (m.isCc())
+        {
+            if (m.data1 == 64) // sustain pedal
+            {
+                sustainPedal = m.data2 >= 64;
+                bloom.setSustain(sustainPedal);
+            }
+            return;
+        }
+    }
+
+    const bool channelOk = map == nullptr || map->noteChannel < 0 || map->noteChannel == ch;
+    if (! channelOk)
+        return;
+    if (m.isNoteOn())
+    {
+        bloom.noteOn(m.data1, static_cast<float>(m.data2) / 127.0f);
+        if (map != nullptr && map->notesToDrone)
+        {
+            // Fold into the drone's range by octaves.
+            int root = m.data1;
+            while (root > 60)
+                root -= 12;
+            while (root < 24)
+                root += 12;
+            applyEvent(ControlEvent::setParam(idx(P::DroneRoot), static_cast<float>(root), ControlSource::Midi));
+        }
+    }
+    else if (m.isNoteOff())
+    {
+        bloom.noteOff(m.data1);
+    }
 }
 
 void Engine::applyEvent(const ControlEvent& e) noexcept
@@ -809,7 +964,9 @@ void Engine::accumulateTelemetry(const float* l, const float* r, int n) noexcept
     {
         f.paramTargets[i] = params.target(static_cast<ParamIndex>(i));
         f.live[i] = live[i];
+        f.midiPickup[i] = midiPickup[i];
     }
+    f.sustainPedal = sustainPedal;
 
     telemetryQueue.push(f); // dropped if the UI is behind; the next frame supersedes it
 

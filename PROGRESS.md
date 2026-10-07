@@ -2,7 +2,7 @@
 
 Read `CLAUDE.md` (rules) and `docs/ARCHITECTURE.md` (design) first.
 
-## Status: phase 4 complete, phase 5 next
+## Status: phase 5 complete, phase 6 next
 
 ### Phase 1: skeleton, device settings, safety chain, drone, render harness
 
@@ -216,10 +216,44 @@ a saved session that a second score recalls.
 **Untested (needs the Mac)**: file dialogs, background save/load timing, keyboard
 playing feel, Bloom transforms by ear.
 
-## Next: phase 5
-MIDI input (device selection, SPSC from the MIDI thread), learn mode for every
-learnable parameter, soft takeover, note input to Bloom (and drone root), default
-8-knob controller layout, MIDI maps saved in sessions.
+### Phase 5: MIDI
+
+**Built**
+- Engine: one SPSC queue per MIDI port (up to 4 devices; each device's delivery
+  thread is the sole producer of its queue), a monitor queue back to the UI, and a
+  `MidiMap` snapshot with per-(source, channel, number) binding lists. Bindings map a
+  CC to any parameter through a range and curve, or a CC/pad note to an action
+  (Catch, fade toggle, panic, release live layer, capture scene). Buttons fire on a
+  rising edge. Soft takeover per binding: waits until the controller reaches or
+  crosses the value, re-arms when anything else moves the parameter; telemetry shows
+  which way to turn. Notes play Bloom (channel filter), optionally set the drone root
+  (folded into range), CC 64 sustain holds Bloom voices.
+- `MidiManager` (message thread): bindings, learn for parameters and actions (one
+  control drives one target when learned; sustain pedal never learnable), default
+  layout CC 21-28 (terrain X/Y, Tide, wander, gravity, reverb return, cloud 1
+  density, master level capped at 0 dB), readable descriptions.
+- Sessions store the mapping; a session without one leaves the rig's mapping alone.
+  The app keeps the rig mapping in its settings across launches.
+- App: `MidiInputs` opens devices with per-device callback objects (no shared lookup
+  on the MIDI thread), follows hot-plugging, remembers disabled devices. Knob
+  right-click menu: MIDI learn / forget, release to terrain, reset. Learning knobs
+  turn red; waiting-for-pickup knobs show an arrow. New MIDI tab: devices, note
+  channel, notes-to-drone, learn buttons for actions, binding list, activity readout.
+
+**Verified**: 80 core + 5 io tests pass, including pickup catching by approach and by
+crossing, re-pickup after another source moves the value, ranges and curves, mixed
+any-channel and channel-specific bindings, rising-edge actions from CCs and pads,
+note channel filtering, sustain pedal holding voices, notes to drone root, learn
+replacing an old target, the default layout's master cap, MIDI session round trip,
+and zero allocations while handling a stream of CCs and notes.
+
+**Untested (needs the Mac and a controller)**: real devices, hot-plugging, CoreMIDI
+threading, how pickup feels in hand.
+
+## Next: phase 6
+React WebView UI: performance view first (terrain front and centre, few large
+controls, visuals driven by telemetry), then the edit view. Same contract as the
+placeholder panel: ControlEvents in, telemetry out, managers on the message thread.
 
 ## How to run
 ```

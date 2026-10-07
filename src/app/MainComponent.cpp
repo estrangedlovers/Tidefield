@@ -2,6 +2,7 @@
 
 #include <BinaryData.h>
 #include <io/AudioFileIO.h>
+#include <io/Session.h>
 
 namespace tf::app {
 
@@ -22,8 +23,12 @@ const char* fadeStateName(engine::FadeState s)
 } // namespace
 
 MainComponent::MainComponent(AudioHost& h)
-    : host(h), engine(h.getEngine()), scenes(h.getEngine()), fx(h.getEngine()), catcher(h.getEngine()), session(h.getEngine(), scenes, fx)
+    : host(h), engine(h.getEngine()), scenes(h.getEngine()), fx(h.getEngine()), catcher(h.getEngine()), midi(h.getEngine()),
+      midiInputs(h.getEngine(), h.getSettings()), session(h.getEngine(), scenes, fx, &midi)
 {
+    knobContext().midi = &midi;
+    midi.onLearned = [this](const std::string& d) { showStatus("MIDI learned: " + juce::String(d)); };
+    loadRigMidi();
     // Default (not per-component) so every child copies the palette when it is built.
     juce::LookAndFeel::setDefaultLookAndFeel(&lookAndFeel);
     fx.loadDefaultLayout();
@@ -64,6 +69,8 @@ MainComponent::MainComponent(AudioHost& h)
     addPage("Sources", new SourcesPage(engine));
     addPage("Mixer", new MixerPage(engine));
     addPage("FX", new FxPage(engine, fx));
+    midiPage = new MidiPage(midi, midiInputs);
+    addPage("MIDI", midiPage);
     tabs.setTabBarDepth(32);
     addAndMakeVisible(tabs);
 
@@ -84,6 +91,23 @@ void MainComponent::loadFactoryContent()
     engine.loadBloomSample(decode(BinaryData::glass_wav, BinaryData::glass_wavSize, "glass"));
     engine.loadCloudSample(0, decode(BinaryData::chord_wav, BinaryData::chord_wavSize, "chord"));
     engine.setParam(engine::P::BloomRoot, 81.0f); // glass.wav rings at A5
+}
+
+void MainComponent::loadRigMidi()
+{
+    // The controller mapping belongs to the rig: it persists in the app settings and
+    // only changes when a session that carries its own mapping is opened.
+    const auto stored = host.getSettings().getValue("midiMapping");
+    if (stored.isNotEmpty())
+        io::applyMidiJson(juce::JSON::parse(stored), midi, engine.getRegistry());
+    else
+        midi.loadDefaultLayout();
+}
+
+void MainComponent::saveRigMidi()
+{
+    host.getSettings().setValue("midiMapping", juce::JSON::toString(io::midiToJson(midi, engine.getRegistry()), true));
+    host.getSettings().saveIfNeeded();
 }
 
 void MainComponent::showStatus(const juce::String& message, bool warning)
@@ -122,6 +146,8 @@ void MainComponent::showSessionMenu()
 MainComponent::~MainComponent()
 {
     stopTimer();
+    saveRigMidi();
+    knobContext().midi = nullptr;
     tabs.clearTabs();
     juce::LookAndFeel::setDefaultLookAndFeel(nullptr);
 }
@@ -152,7 +178,7 @@ bool MainComponent::keyPressed(const juce::KeyPress& key)
         perform->captureScene();
     else if (c == 'r')
         perform->releaseLive();
-    else if (c >= '1' && c <= '4')
+    else if (c >= '1' && c <= '5')
         tabs.setCurrentTabIndex(c - '1');
     else
         return false;
@@ -228,7 +254,15 @@ void MainComponent::timerCallback()
 {
     scenes.tick();
     fx.tick();
+    midi.tick();
     engine.collectGarbage();
+
+    engine::RawMidi monitored;
+    while (engine.popMidiMonitor(monitored))
+    {
+        midi.handleMonitor(monitored);
+        midiPage->noteActivity(monitored);
+    }
 
     engine::TelemetryFrame f;
     bool got = false;
@@ -248,6 +282,8 @@ void MainComponent::timerCallback()
     {
         if (notice.type == engine::EngineNotice::Type::GuardTripped)
             showStatus("Safety guard tripped: a non-finite sample was caught and the engine reset.", true);
+        if (notice.type == engine::EngineNotice::Type::CaptureSceneRequest)
+            perform->captureScene();
         catcher.handle(notice);
         session.handleNotice(notice);
     }

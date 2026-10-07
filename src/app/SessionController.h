@@ -1,6 +1,7 @@
 #pragma once
 
 #include <engine/Engine.h>
+#include <engine/midi/MidiManager.h>
 #include <engine/mix/FxManager.h>
 #include <engine/scene/SceneManager.h>
 #include <io/Session.h>
@@ -19,7 +20,7 @@ namespace tf::app {
 class SessionController
 {
 public:
-    SessionController(engine::Engine& engine, engine::SceneManager& scenes, engine::FxManager& fx);
+    SessionController(engine::Engine& engine, engine::SceneManager& scenes, engine::FxManager& fx, engine::MidiManager* midi);
     ~SessionController();
 
     void newSession();
@@ -47,6 +48,7 @@ private:
     engine::Engine& engine;
     engine::SceneManager& scenes;
     engine::FxManager& fx;
+    engine::MidiManager* midi;
     engine::TelemetryFrame latest;
     juce::File current;
     std::unique_ptr<juce::FileChooser> chooser;

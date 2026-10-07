@@ -72,6 +72,8 @@ public:
 
     void noteOn(int note, float velocity) noexcept;
     void noteOff(int note) noexcept;
+    /** Sustain pedal: while down, note-offs are deferred until it is released. */
+    void setSustain(bool down) noexcept;
     /** Fast release of every voice (e.g. before swapping the sample). */
     void releaseAll(float seconds = 0.02f) noexcept;
 
@@ -104,6 +106,7 @@ private:
     {
         bool active = false;
         bool held = false;
+        bool sustained = false;    // note released while the pedal was down
         int note = 60;
         float playedNote = 60.0f;
         float velocityGain = 1.0f;
@@ -142,6 +145,7 @@ private:
     Random rng;
     std::array<Voice, kMaxVoices> voices {};
     std::vector<float> hann;
+    bool sustainPedal = false;
 };
 
 } // namespace tf::dsp

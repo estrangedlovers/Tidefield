@@ -112,8 +112,26 @@ void BloomSampler::noteOn(int note, float velocity) noexcept
 void BloomSampler::noteOff(int note) noexcept
 {
     for (auto& v : voices)
-        if (v.active && v.note == note)
+        if (v.active && v.note == note && v.held)
+        {
+            if (sustainPedal)
+                v.sustained = true;
+            else
+                v.held = false;
+        }
+}
+
+void BloomSampler::setSustain(bool down) noexcept
+{
+    sustainPedal = down;
+    if (down)
+        return;
+    for (auto& v : voices)
+        if (v.sustained)
+        {
+            v.sustained = false;
             v.held = false;
+        }
 }
 
 void BloomSampler::releaseAll(float seconds) noexcept

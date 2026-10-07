@@ -25,6 +25,7 @@ public:
     int getXrunCount() const { return loadMeasurer.getXRunCount(); }
 
     void saveDeviceState();
+    juce::PropertiesFile& getSettings() noexcept { return settings; }
 
 private:
     void audioDeviceIOCallbackWithContext(const float* const* inputs, int numInputs, float* const* outputs, int numOutputs,

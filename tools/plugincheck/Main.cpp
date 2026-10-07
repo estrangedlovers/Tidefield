@@ -8,6 +8,7 @@
 #include <juce_events/juce_events.h>
 
 #include <cmath>
+#include <cstring>
 #include <iostream>
 #include <map>
 
@@ -76,18 +77,42 @@ Result render(juce::AudioPluginInstance& p, double rate, std::initializer_list<i
     host's XML container when there is one. Returns entry name -> size, and the JSON. */
 std::map<juce::String, juce::int64> sessionEntries(const juce::MemoryBlock& state, juce::var& json)
 {
-    juce::MemoryBlock zipData = state;
-    // JUCE's VST3 host prefixes "VC2!" and a 4-byte size before the XML.
+    juce::MemoryBlock zipData;
     const auto* bytes = static_cast<const char*>(state.getData());
-    const bool wrapped = state.getSize() > 8 && juce::String(juce::CharPointer_UTF8(bytes), 4) == "VC2!";
-    const auto text = wrapped ? juce::String::fromUTF8(bytes + 8, static_cast<int>(state.getSize() - 8)) : juce::String();
-    if (const auto start = text.indexOf("<IComponent>"); start >= 0)
+    const auto size = state.getSize();
+    if (size > 8 && juce::String(juce::CharPointer_UTF8(bytes), 4) == "VC2!")
     {
-        const auto body = text.substring(start + 12, text.indexOf("</IComponent>"));
-        zipData.reset();
-        zipData.fromBase64Encoding(body);
+        // JUCE's VST3 host: "VC2!", a 4-byte size, then XML with the component state
+        // in JUCE's base64 form.
+        const auto text = juce::String::fromUTF8(bytes + 8, static_cast<int>(size - 8));
+        const auto start = text.indexOf("<IComponent>");
+        if (start >= 0)
+            zipData.fromBase64Encoding(text.substring(start + 12, text.indexOf("</IComponent>")));
+    }
+    else
+    {
+        // An Audio Unit's ClassInfo: the plugin's bytes as data under jucePluginState,
+        // either raw (binary plist) or standard base64 (XML plist).
+        const juce::MemoryBlock pk("PK\x03\x04", 4);
+        for (size_t i = 0; i + 4 <= size && zipData.isEmpty(); ++i)
+            if (std::memcmp(bytes + i, pk.getData(), 4) == 0)
+                zipData.replaceAll(bytes + i, size - i);
+        if (zipData.isEmpty())
+        {
+            const auto text = juce::String::fromUTF8(bytes, static_cast<int>(size));
+            const auto key = text.indexOf("jucePluginState");
+            const auto from = text.indexOf(key, "<data>");
+            if (key >= 0 && from >= 0)
+            {
+                juce::MemoryOutputStream decoded;
+                juce::Base64::convertFromBase64(decoded, text.substring(from + 6, text.indexOf(from, "</data>")).removeCharacters(" \t\r\n"));
+                zipData = decoded.getMemoryBlock();
+            }
+        }
     }
     std::map<juce::String, juce::int64> entries;
+    if (zipData.isEmpty())
+        return {};
     juce::MemoryInputStream stream(zipData, false);
     juce::ZipFile zip(stream);
     for (int i = 0; i < zip.getNumEntries(); ++i)
@@ -163,6 +188,9 @@ int main(int argc, char** argv)
         // Same sounds, scenes, effects and parameters come back out.
         juce::var a, b;
         const auto ea = sessionEntries(state, a), eb = sessionEntries(again, b);
+        if (ea.empty()) // unknown wrapper: show how it starts, for the next fix
+            std::cout << "      state begins: " << juce::String::toHexString(state.getData(), static_cast<int>(std::min<size_t>(64, state.getSize())))
+                      << "\n      as text: " << juce::String::fromUTF8(static_cast<const char*>(state.getData()), static_cast<int>(std::min<size_t>(300, state.getSize()))).replaceCharacters("\r\n", "  ") << std::endl;
         auto names = [](const std::map<juce::String, juce::int64>& m) {
             juce::StringArray n;
             for (const auto& [name, size] : m)

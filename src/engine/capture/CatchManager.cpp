@@ -70,6 +70,7 @@ bool CatchManager::handle(const EngineNotice& notice)
     shape(buffer->left);
     if (buffer->isStereo())
         shape(buffer->right);
+    dsp::buildMips(*buffer); // so the cloud can be pitched up without aliasing
 
     const int cloud = chooseCloud(notice.target);
     ++counter;

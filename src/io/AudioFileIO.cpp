@@ -31,6 +31,7 @@ std::unique_ptr<dsp::SampleBuffer> readAll(std::unique_ptr<juce::AudioFormatRead
     buffer->left.assign(temp.getReadPointer(0), temp.getReadPointer(0) + length);
     if (channels > 1)
         buffer->right.assign(temp.getReadPointer(1), temp.getReadPointer(1) + length);
+    dsp::buildMips(*buffer); // band-limited copies for pitched-up playback
     return buffer;
 }
 

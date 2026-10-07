@@ -3,6 +3,7 @@
 #include "../Processor.h"
 
 #include "../../core/DelayLine.h"
+#include "../../core/MathUtil.h"
 #include "../../core/Random.h"
 #include "../../filters/Biquad.h"
 #include "../../filters/OnePole.h"
@@ -68,6 +69,7 @@ private:
         Svf hfL, hfR;
         OnePole hissHp, hissLp;
         Random rng;
+        TanhAdaa satL, satR; // anti-aliased tape saturation
         float dropoutGain = 1.0f, dropoutTarget = 1.0f;
         int dropoutRemaining = 0;
     };

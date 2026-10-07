@@ -51,4 +51,41 @@ inline float onePoleCoefficient(float timeSeconds, double sampleRate) noexcept
     return 1.0f - std::exp(-1.0f / (timeSeconds * static_cast<float>(sampleRate)));
 }
 
+/** tanh with first-order antiderivative anti-aliasing (Parker, Zavalishin, Le Bivic
+    2016). The output is the average of tanh over the segment between successive
+    inputs, (F(x[n]) - F(x[n-1])) / (x[n] - x[n-1]) with F = log cosh, which
+    suppresses the aliasing a plain tanh produces when driven hard, at the cost of a
+    half-sample delay. One per channel; reset() with the filter states. */
+class TanhAdaa
+{
+public:
+    void reset() noexcept
+    {
+        x1 = 0.0;
+        f1 = logCosh(0.0);
+    }
+
+    float process(float in) noexcept
+    {
+        const double x = static_cast<double>(in);
+        const double f = logCosh(x);
+        const double d = x - x1;
+        // Nearly equal inputs: the difference quotient is ill-conditioned, use the
+        // midpoint instead (the same value in the limit).
+        const double y = std::fabs(d) < 1.0e-4 ? std::tanh(0.5 * (x + x1)) : (f - f1) / d;
+        x1 = x;
+        f1 = f;
+        return static_cast<float>(y);
+    }
+
+private:
+    static double logCosh(double x) noexcept
+    {
+        const double a = std::fabs(x);
+        return a + std::log1p(std::exp(-2.0 * a)) - 0.69314718055994530942; // stable for any |x|
+    }
+
+    double x1 = 0.0, f1 = 0.0;
+};
+
 } // namespace tf::dsp

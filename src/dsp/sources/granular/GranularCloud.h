@@ -81,6 +81,7 @@ private:
         float gainL = 0.0f, gainR = 0.0f;
         float windowMix = 0.5f; // 0 = perc, 0.5 = hann, 1 = tukey
         float pan = 0.0f;
+        int mip = 0;            // band-limited level read (pitched up -> coarser)
     };
 
     void spawnGrain() noexcept;

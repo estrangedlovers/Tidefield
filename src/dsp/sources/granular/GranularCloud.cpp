@@ -120,6 +120,7 @@ void GranularCloud::spawnGrain() noexcept
     g->active = true;
     g->readPos = start;
     g->increment = reversed ? -ratio : ratio;
+    g->mip = mipLevelFor(std::fabs(g->increment), buffer->mipLevels());
     g->length = length;
     g->age = 0;
     g->windowMix = std::clamp(p.shape, 0.0f, 1.0f);
@@ -146,9 +147,7 @@ void GranularCloud::process(float* left, float* right, int n, float timeScale) n
     const float overlap = std::max(1.0f, params.density * params.grainMs * 0.001f);
     const float norm = 1.0f / std::sqrt(overlap);
 
-    const float* srcL = buffer->channel(0);
-    const float* srcR = buffer->channel(1);
-    const auto size = buffer->size();
+    const bool stereoSource = buffer->isStereo();
     const double meanInterval = spec.sampleRate / std::max(0.05, static_cast<double>(params.density));
 
     // Onsets are resolved per block (the engine calls with <= 32 samples, < 1 ms).
@@ -164,11 +163,17 @@ void GranularCloud::process(float* left, float* right, int n, float timeScale) n
         }
     }
 
-    const bool stereo = srcR != srcL;
     for (auto& g : grains)
     {
         if (! g.active)
             continue;
+        // Read the band-limited level chosen for this grain's speed (positions stay in
+        // level-0 samples; a level-k sample covers 2^k of them).
+        const float* srcL = buffer->mipChannel(0, g.mip);
+        const float* srcR = buffer->mipChannel(1, g.mip);
+        const auto size = buffer->mipSize(g.mip);
+        const bool stereo = stereoSource;
+        const double scale = 1.0 / static_cast<double>(1 << g.mip);
         const float invLength = 1.0f / static_cast<float>(g.length);
         // The window changes slowly against a chunk (<= 32 samples; grains are >= 10 ms),
         // so it is evaluated at the chunk's ends and interpolated: two table blends per
@@ -179,8 +184,8 @@ void GranularCloud::process(float* left, float* right, int n, float timeScale) n
         const float wStep = run > 0 ? (w1 - w0) / static_cast<float>(run) : 0.0f;
         float w = w0;
         const float gl = g.gainL, gr = g.gainR;
-        double pos = g.readPos;
-        const double inc = g.increment;
+        double pos = g.readPos * scale;
+        const double inc = g.increment * scale;
         for (int i = 0; i < run; ++i)
         {
             float sl, sr;
@@ -203,7 +208,7 @@ void GranularCloud::process(float* left, float* right, int n, float timeScale) n
             pos += inc;
             w += wStep;
         }
-        g.readPos = pos;
+        g.readPos = pos / scale;
         g.age += run;
         if (g.age >= g.length)
         {

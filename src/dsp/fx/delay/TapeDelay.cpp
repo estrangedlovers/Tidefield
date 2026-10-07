@@ -56,6 +56,8 @@ void TapeDelay::reset() noexcept
         f->reset();
     dcL.reset();
     dcR.reset();
+    loopSatL.reset();
+    loopSatR.reset();
 }
 
 void TapeDelay::setControls(const std::array<float, 6>& c, const ModContext& ctx) noexcept
@@ -107,8 +109,8 @@ void TapeDelay::process(float* left, float* right, int n) noexcept
         const float cross = 0.5f * spread;
         const float inL = left[s];
         const float inR = right[s];
-        lineL.push(flushDenormal(saturate(inL + feedback * lerp(fbL, fbR, cross))));
-        lineR.push(flushDenormal(saturate(inR + feedback * lerp(fbR, fbL, cross))));
+        lineL.push(flushDenormal(1.2f * loopSatL.process((inL + feedback * lerp(fbL, fbR, cross)) * (1.0f / 1.2f))));
+        lineR.push(flushDenormal(1.2f * loopSatR.process((inR + feedback * lerp(fbR, fbL, cross)) * (1.0f / 1.2f))));
 
         left[s] = echoL;
         right[s] = echoR;

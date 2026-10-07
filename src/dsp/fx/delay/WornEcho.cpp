@@ -11,7 +11,6 @@ namespace tf::dsp {
 namespace {
 const char* const kMediumChoices[] = { "Cassette", "Vinyl", "Sampler" };
 constexpr float kMaxSeconds = 2.2f;
-inline float saturate(float x) noexcept { return 1.2f * std::tanh(x * (1.0f / 1.2f)); }
 } // namespace
 
 using Curve = DisplayMap::Curve;
@@ -49,6 +48,8 @@ void WornEcho::reset() noexcept
     medium.reset();
     dcL.reset();
     dcR.reset();
+    loopSatL.reset();
+    loopSatR.reset();
 }
 
 void WornEcho::setControls(const std::array<float, 6>& c, const ModContext& ctx) noexcept
@@ -91,8 +92,8 @@ void WornEcho::processChunk(float* left, float* right, int n) noexcept
         const auto ui = static_cast<std::size_t>(i);
         const float fbL = dcL.process(echoL[ui]);
         const float fbR = dcR.process(echoR[ui]);
-        lineL.push(flushDenormal(saturate(left[i] + feedback * lerp(fbL, fbR, cross))));
-        lineR.push(flushDenormal(saturate(right[i] + feedback * lerp(fbR, fbL, cross))));
+        lineL.push(flushDenormal(1.2f * loopSatL.process((left[i] + feedback * lerp(fbL, fbR, cross)) * (1.0f / 1.2f))));
+        lineR.push(flushDenormal(1.2f * loopSatR.process((right[i] + feedback * lerp(fbR, fbL, cross)) * (1.0f / 1.2f))));
         left[i] = echoL[ui];
         right[i] = echoR[ui];
     }

@@ -3,6 +3,7 @@
 #include "../Processor.h"
 
 #include "../../core/DelayLine.h"
+#include "../../core/MathUtil.h"
 #include "../../filters/DcBlocker.h"
 #include "../medium/Medium.h"
 
@@ -37,6 +38,7 @@ private:
     DelayLine lineL, lineR;
     Medium medium;
     DcBlocker dcL, dcR;
+    TanhAdaa loopSatL, loopSatR;
     std::array<float, kChunk> echoL {}, echoR {};
     float currentDelay = 0.0f, targetDelay = 0.0f, glide = 0.0002f;
     float feedback = 0.5f, spread = 0.3f;

@@ -217,6 +217,7 @@ void BloomSampler::startVoice(Voice& v, int note, float velocity) noexcept
             const double swellSamples = std::min(size - 2.0, static_cast<double>(lerp(0.6f, 4.0f, amount) * fs) * v.ratio);
             auto& t = v.taps[0];
             t.active = true;
+            t.mip = -1;
             t.pos = swellSamples;
             t.inc = -v.ratio;
             t.gainL = pans.left;
@@ -262,6 +263,7 @@ void BloomSampler::startVoice(Voice& v, int note, float velocity) noexcept
                                                  : v.playedNote + static_cast<float>(degree);
                 }
                 t.active = true;
+                t.mip = -1;
                 t.pos = 0.0;
                 t.inc = std::exp2((static_cast<double>(tapNote) - static_cast<double>(p.rootNote)) / 12.0) * buffer->sampleRate / spec.sampleRate;
                 t.delay = i == 0 ? 0 : static_cast<int>(v.rng.nextFloat() * (0.4f + 2.6f * amount) * fs);
@@ -276,6 +278,7 @@ void BloomSampler::startVoice(Voice& v, int note, float velocity) noexcept
         {
             auto& t = v.taps[0];
             t.active = true;
+            t.mip = -1;
             t.pos = 0.0;
             t.inc = v.ratio;
             t.gainL = pans.left;
@@ -308,6 +311,7 @@ void BloomSampler::spawnGrain(Voice& v) noexcept
     g->active = true;
     g->pos = pos;
     g->inc = v.ratio * std::exp2(static_cast<double>(v.pitchJitter * v.rng.nextBipolar()) / 12.0);
+    g->mip = mipLevelFor(std::fabs(g->inc), buffer->mipLevels());
     g->length = std::max(32, static_cast<int>(v.grainLength * (0.8 + 0.4 * static_cast<double>(v.rng.nextFloat()))));
     g->age = 0;
     const auto pans = equalPowerPan(std::clamp(v.pan + 0.3f * params.spread * v.rng.nextBipolar(), -1.0f, 1.0f));
@@ -317,10 +321,15 @@ void BloomSampler::spawnGrain(Voice& v) noexcept
 
 void BloomSampler::renderVoice(Voice& v, float* left, float* right, int n, float timeScale) noexcept
 {
-    const float* srcL = buffer->channel(0);
-    const float* srcR = buffer->channel(1);
-    const auto size = buffer->size();
-    const double sizeD = static_cast<double>(size);
+    const bool stereo = buffer->isStereo();
+    const double sizeD = static_cast<double>(buffer->size());
+    // Reads from the band-limited level for that speed (positions in level-0 samples).
+    auto readAt = [&](int mip, double pos, float& sl, float& sr) {
+        const double p = pos / static_cast<double>(1 << mip);
+        const auto sz = buffer->mipSize(mip);
+        sl = readHermite(buffer->mipChannel(0, mip), sz, p);
+        sr = stereo ? readHermite(buffer->mipChannel(1, mip), sz, p) : sl;
+    };
     const float overlap = v.grainsOn ? std::max(1.0f, static_cast<float>(v.grainLength / std::max(1.0, v.grainInterval))) : 1.0f;
     const float grainNorm = 0.8f / std::sqrt(overlap);
     const float amount = std::clamp(params.amount, 0.0f, 1.0f);
@@ -376,8 +385,10 @@ void BloomSampler::renderVoice(Voice& v, float* left, float* right, int n, float
                     v.tapeSpeed = std::max(0.0f, v.tapeSpeed - dt / 1.2f);
                 inc *= static_cast<double>((1.0f + wobble) * v.tapeSpeed);
             }
-            const float sl = readHermite(srcL, size, t.pos);
-            const float sr = srcR == srcL ? sl : readHermite(srcR, size, t.pos);
+            if (t.mip < 0)
+                t.mip = mipLevelFor(std::fabs(t.inc), buffer->mipLevels());
+            float sl, sr;
+            readAt(t.mip, t.pos, sl, sr);
             l += sl * t.gainL;
             r += sr * t.gainR;
             t.pos += inc;
@@ -400,8 +411,8 @@ void BloomSampler::renderVoice(Voice& v, float* left, float* right, int n, float
                 if (! g.active)
                     continue;
                 const float w = window(static_cast<float>(g.age) / static_cast<float>(g.length)) * grainNorm;
-                const float sl = readHermite(srcL, size, g.pos);
-                const float sr = srcR == srcL ? sl : readHermite(srcR, size, g.pos);
+                float sl, sr;
+                readAt(g.mip, g.pos, sl, sr);
                 l += sl * w * g.gainL;
                 r += sr * w * g.gainR;
                 g.pos += g.inc;

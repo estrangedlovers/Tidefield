@@ -3,6 +3,7 @@
 #include "../Processor.h"
 
 #include "../../core/DelayLine.h"
+#include "../../core/MathUtil.h"
 #include "../../core/Random.h"
 #include "../../filters/DcBlocker.h"
 #include "../../filters/OnePole.h"
@@ -38,6 +39,7 @@ private:
     DelayLine lineL, lineR;
     OnePole toneL, toneR, lowCutL, lowCutR;
     DcBlocker dcL, dcR;
+    TanhAdaa loopSatL, loopSatR; // the bound on the loop, anti-aliased
     Drift wowDrift;
     float flutterPhase = 0.0f;
     float currentDelay = 4800.0f, targetDelay = 4800.0f, glideCoeff = 0.0002f;

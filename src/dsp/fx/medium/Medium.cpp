@@ -76,6 +76,8 @@ void Medium::reset() noexcept
     for (auto* o : { &cassette.hissHp, &cassette.hissLp, &vinyl.sideHp, &vinyl.crackleHp, &vinyl.rumbleLp, &vinyl.surfaceLp, &vinyl.popLp })
         o->reset();
     cassette.dropoutGain = cassette.dropoutTarget = 1.0f;
+    cassette.satL.reset();
+    cassette.satR.reset();
     cassette.dropoutRemaining = 0;
     vinyl.clickEnv = vinyl.popEnv = 0.0f;
     sampler.phase = sampler.holdL = sampler.holdR = 0.0f;
@@ -155,9 +157,10 @@ void Medium::runCassette(const float* iL, const float* iR, float* oL, float* oR,
         const float lx = l + 0.03f * r;
         const float rx = r + 0.03f * l;
 
-        // Asymmetric tape saturation (bias shifts the curve; the offset is removed).
-        l = (softClip(lx * driveGain + bias) - biasOffset) * makeup;
-        r = (softClip(rx * driveGain + bias) - biasOffset) * makeup;
+        // Asymmetric tape saturation (bias shifts the curve; the offset is removed),
+        // anti-aliased: up to 18 dB of drive would otherwise fold harmonics back down.
+        l = (c.satL.process(lx * driveGain + bias) - biasOffset) * makeup;
+        r = (c.satR.process(rx * driveGain + bias) - biasOffset) * makeup;
 
         l = c.hfL.processLow(c.bumpL.process(l));
         r = c.hfR.processLow(c.bumpR.process(r));

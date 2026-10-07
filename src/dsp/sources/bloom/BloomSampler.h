@@ -93,6 +93,7 @@ private:
         double pos = 0.0, inc = 1.0;
         int delay = 0;
         float gainL = 0.0f, gainR = 0.0f;
+        int mip = -1; // band-limited level, chosen from |inc| on first read
     };
 
     struct Grain
@@ -101,6 +102,7 @@ private:
         double pos = 0.0, inc = 1.0;
         int length = 1, age = 0;
         float gainL = 0.0f, gainR = 0.0f;
+        int mip = 0;
     };
 
     enum class Stage { Attack, Hold, Release };

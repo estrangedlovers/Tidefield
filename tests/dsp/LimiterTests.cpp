@@ -62,3 +62,36 @@ TEST_CASE("Limiter passes quiet material unchanged apart from latency")
     for (int i = latency; i < 256; ++i)
         REQUIRE(std::fabs(l[static_cast<size_t>(i)] - ref[static_cast<size_t>(i - latency)]) < 1.0e-6f);
 }
+
+TEST_CASE("Limiter holds the ceiling for the reconstructed signal (true peak)", "[limiter][truepeak]")
+{
+    // A tone at fs/4 sampled at 45 degrees: every sample is 0.707 of the waveform's
+    // real peak, the classic 3 dB intersample overshoot.
+    tf::dsp::Limiter lim;
+    lim.prepare({ 48000.0, 256 });
+    lim.setCeilingDb(-1.0f);
+    const int n = 188 * 256;
+    std::vector<float> l(static_cast<std::size_t>(n)), r(l.size());
+    for (int i = 0; i < n; ++i)
+        l[static_cast<std::size_t>(i)] = r[static_cast<std::size_t>(i)] = 1.2f * std::sin(3.14159265f * 0.5f * static_cast<float>(i) + 0.785398f);
+    for (int pos = 0; pos < n; pos += 256)
+        lim.process(l.data() + pos, r.data() + pos, 256);
+    // Reconstruct at 8x with a long windowed sinc and measure the true peak.
+    float truePeak = 0.0f;
+    for (int i = 4000; i < n - 64; ++i)
+        for (int ph = 0; ph < 8; ++ph)
+        {
+            const double t = i + ph / 8.0;
+            double acc = 0.0;
+            for (int k = i - 48; k <= i + 48; ++k)
+            {
+                const double x = t - k;
+                const double s = std::fabs(x) < 1e-9 ? 1.0 : std::sin(3.141592653589793 * x) / (3.141592653589793 * x);
+                const double w = 0.5 + 0.5 * std::cos(3.141592653589793 * x / 49.0);
+                acc += l[static_cast<std::size_t>(k)] * s * w;
+            }
+            truePeak = std::max(truePeak, static_cast<float>(std::fabs(acc)));
+        }
+    INFO("true peak " << 20.0f * std::log10(truePeak) << " dBTP");
+    CHECK(20.0f * std::log10(truePeak) <= -0.9f); // within 0.1 dB of the -1 dB ceiling
+}

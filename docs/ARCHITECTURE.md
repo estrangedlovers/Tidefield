@@ -7,12 +7,13 @@ Change it when the design changes.
 
 ## 1. Main decisions
 
-**Standalone JUCE GUI app with its own audio callback, not an `AudioProcessor`.**
+**A standalone app first, with the same instrument as an AU/VST3 plugin.** The app is
 `juce_add_gui_app` + `AudioDeviceManager` + our own `AudioIODeviceCallback` that calls
 `Engine::process()`. APVTS assumes a fixed parameter list and message-thread
 listeners; Tidefield has slot-based sources and FX, a terrain layer underneath every
-parameter, and soft takeover. The `Engine` is host-agnostic, so a thin
-`AudioProcessor` wrapper (AU/VST3) stays cheap to add later.
+parameter, and soft takeover, so it has no APVTS. The plugin is a thin
+`AudioProcessor` (`src/plugin`) around the same `Engine`; both implement `app::Host`,
+and everything above it (the app core, the native interface) is shared.
 
 **Targets and dependency direction**
 
@@ -20,7 +21,9 @@ parameter, and soft takeover. The `Engine` is host-agnostic, so a thin
 tidefield_dsp     (static, no JUCE)  pure DSP. No engine, no UI, no threads.
 tidefield_engine  (static, no JUCE)  params, control flow, scenes, terrain, tide, harmony, mixer, master, catch, MIDI map, CPU policy.
 tidefield_io      (JUCE, phase 4)    session files, audio file I/O, recorder, worker thread. Never realtime.
-Tidefield         (app)              JUCEApplication, device host, WebView bridge, telemetry pump.
+tidefield_app_core (JUCE, interface) AppCore (managers, telemetry pump), factory content, the native interface.
+Tidefield         (app)              JUCEApplication and the device host (AudioHost).
+TidefieldPlugin   (AU, VST3)         TidefieldProcessor: the DAW drives the engine; state = session format.
 tidefield_render  (CLI)              offline harness: engine + score -> WAV + JSON analysis.
 tidefield_tests   (Catch2 v3)        dsp/engine/io tests. No JUCE GUI.
 ```
@@ -30,12 +33,14 @@ in seconds. The imported plugin DSP (reverse shimmer, fuzz) is JUCE-based, so it
 in a separate `tidefield_fx_juce` library behind the same `Processor` interface
 instead of pulling JUCE into `dsp`.
 
-**Plugin build is planned.** `Engine::process` follows the `AudioProcessor` contract
-already: inputs may alias outputs (inputs are copied to scratch before any write),
-block sizes may vary and exceed the prepared size, `getLatencySamples()` reports the
-limiter lookahead, and all state lives in the engine, never in a view. The AU/VST3
-target will be a thin `AudioProcessor` adapter plus a `getStateInformation` that
-reuses the session serializer. Tail length is not applicable to an instrument.
+**Plugin.** `Engine::process` follows the `AudioProcessor` contract: inputs may alias
+outputs (inputs are copied to scratch before any write), block sizes may vary and
+exceed the prepared size, `getLatencySamples()` reports the limiter lookahead, and all
+state lives in the engine, never in a view. `TidefieldProcessor` forwards track MIDI
+to an engine MIDI port, reports latency per sample rate and a 30 s tail, and saves
+its state with the session serializer (`io::writeSession`/`readSession`, sounds
+included). `tools/plugincheck` hosts the built plugin like a DAW and CI runs it on
+the VST3 and the AU, plus `auval`.
 
 **One event path.** Every change (UI, MIDI, scores, terrain, later OSC) is a
 `ControlEvent { type, source, command, param, value }`. Gesture recording is
@@ -264,35 +269,36 @@ voices and Bloom polyphony together. Every cut is gentle: grains finish, modes r
 out over 80 ms, voices release. Reverb quality is not on the ladder (effects are
 opaque processors). Hard caps (pool sizes) apply regardless.
 
-## 14. UI (phase 6)
+## 14. UI
 
 `AppCore` (message thread) owns the managers and a 30 Hz pump that drains telemetry,
-notices and the MIDI monitor; front ends observe it through callbacks. The face of
-the instrument is `WebUI`: a `juce::WebBrowserComponent` (WKWebView on macOS) serving
-`ui/dist` through a resource provider, or a Vite dev server via `TIDEFIELD_UI_DEV`.
-The JUCE `ClassicUI` panel remains as a fallback.
+notices and the MIDI monitor. Until telemetry arrives (no device yet, or a DAW that
+has not started processing) its parameter snapshot is seeded from the defaults and
+from each applied session, so saving never writes stale values.
 
-Protocol (`src/io/UiProtocol`, tested): one native function `tidefield(method,
-...args)` for everything the UI asks; events back to the page: `telemetry` (~30 Hz,
-parameter targets/live/pickup as deltas, the rest compact), `scenes`, `fx`,
-`samples`, `midi`, `session` (pushed when their JSON changes), `status`,
-`midiActivity`. The page asks once for the schema (`hello`), so the front end has no
-hard-coded parameter tables. FX control display is declarative (`dsp::DisplayMap`)
-so C++ and TypeScript format identically.
+The interface is native JUCE drawing in C++ (`src/app/gui`, version 1.1; it replaced
+a React WebView, which never received key presses on macOS). A `Model` gives every
+control the value to show (the local value while the hand is on it, the engine's
+target otherwise) and ticks every visual once per display frame from a
+`VBlankAttachment`. Layout, in a mid-grey studio style with one orange accent and a
+colour per scene: top bar (session, fade, panic, record, auto master, keys, CPU,
+meter), browser (scenes with live weights, factory and disk sounds), the terrain,
+the performance panel (Tide, Wander, Gravity, Glide, key, scale, wander style,
+recording type), performance pads, a tabbed device panel (Drone, Clouds, Resonator,
+Bloom, Input, Looper, Weather, Gestures, Loops, Seasons, Mixer, Effects, Master,
+MIDI) and a status bar that explains whatever is under the mouse. `MainView` owns the
+keyboard: standalone, every key is consumed so macOS never beeps; holds (S, H, T)
+release on key-up, focus loss or the app going to the background; M turns the letter
+rows into a Bloom keyboard. In a plugin, Space and unused keys go to the DAW.
 
-Front end (`ui/`): React 19 + TypeScript + Vite. A single external store keeps
-parameters in typed arrays with per-parameter subscriptions, so 30 Hz telemetry only
-re-renders the controls whose values moved; canvases (terrain field, waveform with
-grains, pitch lanes, meters, keyboard glow) read telemetry in requestAnimationFrame
-loops. Performance view: three tall faders (Tide, Wander, Gravity), key and scale,
-the terrain (scenes, cursor, wander trail, particles per grain, drone voices as
-orbiting lights, resonator strikes as ripples, Bloom blooms, a Medium texture), the
-scene strip, recording-type tiles, Catch, Bloom transforms, fade and panic, and a
-four-octave Bloom keyboard. Edit view: global, every source, mixer, effects, scenes,
-MIDI. Knobs: drag, Shift fine, wheel, double-click default, Alt-click release,
-right-click learn/forget/release/reset; sand = live layer, coral = learning, arrows
-= soft takeover. Shortcuts: Space fade, Esc panic, K catch, C capture, R release,
-Shift+R record, Tab switch view, Cmd+N/O/S sessions.
+The older web protocol (`src/io/UiProtocol`) remains for tools: `tidefield_render
+--dump-schema` writes the parameter schema for external controllers.
+
+**Path wander.** A loop drawn on the terrain (`PathManager`, message thread) is
+smoothed and resampled to 128 evenly spaced points (`TerrainPath`), published through
+a `SnapshotChannel`, and travelled by `Wander::Style::Path` at one lap per 1 / rate
+seconds of Tide time, starting from the point nearest the sound. Sessions store the
+stroke as drawn.
 
 ## 15. Extension points for later features
 
@@ -302,9 +308,9 @@ Shift+R record, Tab switch view, Cmd+N/O/S sessions.
 | Sample import | worker decode path shared with Catch and Bloom |
 | OSC | another `ControlEvent` producer with its own SPSC queue |
 | Ableton Link | a `TideClock` implementation |
-| Projector visuals window | a second WebView consuming the same telemetry |
+| Projector visuals window | a second `TerrainView` in its own window, same `Model` |
 | Multichannel output | master bus channel count + a panner interface on strips |
-| Plugin build | `AudioProcessor` adapter around `Engine` |
+| Host tempo sync | `AudioPlayHead` in the plugin -> Tide and loop rates |
 
 ## 16. Phase plan
 
@@ -314,6 +320,7 @@ Shift+R record, Tab switch view, Cmd+N/O/S sessions.
    **Medium stage**. **(done)**
 4. Catch, **sample import + Bloom keyboard**, session save/recall. **(done)**
 5. MIDI learn, soft takeover, note input. **(done)**
-6. React WebView UI: performance view, then edit view. **(done)**
+6. UI: performance view, then edit view. **(done; native C++ since 1.1)**
 7. Recording to disk, CPU guardrails, polish. **(done)**
 8. Ambient feature pack: the approved items from section 10. **(done)**
+9. Native interface, factory library, path wander, AU/VST3 plugin (1.1). **(done)**

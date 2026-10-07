@@ -328,12 +328,17 @@ void TerrainView::paint(juce::Graphics& g)
         if (closed)
             p.closeSubPath();
         g.setColour(c.withAlpha(alpha));
-        const float dashes[] = { 6.0f, 5.0f };
-        juce::Path dashed;
-        juce::PathStrokeType(2.0f, juce::PathStrokeType::curved, juce::PathStrokeType::rounded).createDashedStroke(dashed, p, dashes, closed ? 2 : 0);
-        g.fillPath(closed ? dashed : p);
-        if (! closed)
-            g.strokePath(p, juce::PathStrokeType(2.0f, juce::PathStrokeType::curved, juce::PathStrokeType::rounded));
+        const juce::PathStrokeType stroke(2.0f, juce::PathStrokeType::curved, juce::PathStrokeType::rounded);
+        if (closed)
+        {
+            // The loop being followed: dashed. (The stroke being drawn is solid.)
+            const float dashes[] = { 6.0f, 5.0f };
+            juce::Path dashed;
+            stroke.createDashedStroke(dashed, p, dashes, 2);
+            g.fillPath(dashed);
+        }
+        else
+            g.strokePath(p, stroke);
     };
     const bool following = juce::roundToInt(model.value(engine::P::TerrainWanderStyle)) == 4;
     drawPath(shownPath, colour::tide, following ? 0.7f : 0.3f, true);
@@ -417,6 +422,9 @@ void TerrainView::paint(juce::Graphics& g)
         g.setFont(font(11.0f, 600));
         const float tw = juce::GlyphArrangement::getStringWidth(g.getCurrentFont(), name) + 14.0f;
         auto pill = juce::Rectangle<float>(tw, 18.0f).withCentre(s.translated(0.0f, 24.0f));
+        if (pill.getBottom() > f.getBottom() - 2.0f) // no room below: label above the dot
+            pill = pill.withCentre(s.translated(0.0f, -24.0f));
+        pill = pill.withX(juce::jlimit(f.getX() + 2.0f, std::max(f.getX() + 2.0f, f.getRight() - pill.getWidth() - 2.0f), pill.getX()));
         g.setColour(c.withAlpha(hover ? 1.0f : 0.85f));
         g.fillRoundedRectangle(pill, 3.0f);
         g.setColour(colour::well);

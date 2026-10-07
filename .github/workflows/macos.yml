@@ -64,6 +64,8 @@ jobs:
           /usr/libexec/PlistBuddy -c "Print :LSMinimumSystemVersion" "$APP/Contents/Info.plist"
           /usr/libexec/PlistBuddy -c "Print :CFBundleShortVersionString" "$APP/Contents/Info.plist"
           "$APP/Contents/MacOS/Tidefield" --self-test
+          # The whole interface opens, shows every page and quits cleanly.
+          "$APP/Contents/MacOS/Tidefield" --ui-test
           mkdir -p dist
           ditto -c -k --keepParent "$APP" dist/Tidefield-macOS-arm64.zip
 
@@ -82,13 +84,14 @@ jobs:
           # rates, state round-trip.
           CHECK=$(find build/release -name tidefield_plugincheck -type f -perm -u+x | head -1)
           "$CHECK" "$VST3"
-          "$CHECK" "$AU"
-          # Apple's own validator for the AU, from where hosts look for it.
+          # Audio Units are found by registration: install it where hosts look, run
+          # Apple's validator, then host it by its identifier.
           mkdir -p ~/Library/Audio/Plug-Ins/Components
           cp -R "$AU" ~/Library/Audio/Plug-Ins/Components/
           killall -9 AudioComponentRegistrar 2>/dev/null || true
-          sleep 2
+          sleep 3
           auval -v aumu Tdfl Tdfd
+          "$CHECK" "AudioUnit:Synths/aumu,Tdfl,Tdfd"
           mkdir -p dist/plugins
           cp -R "$VST3" "$AU" dist/plugins/
           cp resources/plugins-README.txt dist/plugins/README.txt

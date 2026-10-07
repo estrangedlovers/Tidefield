@@ -159,7 +159,25 @@ public:
         host = std::make_unique<AudioHost>(*settings.getUserSettings());
         core = std::make_unique<AppCore>(*host);
 
-        window = std::make_unique<MainWindow>(getApplicationName() + " - " + core->session.getName(), new gui::MainView(*core));
+        auto* view = new gui::MainView(*core);
+        window = std::make_unique<MainWindow>(getApplicationName() + " - " + core->session.getName(), view);
+
+        // `--ui-test`: open the whole interface, visit every page, then quit cleanly
+        // (CI runs it on the shipped app; sanitizer builds use it for teardown).
+        if (commandLine.contains("--ui-test"))
+        {
+            for (int p = 0; p <= gui::DeviceView::NumPages; ++p)
+                juce::Timer::callAfterDelay(800 + p * 250, [this, p] {
+                    if (window == nullptr)
+                        return;
+                    if (auto* v = dynamic_cast<gui::MainView*>(window->getContentComponent()))
+                        v->showPage(p % gui::DeviceView::NumPages);
+                });
+            juce::Timer::callAfterDelay(800 + (gui::DeviceView::NumPages + 2) * 250, [this] {
+                std::cout << "UI test passed: every page shown" << std::endl;
+                systemRequestedQuit();
+            });
+        }
     }
 
     void shutdown() override

@@ -103,14 +103,17 @@ int main(int argc, char** argv)
 {
     if (argc < 2)
     {
-        std::cerr << "usage: tidefield_plugincheck <plugin.vst3 | plugin.component>\n";
+        std::cerr << "usage: tidefield_plugincheck <plugin.vst3 | AudioUnit:Synths/aumu,Tdfl,Tdfd> [--editor]\n";
         return 2;
     }
     juce::ScopedJuceInitialiser_GUI juce;
     juce::AudioPluginFormatManager formats;
     juce::addDefaultFormatsToManager(formats);
 
-    const juce::String path = juce::File::getCurrentWorkingDirectory().getChildFile(juce::String(argv[1])).getFullPathName();
+    // A file (VST3), or an installed Audio Unit's identifier such as
+    // "AudioUnit:Synths/aumu,Tdfl,Tdfd" (AUs are found by registration, not path).
+    const juce::String arg(argv[1]);
+    const juce::String path = arg.startsWith("AudioUnit:") ? arg : juce::File::getCurrentWorkingDirectory().getChildFile(arg).getFullPathName();
     juce::OwnedArray<juce::PluginDescription> found;
     for (auto* f : formats.getFormats())
         f->findAllTypesForFile(found, path);

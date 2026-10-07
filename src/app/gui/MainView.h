@@ -41,6 +41,8 @@ public:
     void chooseSample(int slot);
     void loadFactory(int soundIndex, int slot);
     void showAudioSettings();
+    /** Shows a device page (also used by `--ui-test` to visit every page). */
+    void showPage(int page) { devices->show(page); }
 
 private:
     void frame();

@@ -24,14 +24,14 @@ before changing anything. Update `PROGRESS.md` at the end of every phase or sess
    denormal range; gate those explicitly (see `ResonatorBank`).
 5. **DSP is independent of the UI.** `src/dsp` and `src/engine` are plain C++20 with no
    JUCE dependency, so they build and unit-test headless. JUCE is used only in
-   `src/app`, `src/io` and `tools/`.
+   `src/app`, `src/plugin`, `src/io` and `tools/`.
 6. **Determinism.** No wall clock and no global RNG on the audio path. All randomness
    comes from seeded `dsp::Random` instances so offline renders are bit-reproducible.
 
 ## Layering
 
 ```
-dsp     <- engine <- io/app/tools/tests
+dsp     <- engine <- io/app/plugin/tools/tests
 (no JUCE)  (no JUCE)   (JUCE allowed)
 ```
 
@@ -50,6 +50,8 @@ own JUCE modules, so JUCE module code is never linked twice.
 - Anything that allocates or touches files: message thread or worker, handed to the
   audio thread through `SnapshotChannel`, `FxSlot` or `SpscQueue`. Audio going the
   other way (recording) goes through `engine/record/RecordTap`.
+- Factory sounds: generate in `tools/scripts/make_samples.py` (library section),
+  list in `src/app/FactoryContent.cpp`. Starter scenes live there too.
 - Your own JUCE effects (shimmer, fuzz): `src/fx_juce/UserEffects.cpp` (instructions
   inside); they become FX types like the built-in ones.
 - A performance gesture that moves many parameters at once: add offsets in
@@ -69,28 +71,39 @@ ctest --preset dev
 ./build/dev/tools/render/tidefield_render scores/ecosystem.json -o out/ecosystem.wav --strict
 python3 tools/scripts/spectrogram.py out/ecosystem.wav   # needs numpy + matplotlib
 ./build/dev/tests/tidefield_io_tests                     # JUCE-based session tests
+./build/dev/tools/plugincheck/tidefield_plugincheck_artefacts/Debug/tidefield_plugincheck \
+    build/dev/src/app/TidefieldPlugin_artefacts/Debug/VST3/Tidefield.vst3
 ```
 
 Presets live in `CMakePresets.json`; CLion picks them up. JUCE 8 and Catch2 are fetched
 by `cmake/Dependencies.cmake`. The app target defaults on for macOS only; on Linux
 pass `-DTIDEFIELD_BUILD_APP=ON` (needs ALSA/X11 headers) to compile-check it.
 
-## Web UI (ui/)
+## Interface (src/app/gui)
 
-React + TypeScript + Vite, one typeface (Inter), tokens in `ui/src/theme/tokens.css`.
-- `cd ui && npm install && npm run dev`: the UI in a browser against a mock engine
-  (`ui/src/bridge/mock.ts`); add `?demo` for a populated terrain.
-- In the app with hot reload: run `npm run dev`, then start the app with
-  `TIDEFIELD_UI_DEV=http://localhost:5173`.
-- `npm run build` is run by CMake (target `tidefield_ui`) and copied into the app.
-- `npm test` (vitest) and `npm run typecheck`.
-- After changing parameters, regenerate the mock's schema:
-  `tidefield_render --dump-schema ui/src/bridge/schema.json` (a ctest fails if stale).
-- Everything crosses one native function, `tidefield(method, ...args)` in
-  `src/app/web/WebUI.cpp`; state flows back as events (`telemetry`, `scenes`, `fx`,
-  `samples`, `midi`, `session`, `status`, `midiActivity`). Visuals read telemetry in
-  requestAnimationFrame loops and never re-render through React.
-- `--classic` or `TIDEFIELD_CLASSIC_UI=1` starts the JUCE fallback panel instead.
+Native JUCE drawing in C++, one typeface (Inter, embedded), palette and metrics in
+`gui/Style.h`. Shared by the app and the plugin (`tidefield_app_core`).
+- Controls bind to a parameter through `Model` (`gui/Model.h`): `Knob`, `Fader`,
+  `Toggle`, `Choice`, `Pad`. They get MIDI learn, release, reset, hover help and the
+  live/learn/pickup colours for free. A device page is a list of parameters in
+  `DeviceView::build` (`gui/Pages.cpp`); `Device::add(P)` picks the right control.
+- Anything animated implements `Animated::tick()` (called once per display frame);
+  repaint only when what you draw changed. Never block or allocate per frame in a
+  way that grows.
+- Keys live in `MainView::keyPressed`; standalone every key is consumed (no macOS
+  beep), in a plugin leave Space and unused keys to the DAW.
+- Check the look under Xvfb on Linux: build with `-DTIDEFIELD_BUILD_APP=ON`, run the
+  app under `xvfb-run` and capture the screen (`import -window root`). Without an
+  audio device there is no telemetry; values come from the seeded targets.
+- `Tidefield --self-test` checks the typeface, every factory sound, the starter
+  session and a full-engine render; CI runs it on the shipped bundle.
+
+## Plugin (src/plugin)
+
+`TidefieldProcessor` implements `app::Host` like `AudioHost` does. Nothing in
+`AppCore` or the interface may assume an audio device: use `host.isRunning()`,
+`host.getDeviceManager()` (null in a DAW) and `host.isPlugin()`. After changing the
+plugin, run `tidefield_plugincheck <path to Tidefield.vst3>` (CI also runs auval).
 
 ## Conventions
 

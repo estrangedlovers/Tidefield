@@ -26,12 +26,6 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
-      - uses: actions/setup-node@v4
-        with:
-          node-version: 22
-          cache: npm
-          cache-dependency-path: ui/package-lock.json
-
       - name: Tools
         run: brew list ninja >/dev/null 2>&1 || brew install ninja
 
@@ -64,7 +58,6 @@ jobs:
           # (not notarised: first launch needs right-click > Open).
           codesign --force --deep --options runtime --preserve-metadata=entitlements -s - "$APP"
           codesign --verify --deep --strict "$APP"
-          test -f "$APP/Contents/Resources/ui/index.html"
           # The shipped binary: Apple Silicon, macOS 12+, and it passes its own self-test.
           lipo -info "$APP/Contents/MacOS/Tidefield"
           vtool -show-build "$APP/Contents/MacOS/Tidefield" | grep -E "minos|platform"

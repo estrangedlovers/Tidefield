@@ -46,10 +46,3 @@ if(TARGET juce::juce_core)
     set_target_properties(tidefield_io_tests PROPERTIES RUNTIME_OUTPUT_DIRECTORY ${CMAKE_CURRENT_BINARY_DIR})
     catch_discover_tests(tidefield_io_tests)
 endif()
-
-# The web UI's browser mock uses a copy of the engine schema; fail when it is stale.
-if(TARGET tidefield_render)
-    add_test(NAME ui_schema_up_to_date
-             COMMAND tidefield_render --check-schema ui/src/bridge/schema.json
-             WORKING_DIRECTORY ${CMAKE_SOURCE_DIR})
-endif()

@@ -1,7 +1,7 @@
 #include "AppCore.h"
 #include "AudioHost.h"
-#include "ClassicUI.h"
-#include "web/WebUI.h"
+#include "FactoryContent.h"
+#include "gui/MainView.h"
 
 #include <AudioProcessorEffect.h>
 #include <BinaryData.h>
@@ -30,18 +30,26 @@ int runSelfTest()
         failures += ok ? 0 : 1;
     };
 
-    const auto uiRoot = WebUI::findUiRoot();
-    check(uiRoot.has_value() && uiRoot->getChildFile("index.html").existsAsFile(), "bundled UI present");
-    if (uiRoot.has_value())
+    const auto inter = gui::font(14.0f, 600);
+    check(inter.getTypefaceName().containsIgnoreCase("Inter"), "embedded typeface loads: " + inter.getTypefaceName());
+
+    for (const auto& sound : factorySounds())
     {
-        const auto html = uiRoot->getChildFile("index.html").loadFileAsString();
-        const auto script = html.fromFirstOccurrenceOf("src=\"./", false, false).upToFirstOccurrenceOf("\"", false, false);
-        check(script.isNotEmpty() && uiRoot->getChildFile(script).existsAsFile(), "UI script bundle present: " + script);
+        const auto b = loadFactorySound(sound);
+        check(b != nullptr && b->seconds() > 0.5, juce::String("factory sound decodes: ") + sound.name);
     }
 
     fxjuce::registerUserEffects();
     engine::Engine engine;
     engine.prepare(48000.0, 512);
+
+    const auto starter = makeStarterSession(engine);
+    bool idsKnown = true;
+    for (const auto& sc : starter.scenes)
+        for (const auto& [id, value] : sc.values)
+            idsKnown = idsKnown && engine.getRegistry().find(id).has_value();
+    check(starter.scenes.size() >= 6 && idsKnown, "starter session: " + juce::String(static_cast<int>(starter.scenes.size())) + " scenes, all parameters known");
+    check(starter.samples.count("cloud1") == 1 && starter.samples.count("bloom") == 1, "starter session loads its sounds");
     engine::FxManager fx(engine);
     fx.loadDefaultLayout();
 
@@ -111,7 +119,7 @@ class MainWindow final : public juce::DocumentWindow
 {
 public:
     MainWindow(const juce::String& name, juce::Component* content)
-        : DocumentWindow(name, juce::Colour(0xff0d1014), DocumentWindow::allButtons)
+        : DocumentWindow(name, gui::colour::window, DocumentWindow::allButtons)
     {
         setUsingNativeTitleBar(true);
         setContentOwned(content, true);
@@ -119,6 +127,7 @@ public:
         setResizeLimits(1100, 720, 10000, 10000);
         centreWithSize(getWidth(), getHeight());
         setVisible(true);
+        toFront(true); // key window from the start, so the first key press reaches the instrument
     }
 
     void closeButtonPressed() override { juce::JUCEApplication::getInstance()->systemRequestedQuit(); }
@@ -150,18 +159,7 @@ public:
         host = std::make_unique<AudioHost>(*settings.getUserSettings());
         core = std::make_unique<AppCore>(*host);
 
-        // The web UI is the instrument's face; the JUCE panel is the fallback when the
-        // built UI is missing, or on request (--classic or TIDEFIELD_CLASSIC_UI=1).
-        const bool forceClassic = commandLine.contains("--classic")
-                                  || juce::SystemStats::getEnvironmentVariable("TIDEFIELD_CLASSIC_UI", {}) == "1";
-        juce::Component* content = nullptr;
-        const auto uiRoot = WebUI::findUiRoot();
-        if (! forceClassic && (uiRoot.has_value() || WebUI::devServerUrl().isNotEmpty()))
-            content = new WebUI(*core, uiRoot.value_or(juce::File()));
-        else
-            content = new ClassicUI(*core);
-
-        window = std::make_unique<MainWindow>(getApplicationName() + " - " + core->session.getName(), content);
+        window = std::make_unique<MainWindow>(getApplicationName() + " - " + core->session.getName(), new gui::MainView(*core));
     }
 
     void shutdown() override

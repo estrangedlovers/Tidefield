@@ -1,4 +1,5 @@
 #include "AppCore.h"
+#include "FactoryContent.h"
 
 #include <BinaryData.h>
 #include <AudioProcessorEffect.h>
@@ -119,15 +120,10 @@ void AppCore::captureSceneAtCursor()
 
 void AppCore::loadFactoryContent()
 {
-    // A first launch should make sound: Bloom gets the glass one-shot, Cloud 1 a pad.
-    auto decode = [](const void* data, int size, const char* name) -> std::shared_ptr<const dsp::SampleBuffer> {
-        juce::String error;
-        auto b = io::loadSample(std::make_unique<juce::MemoryInputStream>(data, static_cast<size_t>(size), false), name, error);
-        return std::shared_ptr<const dsp::SampleBuffer>(std::move(b));
-    };
-    engine.loadBloomSample(decode(BinaryData::glass_wav, BinaryData::glass_wavSize, "glass"));
-    engine.loadCloudSample(0, decode(BinaryData::chord_wav, BinaryData::chord_wavSize, "chord"));
-    engine.setParam(engine::P::BloomRoot, 81.0f); // glass.wav rings at A5
+    // A first launch (and every New) should play from the first touch: factory sounds
+    // loaded and a terrain of starter scenes.
+    session.makeNewSession = [this] { return makeStarterSession(engine); };
+    session.newSession();
 }
 
 void AppCore::loadRigMidi()

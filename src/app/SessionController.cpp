@@ -20,7 +20,7 @@ SessionController::~SessionController() { *alive = false; }
 void SessionController::newSession()
 {
     current = juce::File();
-    apply(std::make_shared<io::SessionData>(io::defaultSession(engine)));
+    apply(std::make_shared<io::SessionData>(makeNewSession ? makeNewSession() : io::defaultSession(engine)));
 }
 
 void SessionController::open()

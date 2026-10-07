@@ -19,6 +19,10 @@ const char* MidiManager::actionName(MidiAction action) noexcept
         case MidiAction::ReleaseLive: return "Release live layer";
         case MidiAction::CaptureScene: return "Capture scene";
         case MidiAction::RecordToggle: return "Record";
+        case MidiAction::LoopRecord: return "Loop record / overdub";
+        case MidiAction::LoopClear: return "Loop clear";
+        case MidiAction::FreezeToggle: return "Freeze all";
+        case MidiAction::InputFreezeToggle: return "Freeze input";
         case MidiAction::None: break;
     }
     return "";

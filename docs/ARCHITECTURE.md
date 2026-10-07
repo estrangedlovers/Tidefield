@@ -292,8 +292,7 @@ four-octave Bloom keyboard. Edit view: global, every source, mixer, effects, sce
 MIDI. Knobs: drag, Shift fine, wheel, double-click default, Alt-click release,
 right-click learn/forget/release/reset; sand = live layer, coral = learning, arrows
 = soft takeover. Shortcuts: Space fade, Esc panic, K catch, C capture, R release,
-Shift+R record,
-Tab switch view, Cmd+N/O/S sessions.
+Shift+R record, Tab switch view, Cmd+N/O/S sessions.
 
 ## 15. Extension points for later features
 

@@ -74,6 +74,22 @@ void Engine::prepare(double newSampleRate, int maxBlockSize)
     bloom.setHarmony(&harmony);
     bloom.setBuffer(rawBuffer(bloomBuffers.current()));
     bloomSwapping = false;
+    looper.prepare(spec, config.seed + 500u);
+    weather.prepare(spec, config.seed + 600u);
+    inputFreeze.prepare(spec, config.seed + 700u);
+    freezeCloud.prepare(spec, config.seed + 800u);
+    freezeCloud.setHarmony(&harmony);
+    freezeBuffer.sampleRate = sampleRate;
+    freezeBuffer.name = "freeze";
+    freezeBuffer.left.assign(static_cast<std::size_t>(kFreezeSeconds * sampleRate), 0.0f);
+    freezeBuffer.right.assign(freezeBuffer.left.size(), 0.0f);
+    freezeCloud.setBuffer(nullptr);
+    freezeLoaded = false;
+    freezeGain = 0.0f;
+    preCapacity = static_cast<std::size_t>(kFreezeRingSeconds * sampleRate) + static_cast<std::size_t>(maxBlock);
+    preRingL.assign(preCapacity, 0.0f);
+    preRingR.assign(preCapacity, 0.0f);
+    preWritten = 0;
     medium.prepare(spec, config.seed + 300u);
     master.prepare(spec);
     for (auto& slot : fxSlots)
@@ -93,7 +109,7 @@ void Engine::prepare(double newSampleRate, int maxBlockSize)
         stripR[static_cast<std::size_t>(s)].assign(n, 0.0f);
     }
     for (auto* v : { &busAL, &busAR, &busBL, &busBR, &masterL, &masterR, &inputMono, &excite, &scratchDryL, &scratchDryR,
-                     &scratchAltL, &scratchAltR })
+                     &scratchAltL, &scratchAltR, &loopInL, &loopInR, &padL, &padR, &freezeGainBuf })
         v->assign(n, 0.0f);
 
     for (std::size_t k = 0; k < stemL.size(); ++k)
@@ -135,7 +151,7 @@ void Engine::release()
         stripR[static_cast<std::size_t>(s)].clear();
     }
     for (auto* v : { &busAL, &busAR, &busBL, &busBR, &masterL, &masterR, &inputMono, &excite, &scratchDryL, &scratchDryR,
-                     &scratchAltL, &scratchAltR })
+                     &scratchAltL, &scratchAltR, &loopInL, &loopInR, &padL, &padR, &freezeGainBuf })
         v->clear();
 }
 
@@ -313,6 +329,14 @@ void Engine::fireMidiAction(MidiAction action) noexcept
         }
         case MidiAction::CaptureScene: notify(EngineNotice::Type::CaptureSceneRequest); break; // needs the message thread
         case MidiAction::RecordToggle: notify(EngineNotice::Type::RecordToggleRequest); break;  // files open there too
+        case MidiAction::LoopRecord: looper.record(); break;
+        case MidiAction::LoopClear: looper.clear(); break;
+        case MidiAction::FreezeToggle:
+            params.setTarget(idx(P::FreezeOn), params.target(idx(P::FreezeOn)) > 0.5f ? 0.0f : 1.0f);
+            break;
+        case MidiAction::InputFreezeToggle:
+            params.setTarget(idx(P::InputFreeze), params.target(idx(P::InputFreeze)) > 0.5f ? 0.0f : 1.0f);
+            break;
         case MidiAction::None: break;
     }
 }
@@ -489,6 +513,8 @@ void Engine::applyCommand(Command c) noexcept
         case Command::ResetFeedback: resetFeedback(); break;
         case Command::ReleaseLiveLayer: std::fill(live.begin(), live.end(), std::uint8_t { 0 }); break;
         case Command::Catch: requestCatch(); break;
+        case Command::LoopRecord: looper.record(); break;
+        case Command::LoopClear: looper.clear(); break;
         case Command::None: break;
     }
 }
@@ -501,6 +527,12 @@ void Engine::resetFeedback() noexcept
         c.cloud.reset();
     resonator.reset();
     bloom.reset();
+    looper.reset();
+    weather.reset();
+    inputFreeze.reset();
+    freezeCloud.reset();
+    freezeGain = 0.0f;
+    freezeLoaded = false;
     for (auto& slot : fxSlots)
         slot.reset();
     medium.reset();
@@ -605,6 +637,35 @@ void Engine::updateSources(float t) noexcept
     in.highPassHz = params.current(P::InputHighPass);
     in.gateDb = params.current(P::InputGate);
     liveInput.setParams(in);
+
+    inputFreeze.setDrift(params.current(P::InputFreezeDrift));
+
+    dsp::Disintegrator::Params lp;
+    lp.erosion = params.current(P::LoopErosion);
+    lp.flakes = params.current(P::LoopFlakes);
+    lp.overdub = params.current(P::LoopOverdub);
+    looper.setParams(lp);
+
+    dsp::WeatherBed::Params wp;
+    wp.wind = params.current(P::WeatherWind);
+    wp.rain = params.current(P::WeatherRain);
+    wp.surf = params.current(P::WeatherSurf);
+    wp.gust = params.current(P::WeatherGust);
+    wp.tone = params.current(P::WeatherTone);
+    wp.distance = params.current(P::WeatherDistance);
+    weather.setParams(wp);
+
+    // Freeze all: texture runs from a fine shimmer to long, overlapping smears.
+    const float tex = params.current(P::FreezeTexture);
+    dsp::GranularCloud::Params fc;
+    fc.density = 25.0f + 60.0f * tex;
+    fc.grainMs = 150.0f + 650.0f * tex;
+    fc.position = 0.5f;
+    fc.spray = 1.0f;
+    fc.pitchSpread = 0.04f + 0.1f * tex;
+    fc.reverse = 0.3f * tex;
+    fc.stereo = 0.9f;
+    freezeCloud.setParams(fc);
     (void) t; // sources receive Tide in process(); kept for symmetry with updateFx
 }
 
@@ -659,7 +720,7 @@ void Engine::controlTick() noexcept
         st.width = params.current(info.width);
         st.sendADb = params.current(info.sendA);
         st.sendBDb = params.current(info.sendB);
-        st.gate = s == static_cast<int>(StripId::Input) ? params.current(P::InputArmed) : 1.0f;
+        st.gate = 1.0f; // the input's monitor arm gates only the live signal (in processChunk), not its frozen pad
         strips[static_cast<std::size_t>(s)].update(st);
     }
 
@@ -777,9 +838,69 @@ void Engine::processChunk(const float* const* inputs, int numInputs, int inputOf
     }
     resonator.process(ex, L(StripId::Resonator), R(StripId::Resonator), n, tide);
 
-    // 6. The input strip carries the conditioned input.
-    std::copy_n(in, n, L(StripId::Input));
-    std::copy_n(in, n, R(StripId::Input));
+    // 6. The input strip: the live signal (gated by the monitor arm, ramped across the
+    //    tick) plus the spectral freeze pad, which sounds whether or not it is armed.
+    {
+        const bool frozen = params.current(P::InputFreeze) > 0.5f;
+        inputFreeze.setFrozen(frozen);
+        float* pl = padL.data() + o;
+        float* pr = padR.data() + o;
+        if (frozen || inputFreeze.getGain() > 0.0f || liveInput.getLevel() > 1.0e-5f)
+            inputFreeze.process(in, pl, pr, n);
+        else
+        {
+            std::fill_n(pl, n, 0.0f);
+            std::fill_n(pr, n, 0.0f);
+        }
+        const float padGain = dsp::dbToGain(params.current(P::InputFreezeLevel));
+        const float m0 = params.previous(P::InputArmed);
+        const float m1 = params.current(P::InputArmed);
+        for (int i = 0; i < n; ++i)
+        {
+            const float m = dsp::lerp(m0, m1, static_cast<float>(tickPos + i + 1) / kControlInterval);
+            L(StripId::Input)[i] = in[i] * m + pl[i] * padGain;
+            R(StripId::Input)[i] = in[i] * m + pr[i] * padGain;
+        }
+    }
+
+    // 7. Looper, fed by the live input or by the mix itself (read one prepared block
+    //    behind from the catch ring, so it is independent of the host's block size).
+    {
+        const float* li = in;
+        const float* ri = in;
+        if (params.current(P::LoopSource) > 0.5f)
+        {
+            const auto lag = static_cast<std::uint64_t>(maxBlock);
+            for (int i = 0; i < n; ++i)
+            {
+                const auto t = sampleTime + static_cast<std::uint64_t>(i);
+                const auto ui = o + static_cast<std::size_t>(i);
+                if (t < lag)
+                {
+                    loopInL[ui] = loopInR[ui] = 0.0f;
+                    continue;
+                }
+                const auto ring = static_cast<std::size_t>((t - lag) % catchCapacity);
+                loopInL[ui] = catchL[ring];
+                loopInR[ui] = catchR[ring];
+            }
+            li = loopInL.data() + o;
+            ri = loopInR.data() + o;
+        }
+        looper.process(li, ri, L(StripId::Loop), R(StripId::Loop), n);
+    }
+
+    // 8. Weather.
+    if (params.current(P::WeatherWind) + params.current(P::WeatherRain) + params.current(P::WeatherSurf) > 0.0f)
+        weather.process(L(StripId::Weather), R(StripId::Weather), n, tide);
+    else
+    {
+        std::fill_n(L(StripId::Weather), n, 0.0f);
+        std::fill_n(R(StripId::Weather), n, 0.0f);
+    }
+
+    // 9. Freeze all.
+    processFreeze(offset, n);
 
     // 7. Inserts and strips.
     for (int s = 0; s < kNumStrips; ++s)
@@ -794,12 +915,88 @@ void Engine::processChunk(const float* const* inputs, int numInputs, int inputOf
             slot.process(L(sid), R(sid), n, mixRamp(mixParam, tickPos), mixRamp(mixParam, tickPos + n), scratchDryL.data(),
                          scratchDryR.data(), scratchAltL.data(), scratchAltR.data());
         }
+        if (sid == StripId::Freeze)
+        {
+            // While the mix is frozen, everything else steps back (freeze.duck).
+            const float duck = params.current(P::FreezeDuck);
+            const float* fg = freezeGainBuf.data() + o;
+            if (duck > 0.0f && (fg[0] > 0.0f || fg[n - 1] > 0.0f))
+                for (int i = 0; i < n; ++i)
+                {
+                    const float g = 1.0f - duck * fg[i];
+                    const auto ui = o + static_cast<std::size_t>(i);
+                    masterL[ui] *= g;
+                    masterR[ui] *= g;
+                    busAL[ui] *= g;
+                    busAR[ui] *= g;
+                    busBL[ui] *= g;
+                    busBR[ui] *= g;
+                }
+        }
         const bool stems = recordStride > 2;
         const auto us = static_cast<std::size_t>(s);
         strips[us].processAdd(L(sid), R(sid), masterL.data() + o, masterR.data() + o, busAL.data() + o, busAR.data() + o,
                               busBL.data() + o, busBR.data() + o, n, tickPos, kControlInterval,
                               stems ? stemL[us].data() + o : nullptr, stems ? stemR[us].data() + o : nullptr);
     }
+}
+
+void Engine::captureFreeze() noexcept
+{
+    // The last kFreezeSeconds of the pre-Medium mix, ending one prepared block back
+    // (that much is always written, whatever the host's block size).
+    const auto len = static_cast<std::uint64_t>(freezeBuffer.size());
+    const auto lag = static_cast<std::uint64_t>(maxBlock);
+    const auto end = sampleTime > lag ? sampleTime - lag : 0;
+    for (std::uint64_t k = 0; k < len; ++k)
+    {
+        const auto i = static_cast<std::size_t>(k);
+        if (end + k < len)
+        {
+            freezeBuffer.left[i] = freezeBuffer.right[i] = 0.0f;
+            continue;
+        }
+        const auto ring = static_cast<std::size_t>((end - len + k) % preCapacity);
+        freezeBuffer.left[i] = preRingL[ring];
+        freezeBuffer.right[i] = preRingR[ring];
+    }
+    freezeCloud.reset();
+    freezeCloud.setBuffer(&freezeBuffer);
+    freezeLoaded = true;
+}
+
+void Engine::processFreeze(int offset, int n) noexcept
+{
+    const auto o = static_cast<std::size_t>(offset);
+    float* l = stripL[static_cast<std::size_t>(StripId::Freeze)].data() + o;
+    float* r = stripR[static_cast<std::size_t>(StripId::Freeze)].data() + o;
+    float* g = freezeGainBuf.data() + o;
+
+    const bool wanted = params.current(P::FreezeOn) > 0.5f;
+    if (wanted && ! freezeLoaded && freezeGain <= 0.0f)
+        captureFreeze();
+    if (! freezeLoaded)
+    {
+        std::fill_n(l, n, 0.0f);
+        std::fill_n(r, n, 0.0f);
+        std::fill_n(g, n, 0.0f);
+        return;
+    }
+
+    freezeCloud.process(l, r, n, tide);
+    const float target = wanted ? 1.0f : 0.0f;
+    const float fs = static_cast<float>(sampleRate);
+    const float inStep = 1.0f / (0.4f * fs);
+    const float outStep = 1.0f / (1.5f * fs);
+    for (int i = 0; i < n; ++i)
+    {
+        freezeGain = target > freezeGain ? std::min(target, freezeGain + inStep) : std::max(target, freezeGain - outStep);
+        g[i] = freezeGain;
+        l[i] *= freezeGain;
+        r[i] *= freezeGain;
+    }
+    if (! wanted && freezeGain <= 0.0f)
+        freezeLoaded = false; // the next freeze captures afresh
 }
 
 void Engine::process(const float* const* inputs, int numInputs, float* const* outputs, int numOutputs, int numSamples) noexcept
@@ -884,6 +1081,13 @@ void Engine::process(const float* const* inputs, int numInputs, float* const* ou
             slot.process(masterL.data(), masterR.data(), block, mix, mix, scratchDryL.data(), scratchDryR.data(),
                          scratchAltL.data(), scratchAltR.data());
         }
+        for (int i = 0; i < block; ++i)
+        {
+            const auto ring = static_cast<std::size_t>((preWritten + static_cast<std::uint64_t>(i)) % preCapacity);
+            preRingL[ring] = masterL[static_cast<std::size_t>(i)];
+            preRingR[ring] = masterR[static_cast<std::size_t>(i)];
+        }
+        preWritten += static_cast<std::uint64_t>(block);
         medium.process(masterL.data(), masterR.data(), block);
 
         const float levelEnd = dsp::dbToGain(params.current(P::MasterLevel));
@@ -1039,6 +1243,14 @@ void Engine::accumulateTelemetry(const float* l, const float* r, int n) noexcept
         f.bloomVoices[static_cast<std::size_t>(v)] = bloom.getVoice(v);
     f.inputLevel = liveInput.getLevel();
     f.inputGateOpen = liveInput.isGateOpen();
+    f.inputFreeze = inputFreeze.getGain();
+    f.loopState = static_cast<int>(looper.getState());
+    f.loopPosition = looper.getPosition();
+    f.loopSeconds = looper.getLengthSeconds();
+    f.loopPasses = looper.getPasses();
+    f.weatherGust = weather.getGust();
+    f.weatherWave = weather.getWave();
+    f.freezeGain = freezeGain;
 
     f.cursor = cursor;
     f.position = position;

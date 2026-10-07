@@ -19,6 +19,8 @@ engine::Command parseCommand(const juce::String& name)
     if (name == "resetFeedback") return Command::ResetFeedback;
     if (name == "releaseLive") return Command::ReleaseLiveLayer;
     if (name == "catch") return Command::Catch;
+    if (name == "loopRecord") return Command::LoopRecord;
+    if (name == "loopClear") return Command::LoopClear;
     throw std::runtime_error("Unknown command: " + name.toStdString());
 }
 

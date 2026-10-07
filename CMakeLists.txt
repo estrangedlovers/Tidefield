@@ -33,6 +33,9 @@ add_library(tidefield_dsp STATIC
     src/dsp/sources/bloom/BloomSampler.cpp
     src/dsp/sources/drone/DroneGenerator.cpp
     src/dsp/sources/granular/GranularCloud.cpp
+    src/dsp/sources/looper/Disintegrator.cpp
+    src/dsp/sources/weather/WeatherBed.cpp
+    src/dsp/spectral/SpectralFreeze.cpp
     src/dsp/sources/resonator/ResonatorBank.cpp
 )
 target_include_directories(tidefield_dsp PUBLIC src)

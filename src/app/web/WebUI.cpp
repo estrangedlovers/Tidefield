@@ -38,6 +38,8 @@ engine::Command commandFor(const juce::String& name, const engine::TelemetryFram
     if (name == "catch") return engine::Command::Catch;
     if (name == "releaseLive") return engine::Command::ReleaseLiveLayer;
     if (name == "resetFeedback") return engine::Command::ResetFeedback;
+    if (name == "loopRecord") return engine::Command::LoopRecord;
+    if (name == "loopClear") return engine::Command::LoopClear;
     ok = false;
     return engine::Command::None;
 }
@@ -50,6 +52,10 @@ engine::MidiAction actionFor(const juce::String& name)
     if (name == "releaseLive") return engine::MidiAction::ReleaseLive;
     if (name == "captureScene") return engine::MidiAction::CaptureScene;
     if (name == "recordToggle") return engine::MidiAction::RecordToggle;
+    if (name == "loopRecord") return engine::MidiAction::LoopRecord;
+    if (name == "loopClear") return engine::MidiAction::LoopClear;
+    if (name == "freezeToggle") return engine::MidiAction::FreezeToggle;
+    if (name == "inputFreezeToggle") return engine::MidiAction::InputFreezeToggle;
     return engine::MidiAction::None;
 }
 

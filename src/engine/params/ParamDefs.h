@@ -124,6 +124,9 @@ inline constexpr unsigned kDiscrete = 1u << 4;      // integer choice; scenes pi
     X(InputGate,        "input.gate",         "Gate",            -90.0f, -20.0f,  -70.0f, Linear,  Linear,         0.05f, "dB", kMidiLearnable) \
     X(InputArmed,       "input.armed",        "Monitor",           0.0f,   1.0f,    0.0f, Linear,  Linear,         0.03f, "",   kMidiLearnable | kDiscrete | kPerformance) \
     TF_STRIP(X, Input,     "input",     0.0f, -14.0f, -18.0f) \
+    X(InputFreeze,      "input.freeze",       "Freeze",            0.0f,   1.0f,    0.0f, Linear,  Linear,         0.0f,  "",   kMidiLearnable | kDiscrete | kPerformance) \
+    X(InputFreezeLevel, "input.freezeLevel",  "Freeze Level",    -24.0f,   6.0f,    0.0f, Linear,  Linear,         0.05f, "dB", TF_TB_ML) \
+    X(InputFreezeDrift, "input.freezeDrift",  "Freeze Drift",      0.0f,   1.0f,    0.35f, Linear, Exponential,    0.2f,  "",   TF_TB_ML) \
     X(BloomTransform,   "bloom.transform",    "Transform",         0.0f,   5.0f,    0.0f, Linear,  Linear,         0.0f,  "",   TF_TB_ML | kDiscrete | kPerformance) \
     X(BloomAmount,      "bloom.amount",       "Amount",            0.0f,   1.0f,    0.5f, Linear,  Exponential,    0.2f,  "",   TF_TB_ML | kPerformance) \
     X(BloomLength,      "bloom.length",       "Length",            0.5f,  30.0f,    8.0f, Log,     LogExponential, 0.2f,  "s",  TF_TB_ML) \
@@ -138,6 +141,22 @@ inline constexpr unsigned kDiscrete = 1u << 4;      // integer choice; scenes pi
     X(BloomGravity,     "bloom.gravity",      "Gravity",           0.0f,   1.0f,    1.0f, Linear,  Exponential,    0.2f,  "",   TF_TB_ML) \
     X(ResExciteBloom,   "res.exciteBloom",    "From Bloom",        0.0f,   1.0f,    0.0f, Linear,  Exponential,    0.1f,  "",   TF_TB_ML) \
     TF_STRIP(X, Bloom,     "bloom",     0.0f,  -6.0f, -14.0f) \
+    X(LoopSource,       "loop.source",        "Source",            0.0f,   1.0f,    0.0f, Linear,  Linear,         0.0f,  "",   kMidiLearnable | kDiscrete) \
+    X(LoopErosion,      "loop.erosion",       "Erosion",           0.0f,   1.0f,    0.4f, Linear,  Exponential,    0.2f,  "",   TF_TB_ML | kPerformance) \
+    X(LoopFlakes,       "loop.flakes",        "Flakes",            0.0f,   1.0f,    0.3f, Linear,  Exponential,    0.2f,  "",   TF_TB_ML) \
+    X(LoopOverdub,      "loop.overdub",       "Overdub",           0.0f,   1.0f,    0.7f, Linear,  Exponential,    0.1f,  "",   TF_TB_ML) \
+    TF_STRIP(X, Loop,      "loop",      0.0f, -10.0f, -60.0f) \
+    X(WeatherWind,      "weather.wind",       "Wind",              0.0f,   1.0f,    0.0f, Linear,  Exponential,    0.5f,  "",   TF_TB_ML | kPerformance) \
+    X(WeatherRain,      "weather.rain",       "Rain",              0.0f,   1.0f,    0.0f, Linear,  Exponential,    0.5f,  "",   TF_TB_ML | kPerformance) \
+    X(WeatherSurf,      "weather.surf",       "Surf",              0.0f,   1.0f,    0.0f, Linear,  Exponential,    0.5f,  "",   TF_TB_ML | kPerformance) \
+    X(WeatherGust,      "weather.gust",       "Gusts",             0.0f,   1.0f,    0.5f, Linear,  Exponential,    0.5f,  "",   TF_TB_ML | kTideScaled) \
+    X(WeatherTone,      "weather.tone",       "Tone",              0.0f,   1.0f,    0.5f, Linear,  Exponential,    0.3f,  "",   TF_TB_ML) \
+    X(WeatherDistance,  "weather.distance",   "Distance",          0.0f,   1.0f,    0.3f, Linear,  Exponential,    0.5f,  "",   TF_TB_ML) \
+    TF_STRIP(X, Weather,   "weather",  -4.0f, -14.0f, -60.0f) \
+    X(FreezeOn,         "freeze.on",          "Freeze All",        0.0f,   1.0f,    0.0f, Linear,  Linear,         0.0f,  "",   kMidiLearnable | kDiscrete | kPerformance) \
+    X(FreezeDuck,       "freeze.duck",        "Duck the Mix",      0.0f,   1.0f,    0.6f, Linear,  Exponential,    0.1f,  "",   TF_TB_ML) \
+    X(FreezeTexture,    "freeze.texture",     "Texture",           0.0f,   1.0f,    0.5f, Linear,  Exponential,    0.3f,  "",   TF_TB_ML) \
+    TF_STRIP(X, Freeze,    "freeze",    0.0f, -10.0f, -60.0f) \
     TF_FX_SLOT(X, DroneFx1,  "drone.fx1")  TF_FX_SLOT(X, DroneFx2,  "drone.fx2")  \
     TF_FX_SLOT(X, Cloud1Fx1, "cloud1.fx1") TF_FX_SLOT(X, Cloud1Fx2, "cloud1.fx2") \
     TF_FX_SLOT(X, Cloud2Fx1, "cloud2.fx1") TF_FX_SLOT(X, Cloud2Fx2, "cloud2.fx2") \
@@ -146,6 +165,9 @@ inline constexpr unsigned kDiscrete = 1u << 4;      // integer choice; scenes pi
     TF_FX_SLOT(X, ResFx1,    "res.fx1")    TF_FX_SLOT(X, ResFx2,    "res.fx2")    \
     TF_FX_SLOT(X, InputFx1,  "input.fx1")  TF_FX_SLOT(X, InputFx2,  "input.fx2")  \
     TF_FX_SLOT(X, BloomFx1,  "bloom.fx1")  TF_FX_SLOT(X, BloomFx2,  "bloom.fx2")  \
+    TF_FX_SLOT(X, LoopFx1,   "loop.fx1")   TF_FX_SLOT(X, LoopFx2,   "loop.fx2")   \
+    TF_FX_SLOT(X, WeatherFx1,"weather.fx1") TF_FX_SLOT(X, WeatherFx2,"weather.fx2") \
+    TF_FX_SLOT(X, FreezeFx1, "freeze.fx1") TF_FX_SLOT(X, FreezeFx2, "freeze.fx2") \
     TF_FX_SLOT(X, BusAFx1,   "busA.fx1")   TF_FX_SLOT(X, BusAFx2,   "busA.fx2")   \
     TF_FX_SLOT(X, BusBFx1,   "busB.fx1")   TF_FX_SLOT(X, BusBFx2,   "busB.fx2")   \
     TF_FX_SLOT(X, MasterFx1, "master.fx1") TF_FX_SLOT(X, MasterFx2, "master.fx2")

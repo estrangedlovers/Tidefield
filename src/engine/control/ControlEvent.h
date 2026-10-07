@@ -20,6 +20,8 @@ enum class Command : std::uint8_t
     ResetFeedback,   // clear filters/delays/reverbs without changing gain
     ReleaseLiveLayer, // hand every overridden parameter back to the terrain
     Catch,            // capture the last catch.seconds of catch.source into a cloud
+    LoopRecord,       // looper pedal: record / close the loop / overdub on-off
+    LoopClear,        // fade the loop out and empty it
 };
 
 /** The single path for every change into the engine. Trivially copyable so it can

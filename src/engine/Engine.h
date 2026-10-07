@@ -25,6 +25,9 @@
 #include <dsp/sources/drone/DroneGenerator.h>
 #include <dsp/sources/granular/GranularCloud.h>
 #include <dsp/sources/input/LiveInput.h>
+#include <dsp/sources/looper/Disintegrator.h>
+#include <dsp/sources/weather/WeatherBed.h>
+#include <dsp/spectral/SpectralFreeze.h>
 #include <dsp/sources/resonator/ResonatorBank.h>
 
 #include <array>
@@ -222,6 +225,24 @@ private:
     SnapshotChannel<SampleHandle> bloomBuffers { 4 };
     std::shared_ptr<const dsp::SampleBuffer> bloomMirror; // message thread only
     bool bloomSwapping = false;
+    dsp::Disintegrator looper;
+    dsp::WeatherBed weather;
+    dsp::SpectralFreeze inputFreeze;
+
+    // Freeze all: a granular hold of the last two seconds of the mix (pre-Medium),
+    // captured from a short ring when freeze.on rises.
+    static constexpr double kFreezeRingSeconds = 3.0;
+    static constexpr double kFreezeSeconds = 2.0;
+    dsp::GranularCloud freezeCloud;
+    dsp::SampleBuffer freezeBuffer;
+    std::vector<float> preRingL, preRingR, freezeGainBuf;
+    std::size_t preCapacity = 0;
+    std::uint64_t preWritten = 0;
+    bool freezeLoaded = false;
+    float freezeGain = 0.0f;
+    void captureFreeze() noexcept;
+    void processFreeze(int offset, int numSamples) noexcept;
+
     std::array<ChannelStrip, kNumStrips> strips;
     std::array<FxSlot, kNumFxSlots> fxSlots;
     dsp::Medium medium;
@@ -230,7 +251,7 @@ private:
     // Buffers (maxBlock samples each).
     std::array<std::vector<float>, kNumStrips> stripL, stripR;
     std::vector<float> busAL, busAR, busBL, busBR, masterL, masterR;
-    std::vector<float> inputMono, excite, scratchDryL, scratchDryR, scratchAltL, scratchAltR;
+    std::vector<float> inputMono, excite, scratchDryL, scratchDryR, scratchAltL, scratchAltR, loopInL, loopInR, padL, padR;
 
     // Catch: rings of recent master output and live input. Written on the audio thread;
     // regions are read by copyCatch() after the CatchReady notice (whose queue release

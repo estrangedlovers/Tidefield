@@ -105,7 +105,7 @@ std::vector<std::string> applyMidiJson(const juce::var& json, engine::MidiManage
             b.pickup = static_cast<bool>(v.getProperty("pickup", true));
             if (v.hasProperty("action"))
             {
-                b.action = static_cast<engine::MidiAction>(std::clamp(static_cast<int>(v["action"]), 0, static_cast<int>(engine::MidiAction::RecordToggle)));
+                b.action = static_cast<engine::MidiAction>(std::clamp(static_cast<int>(v["action"]), 0, static_cast<int>(engine::MidiAction::InputFreezeToggle)));
             }
             else
             {

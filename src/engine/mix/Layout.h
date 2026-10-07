@@ -8,7 +8,7 @@ namespace tf::engine {
 
 /** Fixed mixer layout. The graph never changes shape at runtime; slots and strips
     are always present and simply silent when unused. */
-enum class StripId : int { Drone, Cloud1, Cloud2, Cloud3, Cloud4, Resonator, Input, Bloom, Count };
+enum class StripId : int { Drone, Cloud1, Cloud2, Cloud3, Cloud4, Resonator, Input, Bloom, Loop, Weather, Freeze, Count };
 inline constexpr int kNumStrips = static_cast<int>(StripId::Count);
 inline constexpr int kNumClouds = 4;
 
@@ -29,6 +29,9 @@ inline constexpr std::array<StripInfo, kNumStrips> kStrips { {
     { "res",    "Resonator", P::ResLevel,    P::ResPan,    P::ResWidth,    P::ResSendA,    P::ResSendB,    P::ResFx1P1,    P::ResFx2P1 },
     { "input",  "Live Input", P::InputLevel, P::InputPan,  P::InputWidth,  P::InputSendA,  P::InputSendB,  P::InputFx1P1,  P::InputFx2P1 },
     { "bloom",  "Bloom",     P::BloomLevel,  P::BloomPan,  P::BloomWidth,  P::BloomSendA,  P::BloomSendB,  P::BloomFx1P1,  P::BloomFx2P1 },
+    { "loop",   "Loop",      P::LoopLevel,   P::LoopPan,   P::LoopWidth,   P::LoopSendA,   P::LoopSendB,   P::LoopFx1P1,   P::LoopFx2P1 },
+    { "weather", "Weather",  P::WeatherLevel, P::WeatherPan, P::WeatherWidth, P::WeatherSendA, P::WeatherSendB, P::WeatherFx1P1, P::WeatherFx2P1 },
+    { "freeze", "Freeze",    P::FreezeLevel, P::FreezePan, P::FreezeWidth, P::FreezeSendA, P::FreezeSendB, P::FreezeFx1P1, P::FreezeFx2P1 },
 } };
 
 /** Every FX slot, in a fixed order. Strip inserts first (two per strip), then the
@@ -54,6 +57,9 @@ inline constexpr std::array<FxSlotInfo, kNumFxSlots> kFxSlots { {
     { "res.fx1", "Resonator insert 1", P::ResFx1P1 },     { "res.fx2", "Resonator insert 2", P::ResFx2P1 },
     { "input.fx1", "Input insert 1", P::InputFx1P1 },     { "input.fx2", "Input insert 2", P::InputFx2P1 },
     { "bloom.fx1", "Bloom insert 1", P::BloomFx1P1 },     { "bloom.fx2", "Bloom insert 2", P::BloomFx2P1 },
+    { "loop.fx1", "Loop insert 1", P::LoopFx1P1 },        { "loop.fx2", "Loop insert 2", P::LoopFx2P1 },
+    { "weather.fx1", "Weather insert 1", P::WeatherFx1P1 }, { "weather.fx2", "Weather insert 2", P::WeatherFx2P1 },
+    { "freeze.fx1", "Freeze insert 1", P::FreezeFx1P1 },  { "freeze.fx2", "Freeze insert 2", P::FreezeFx2P1 },
     { "busA.fx1", "Reverb bus 1", P::BusAFx1P1 },         { "busA.fx2", "Reverb bus 2", P::BusAFx2P1 },
     { "busB.fx1", "Delay bus 1", P::BusBFx1P1 },          { "busB.fx2", "Delay bus 2", P::BusBFx2P1 },
     { "master.fx1", "Master insert 1", P::MasterFx1P1 },  { "master.fx2", "Master insert 2", P::MasterFx2P1 },

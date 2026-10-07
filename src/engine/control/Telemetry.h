@@ -65,6 +65,15 @@ struct TelemetryFrame
     // Live input.
     float inputLevel = 0.0f;
     bool inputGateOpen = false;
+    float inputFreeze = 0.0f;  // spectral pad gain 0..1
+
+    // Looper, weather, freeze all.
+    int loopState = 0;         // dsp::Disintegrator::State
+    float loopPosition = 0.0f; // 0..1
+    float loopSeconds = 0.0f;
+    int loopPasses = 0;
+    float weatherGust = 0.0f, weatherWave = 0.0f;
+    float freezeGain = 0.0f;
 
     // Terrain.
     Point2 cursor {};          // performer's cursor after glide

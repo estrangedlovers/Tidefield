@@ -2,7 +2,7 @@
 
 Read `CLAUDE.md` (rules) and `docs/ARCHITECTURE.md` (design) first.
 
-## Status: phase 8 complete; auto master, more gestures, optimisation and review next
+## Status: 1.0.0, all phases and the follow-up passes complete
 
 ### Phase 1: skeleton, device settings, safety chain, drone, render harness
 
@@ -395,9 +395,41 @@ arm64). UI checked in the browser mock at 1440x900.
 real instrument; whether swell's targets and depths feel right; spectral freeze on
 a real cello; the user's own JUCE plugins inside the adapter.
 
-## Next
-Auto master, more performance methods, an optimisation pass, a debugging pass, a
-professional review build, and the downloadable Mac app.
+### After phase 8: auto master, more gestures, optimisation, debugging, review
+
+**Built**
+- **Auto master** (`dsp::AutoMaster`, after the Medium, before the safety chain):
+  analysis of tonal balance (four bands against a warm ambient target), K-weighted
+  short-term loudness and stereo balance; slow corrections through a three-band EQ,
+  a 1.6:1 glue compressor (threshold from its own input's loudness, at most 6 dB),
+  width with mono lows, and make-up to -23, -16 or -14 LUFS. Never lifts silence;
+  bit-transparent and free when off; switching crossfades. This is adaptive DSP, not a
+  trained model and not an online service.
+- **More gestures**: Journey (a wander style that tours the scenes), the Shape pad
+  (Colour and Space macros), Hush (hold H), Slow time (hold T).
+- **Optimisation**: granular window per chunk and a shared-index Hermite fast path,
+  hand-written FFT butterflies, trig-free spectral phase rotors, muted drone and
+  resonator skipped. Stress score 17.6 s to 12.9 s for 60 s; typical patches ~4 % of
+  one core (container x86; the M1 Pro should be faster).
+- **Debugging**: sessions from before a parameter or slot existed now reset it; the
+  auto master's glue could chase its own meter into heavy compression (fixed); held
+  gestures release on focus loss; freeze all was ~9 dB under the moment it caught
+  (made up); journey dwelt at the next scene instead of the current one (fixed);
+  "0 Hz" readouts for slow rates; key and scale pickers overflowing.
+- **Review build**: version 1.0.0, icon, copyright, deployment target applied
+  correctly; `Tidefield --self-test` (bundled UI, factory sounds, full-engine render)
+  run by CI on the shipped bundle together with architecture and minimum-OS checks;
+  a version tag publishes a GitHub Release with the app.
+
+**Verified**: 126 ctest tests; the whole engine suite under AddressSanitizer,
+UndefinedBehaviorSanitizer and leak detection; a two-minute monkey test (every
+parameter, command, note, scene, season and FX swap at random, varying block sizes)
+stays finite and under the ceiling; the app's self-test passes on Linux and in macOS
+CI; every macOS CI run green on Apple Silicon.
+
+**Untested (needs the Mac and ears)**: everything audible: balance between sources,
+whether the auto master's target shape suits your material, how the new gestures
+feel, CPU on the M1 Pro under real load, and the app on your interface and controller.
 
 ## How to run
 ```

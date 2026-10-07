@@ -75,6 +75,12 @@ struct TelemetryFrame
     float weatherGust = 0.0f, weatherWave = 0.0f;
     float freezeGain = 0.0f;
 
+    // Tempo: the beat clock (host's tempo when hostTempo, else the Tempo parameter).
+    float bpm = 90.0f;
+    float beatPhase = 0.0f; // 0..1 within the beat
+    bool syncOn = false;
+    bool hostTempo = false;
+
     // Auto master: loudness (LUFS), make-up dB, low/mud/high EQ dB, width, glue dB, mix.
     std::array<float, 8> autoMaster {};
 

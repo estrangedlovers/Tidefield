@@ -108,6 +108,16 @@ public:
     bool loadBloomSample(std::shared_ptr<const dsp::SampleBuffer> buffer);
     std::shared_ptr<const dsp::SampleBuffer> getBloomSample() const { return bloomMirror; }
 
+    /** Audio thread, before process(): the host's tempo and song position (a DAW's
+        play head). bpm <= 0 means none; the Tempo parameter is used instead. */
+    void setHostTransport(double tempoBpm, double ppqPosition, bool playing) noexcept
+    {
+        hostBpm = tempoBpm;
+        hostPpq = ppqPosition;
+        hostPlaying = playing && tempoBpm > 0.0;
+        hostSampleTime = sampleTime;
+    }
+
     bool noteOn(int note, float velocity) noexcept { return post(ControlEvent::note(note, velocity)); }
     bool noteOff(int note) noexcept { return post(ControlEvent::note(note, 0.0f)); }
 
@@ -170,6 +180,7 @@ private:
     void updateSources(float tide) noexcept;
     void updateFx(float tide) noexcept;
     void updateModulation(float dtSeconds) noexcept;
+    void updateTempo(float dtSeconds) noexcept;
     void updateLoops(float dtSeconds) noexcept;
     void updateCloudSwaps(int numSamples) noexcept;
     void resetFeedback() noexcept;
@@ -263,6 +274,15 @@ private:
     std::array<float, kMaxLoops> loopPhase {}, loopNote {}, loopFlash {};
     std::array<float, kMaxLoops> loopOffset {};
     int loopPattern = -1;
+    // Tempo sync: the host's transport (audio thread), the beat clock and, per loop,
+    // the cycle it last fired in.
+    double hostBpm = 0.0, hostPpq = 0.0;
+    bool hostPlaying = false;
+    std::uint64_t hostSampleTime = 0;
+    double beatPos = 0.0;
+    float bpm = 90.0f;
+    bool syncOn = false;
+    std::array<std::int64_t, kMaxLoops> loopCycle {};
     dsp::Random loopRng;
 
     std::array<ChannelStrip, kNumStrips> strips;

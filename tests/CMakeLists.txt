@@ -21,6 +21,7 @@ add_executable(tidefield_tests
     engine/Phase8SourcesTests.cpp
     engine/Phase8PerformTests.cpp
     engine/PathTests.cpp
+    engine/TempoTests.cpp
     engine/MonkeyTests.cpp)
 
 target_include_directories(tidefield_tests PRIVATE ${CMAKE_CURRENT_SOURCE_DIR})

@@ -103,6 +103,8 @@ inline constexpr unsigned kDiscrete = 1u << 4;      // integer choice; scenes pi
     X(LoopsSpread,      "loops.spread",       "Spread",            0.0f,   3.0f,    1.5f, Linear,  Linear,         0.0f,  "oct", TF_TB_ML) \
     X(LoopsVelocity,    "loops.velocity",     "Velocity",          0.0f,   1.0f,    0.6f, Linear,  Exponential,    0.2f,  "",   TF_TB_ML) \
     X(LoopsTarget,      "loops.target",       "Play Into",         0.0f,   2.0f,    0.0f, Linear,  Linear,         0.0f,  "",   kMidiLearnable | kDiscrete) \
+    X(SyncOn,           "sync.on",            "Tempo Sync",        0.0f,   1.0f,    0.0f, Linear,  Linear,         0.0f,  "",   kMidiLearnable | kDiscrete | kPerformance) \
+    X(SyncBpm,          "sync.bpm",           "Tempo",            40.0f, 200.0f,   90.0f, Linear,  Linear,         0.0f,  "BPM", kMidiLearnable) \
     X(LoopsPattern,     "loops.pattern",      "Pattern",           0.0f,  99.0f,    0.0f, Linear,  Linear,         0.0f,  "",   TF_TB_ML | kDiscrete) \
     X(BusALevel,        "busA.level",         "Reverb Return",   -60.0f,   6.0f,    0.0f, Decibel, Linear,         0.05f, "dB", TF_TB_ML | kPerformance) \
     X(BusBLevel,        "busB.level",         "Delay Return",    -60.0f,   6.0f,    0.0f, Decibel, Linear,         0.05f, "dB", TF_TB_ML | kPerformance) \

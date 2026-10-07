@@ -60,6 +60,8 @@ struct ModContext
 {
     float timeScale = 1.0f;
     const HarmonicGravity* harmony = nullptr;
+    /** > 0 while tempo sync is on: delays lock their time to beat divisions. */
+    float beatSeconds = 0.0f;
 };
 
 /** Base for everything that can sit in an FX slot: inserts, send buses, master.

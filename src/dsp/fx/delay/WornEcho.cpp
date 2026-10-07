@@ -2,6 +2,7 @@
 
 #include "../../core/Denormal.h"
 #include "../../core/MathUtil.h"
+#include "../../core/TempoSync.h"
 
 #include <algorithm>
 #include <cmath>
@@ -54,7 +55,7 @@ void WornEcho::reset() noexcept
 
 void WornEcho::setControls(const std::array<float, 6>& c, const ModContext& ctx) noexcept
 {
-    targetDelay = kInfo.controls[0].display.value(c[0]) * 0.001f * static_cast<float>(fs);
+    targetDelay = syncedSeconds(kInfo.controls[0].display.value(c[0]) * 0.001f, ctx.beatSeconds, 2.0f) * static_cast<float>(fs);
     feedback = 1.05f * std::clamp(c[1], 0.0f, 1.0f);
     const int type = std::clamp(static_cast<int>(c[2] * 3.0f), 0, 2);
     const float age = std::clamp(c[3], 0.0f, 1.0f);

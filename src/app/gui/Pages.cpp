@@ -1,5 +1,6 @@
 #include "Pages.h"
 
+#include <dsp/core/TempoSync.h>
 #include <engine/mix/Layout.h>
 
 #include <map>
@@ -115,6 +116,15 @@ private:
             {
                 kn->setLabel(info->controls[static_cast<std::size_t>(k)].name);
                 kn->formatter = fxFormatter(info->controls[static_cast<std::size_t>(k)]);
+                // Delay times show the note length they lock to while synced.
+                if (k == 0 && (shownType == "tf.delay" || shownType == "tf.wornEcho"))
+                    kn->formatter = [this, free = kn->formatter, control = info->controls[0]](float v) {
+                        const auto& f = model.frame();
+                        if (! f.syncOn)
+                            return free(v);
+                        const int d = dsp::nearestDivision(control.display.value(v) * 0.001f, 60.0f / std::max(20.0f, f.bpm), 2.0f);
+                        return d < 0 ? free(v) : juce::String(dsp::kBeatDivisions[static_cast<std::size_t>(d)].name);
+                    };
             }
         }
         knobs[6]->setVisible(info != nullptr);
@@ -1014,6 +1024,8 @@ void DeviceView::build()
             auto& d = device("Incommensurate loops", sceneTint(7));
             params(d, { P::LoopsOn, P::LoopsTarget, P::LoopsCount, P::LoopsPattern, P::LoopsRate, P::LoopsDensity, P::LoopsRegister, P::LoopsSpread,
                         P::LoopsVelocity });
+            auto& t = device("Tempo", colour::tide);
+            params(t, { P::SyncOn, P::SyncBpm });
             break;
         }
         case Seasons:

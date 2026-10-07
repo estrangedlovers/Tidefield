@@ -133,6 +133,17 @@ void Knob::paint(juce::Graphics& g)
     g.drawText(formatter ? formatter(model.value(param)) : valueText(), valueArea, juce::Justification::centred, true);
 }
 
+void Knob::tick()
+{
+    ParamComponent::tick();
+    if (formatter && isShowing())
+        if (auto t = formatter(model.value(param)); t != lastText)
+        {
+            lastText = t;
+            repaint();
+        }
+}
+
 void Knob::mouseDrag(const juce::MouseEvent& e)
 {
     if (! dragging)

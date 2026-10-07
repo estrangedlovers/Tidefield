@@ -2,6 +2,7 @@
 
 #include "../../core/Denormal.h"
 #include "../../core/MathUtil.h"
+#include "../../core/TempoSync.h"
 
 #include <algorithm>
 #include <cmath>
@@ -62,7 +63,7 @@ void TapeDelay::reset() noexcept
 
 void TapeDelay::setControls(const std::array<float, 6>& c, const ModContext& ctx) noexcept
 {
-    targetDelay = timeMsFrom01(c[0]) * 0.001f * static_cast<float>(fs);
+    targetDelay = syncedSeconds(timeMsFrom01(c[0]) * 0.001f, ctx.beatSeconds, 2.0f) * static_cast<float>(fs);
     feedback = feedbackFrom01(c[1]);
     // Age narrows the band of each repeat: highs roll off lower, lows thin out.
     age = std::clamp(c[5], 0.0f, 1.0f);

@@ -59,6 +59,10 @@ public:
 
     /** Overrides the formatted value (FX slot controls format through their processor). */
     std::function<juce::String(float)> formatter;
+    void tick() override;
+
+private:
+    juce::String lastText; // a formatter can change its text without the value moving (tempo sync)
 };
 
 /** Tall vertical fader for the performance macros. */

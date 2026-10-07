@@ -137,6 +137,8 @@ juce::String Model::format(P p, float v) const
         return (v > 0.0f ? "+" : "") + fixed(v, 1) + " st";
     if (unit == "ct")
         return juce::String(juce::roundToInt(v)) + " ct";
+    if (unit == "BPM")
+        return fixed(v, 1) + " BPM";
     if (unit == "x")
         return fixed(v, 2) + "x";
     if (unit == "/s")

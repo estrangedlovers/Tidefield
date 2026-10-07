@@ -6,6 +6,7 @@
 #include <dsp/core/MathUtil.h>
 
 #include <algorithm>
+#include <limits>
 #include <chrono>
 #include <cmath>
 
@@ -104,6 +105,8 @@ void Engine::prepare(double newSampleRate, int maxBlockSize)
     wander.setSeed(config.seed ^ 0x77616e64ull);
     loopRng.setSeed(config.seed ^ 0x6c6f6f70ull);
     loopPattern = -1;
+    loopCycle.fill(std::numeric_limits<std::int64_t>::min());
+    beatPos = 0.0;
     swellEnv = hushEnv = slowEnv = 0.0f;
     seasonVersion = 0;
 
@@ -692,7 +695,7 @@ std::array<float, 6> Engine::slotControls(int slot) const noexcept
 
 void Engine::updateFx(float t) noexcept
 {
-    const dsp::ModContext ctx { t, &harmony };
+    const dsp::ModContext ctx { t, &harmony, syncOn ? 60.0f / std::max(20.0f, bpm) : 0.0f };
     for (int s = 0; s < kNumFxSlots; ++s)
         if (fxSlots[static_cast<std::size_t>(s)].isActive())
             fxSlots[static_cast<std::size_t>(s)].setControls(slotControls(s), ctx);
@@ -730,6 +733,7 @@ void Engine::controlTick() noexcept
     harmony.advance(tickSeconds * tide);
 
     updateSources(tide);
+    updateTempo(tickSeconds);
     updateLoops(tickSeconds);
 
     for (int s = 0; s < kNumStrips; ++s)
@@ -854,6 +858,17 @@ void Engine::updateModulation(float dt) noexcept
     }
 }
 
+void Engine::updateTempo(float dt) noexcept
+{
+    syncOn = params.current(P::SyncOn) > 0.5f;
+    bpm = hostBpm > 0.0 ? static_cast<float>(std::clamp(hostBpm, 20.0, 400.0)) : params.current(P::SyncBpm);
+    if (hostPlaying)
+        // Follow the host's song position, so a section plays back the same way.
+        beatPos = hostPpq + static_cast<double>(sampleTime - hostSampleTime) / sampleRate * static_cast<double>(bpm) / 60.0;
+    else
+        beatPos += static_cast<double>(dt) * static_cast<double>(bpm) / 60.0;
+}
+
 void Engine::updateLoops(float dt) noexcept
 {
     // Incommensurate loops (Music for Airports): each voice repeats one note on its
@@ -882,6 +897,12 @@ void Engine::updateLoops(float dt) noexcept
     const int target = std::clamp(toInt(params.current(P::LoopsTarget)), 0, 2);
     const float flashDecay = std::exp(-dt / 0.4f);
 
+    // Synced: each voice repeats every prime number of beats (so they still never
+    // line up), halved or doubled by Pace, and fires on the beat itself.
+    static constexpr std::array<double, kMaxLoops> kBeatPeriods { 23.0, 29.0, 31.0, 37.0, 41.0, 43.0, 47.0, 53.0 };
+    const double paceSteps = std::round(std::log2(std::max(0.01f, params.current(P::LoopsRate))));
+    const double beatScale = std::pow(2.0, -paceSteps);
+
     for (int k = 0; k < kMaxLoops; ++k)
     {
         const auto uk = static_cast<std::size_t>(k);
@@ -889,10 +910,27 @@ void Engine::updateLoops(float dt) noexcept
         loopNote[uk] = harmony.quantize(reg + loopOffset[uk] * spread, loopOffset[uk], 1.0f);
         if (k >= count)
             continue;
-        loopPhase[uk] += dt * pace / kPeriods[uk];
-        if (loopPhase[uk] < 1.0f)
-            continue;
-        loopPhase[uk] -= std::floor(loopPhase[uk]);
+        if (syncOn)
+        {
+            const double period = std::max(1.0, std::round(kBeatPeriods[uk] * beatScale)); // whole beats
+            // The voice's offset, rounded to whole beats so it fires on a beat.
+            const double offsetBeats = std::round(static_cast<double>(loopOffset[uk]) * period);
+            const double t = (beatPos + offsetBeats) / period;
+            const auto cycle = static_cast<std::int64_t>(std::floor(t));
+            loopPhase[uk] = static_cast<float>(t - std::floor(t));
+            const auto previous = loopCycle[uk];
+            loopCycle[uk] = cycle;
+            if (cycle != previous + 1) // first tick, or the host jumped: no burst of notes
+                continue;
+        }
+        else
+        {
+            loopPhase[uk] += dt * pace / kPeriods[uk];
+            if (loopPhase[uk] < 1.0f)
+                continue;
+            loopPhase[uk] -= std::floor(loopPhase[uk]);
+            loopCycle[uk] = std::numeric_limits<std::int64_t>::min();
+        }
         if (! on || ! loopRng.chance(density))
             continue;
         const float vel = velocity * (0.75f + 0.25f * loopRng.nextFloat());
@@ -1402,6 +1440,10 @@ void Engine::accumulateTelemetry(const float* l, const float* r, int n) noexcept
     f.limiterGain = master.getLimiterGain();
     f.fadeGain = master.getFadeGain();
     f.fadeState = master.getFadeState();
+    f.bpm = bpm;
+    f.beatPhase = static_cast<float>(beatPos - std::floor(beatPos));
+    f.syncOn = syncOn;
+    f.hostTempo = hostBpm > 0.0;
     f.panicActive = master.isPanicActive();
     f.guardTrips = master.getGuardTrips();
     f.dspLoad = guardEnabled.load(std::memory_order_relaxed) ? guard.getSmoothedLoad() : 0.0f;

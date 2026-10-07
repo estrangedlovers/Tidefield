@@ -103,6 +103,18 @@ void TidefieldProcessor::processBlock(juce::AudioBuffer<float>& buffer, juce::Mi
     }
     midi.clear();
 
+    // The DAW's tempo and song position: synced loops and delays follow them.
+    double tempo = 0.0, ppq = 0.0;
+    bool playing = false;
+    if (auto* head = getPlayHead())
+        if (const auto pos = head->getPosition())
+        {
+            tempo = pos->getBpm().orFallback(0.0);
+            ppq = pos->getPpqPosition().orFallback(0.0);
+            playing = pos->getIsPlaying();
+        }
+    engine.setHostTransport(tempo, ppq, playing);
+
     const int numIn = getTotalNumInputChannels();
     const int numOut = getTotalNumOutputChannels();
     // In place: the engine reads each block's inputs before writing its outputs.

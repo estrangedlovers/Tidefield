@@ -140,6 +140,111 @@ private:
     std::unique_ptr<juce::FileChooser> chooser;
 };
 
+/** Tempo, like a studio's transport: Sync on/off, the tempo (drag to change, or
+    the DAW's when hosted) with a dot on every beat, and Tap. */
+class TempoWidget final : public juce::Component, public Animated
+{
+public:
+    explicit TempoWidget(Model& m) : model(m) { model.add(this); }
+    ~TempoWidget() override { model.remove(this); }
+
+    void tick() override
+    {
+        const auto& f = model.frame();
+        const bool on = model.value(P::SyncOn) > 0.5f;
+        const float bpm = f.hostTempo ? f.bpm : model.value(P::SyncBpm);
+        const float beat = on ? std::pow(1.0f - f.beatPhase, 4.0f) : 0.0f;
+        if (on != shownOn || std::abs(bpm - shownBpm) > 0.05f || std::abs(beat - shownBeat) > 0.02f || f.hostTempo != shownHost)
+        {
+            shownOn = on;
+            shownBpm = bpm;
+            shownBeat = beat;
+            shownHost = f.hostTempo;
+            repaint();
+        }
+    }
+
+    void paint(juce::Graphics& g) override
+    {
+        auto r = getLocalBounds().toFloat().reduced(0.5f);
+        auto syncArea = r.removeFromLeft(54.0f);
+        auto tapArea = r.removeFromRight(38.0f);
+        g.setColour(shownOn ? colour::tide : colour::panelHi);
+        g.fillRoundedRectangle(syncArea, metric::radius);
+        g.setColour(shownOn ? colour::well : colour::text);
+        g.setFont(font(12.0f, 600));
+        g.drawText("Sync", syncArea.withTrimmedRight(10.0f), juce::Justification::centred);
+        g.setColour((shownOn ? colour::well : colour::textFaint).withAlpha(0.35f + 0.65f * shownBeat));
+        g.fillEllipse(juce::Rectangle<float>(6.0f, 6.0f).withCentre({ syncArea.getRight() - 9.0f, syncArea.getCentreY() }));
+
+        auto field = r.reduced(3.0f, 0.0f);
+        drawWell(g, field);
+        g.setColour(shownHost ? colour::tide : colour::text);
+        g.setFont(font(13.0f, 600));
+        g.drawText(juce::String(shownBpm, 1), field, juce::Justification::centred);
+
+        g.setColour(isMouseOver() && tapArea.contains(getMouseXYRelative().toFloat()) ? colour::panelHi.brighter(0.08f) : colour::panelHi);
+        g.fillRoundedRectangle(tapArea, metric::radius);
+        g.setColour(colour::text);
+        g.setFont(font(11.5f, 600));
+        g.drawText("Tap", tapArea, juce::Justification::centred);
+    }
+
+    void mouseEnter(const juce::MouseEvent&) override
+    {
+        if (model.onHover)
+            model.onHover(shownHost ? juce::String("Tempo: following the DAW. Sync locks the loops to the beat and the delays to note lengths.")
+                                    : juce::String("Tempo: Sync locks the loops to the beat and the delays to note lengths; drag the number to change it, or Tap."));
+    }
+    void mouseMove(const juce::MouseEvent&) override { repaint(); }
+
+    void mouseDown(const juce::MouseEvent& e) override
+    {
+        if (e.mods.isPopupMenu())
+            return model.showParamMenu(e.x < 54 ? P::SyncOn : P::SyncBpm);
+        if (e.x < 54)
+            return model.toggle(P::SyncOn);
+        if (e.x > getWidth() - 38)
+            return tap();
+        dragStart = model.value(P::SyncBpm);
+        model.beginTouch(P::SyncBpm);
+    }
+    void mouseDrag(const juce::MouseEvent& e) override
+    {
+        if (e.mouseDownPosition.x < 54 || e.mouseDownPosition.x > static_cast<float>(getWidth() - 38))
+            return;
+        const float step = e.mods.isShiftDown() ? 0.05f : 0.5f;
+        model.set(P::SyncBpm, std::round((dragStart - static_cast<float>(e.getDistanceFromDragStartY()) * step) * 10.0f) / 10.0f);
+    }
+    void mouseUp(const juce::MouseEvent&) override { model.endTouch(P::SyncBpm); }
+    void mouseDoubleClick(const juce::MouseEvent& e) override
+    {
+        if (e.x >= 54 && e.x <= getWidth() - 38)
+            model.resetToDefault(P::SyncBpm);
+    }
+
+private:
+    void tap()
+    {
+        const double now = juce::Time::getMillisecondCounterHiRes();
+        if (! taps.empty() && now - taps.back() > 2000.0)
+            taps.clear(); // a pause starts a new count
+        taps.push_back(now);
+        if (taps.size() > 5)
+            taps.erase(taps.begin());
+        if (taps.size() >= 2)
+        {
+            const double beatMs = (taps.back() - taps.front()) / static_cast<double>(taps.size() - 1);
+            model.set(P::SyncBpm, static_cast<float>(std::round(60000.0 / beatMs * 10.0) / 10.0));
+        }
+    }
+
+    Model& model;
+    std::vector<double> taps;
+    float dragStart = 90.0f, shownBpm = 0.0f, shownBeat = 0.0f;
+    bool shownOn = false, shownHost = false;
+};
+
 } // namespace
 
 // --- Top bar --------------------------------------------------------------------------
@@ -147,7 +252,7 @@ private:
 class TopBar final : public juce::Component, public Animated
 {
 public:
-    TopBar(Model& m, MainView& v) : model(m), view(v), meter(m, -1, true), rec(m), autoMaster(m, P::MasterAuto, "Auto master", {}, colour::good)
+    TopBar(Model& m, MainView& v) : model(m), view(v), meter(m, -1, true), rec(m), autoMaster(m, P::MasterAuto, "Auto master", {}, colour::good), tempo(m)
     {
         model.add(this);
         sessionButton.setHelp(&model, "new, open, save (Cmd+N, Cmd+O, Cmd+S)");
@@ -177,7 +282,7 @@ public:
         keys.onClick = [this] { view.noteMode = ! view.noteMode; };
         audio.setHelp(&model, "audio device, sample rate and buffer size");
         audio.onClick = [this] { view.showAudioSettings(); };
-        for (auto* c : std::initializer_list<juce::Component*> { &sessionButton, &fade, &panic, &keys, &audio, &meter, &rec, &autoMaster })
+        for (auto* c : std::initializer_list<juce::Component*> { &sessionButton, &fade, &panic, &keys, &audio, &meter, &rec, &autoMaster, &tempo })
             addAndMakeVisible(c);
         audio.setVisible(model.core.host.getDeviceManager() != nullptr); // in a DAW, the DAW owns the device
     }
@@ -206,7 +311,7 @@ public:
     {
         auto r = getLocalBounds().reduced(8, 7);
         r.removeFromLeft(112); // wordmark
-        sessionButton.setBounds(r.removeFromLeft(170));
+        sessionButton.setBounds(r.removeFromLeft(150));
         r.removeFromLeft(14);
         fade.setBounds(r.removeFromLeft(96));
         r.removeFromLeft(4);
@@ -217,12 +322,14 @@ public:
         autoMaster.setBounds(r.removeFromLeft(104));
         r.removeFromLeft(4);
         keys.setBounds(r.removeFromLeft(74));
+        r.removeFromLeft(14);
+        tempo.setBounds(r.removeFromLeft(156));
 
         audio.setBounds(r.removeFromRight(58));
         r.removeFromRight(8);
         meter.setBounds(r.removeFromRight(150).reduced(0, 4));
         r.removeFromRight(10);
-        cpuArea = r.removeFromRight(190);
+        cpuArea = r.removeFromRight(std::min(190, r.getWidth())); // shrinks first when the window is narrow
     }
 
     void paint(juce::Graphics& g) override
@@ -272,6 +379,7 @@ private:
     Meter meter;
     RecordButton rec;
     Toggle autoMaster;
+    TempoWidget tempo;
     juce::Rectangle<int> cpuArea;
     int slow = 0;
 };

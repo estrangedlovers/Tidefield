@@ -148,7 +148,7 @@ juce::Colour TerrainView::soundColour() const
     float r = 0.0f, g = 0.0f, b = 0.0f, total = 0.0f;
     for (std::size_t k = 0; k < shownWeights.size(); ++k)
     {
-        const auto c = colour::forScene(static_cast<int>(k));
+        const auto c = display::forScene(static_cast<int>(k));
         const float w = shownWeights[k];
         r += c.getFloatRed() * w;
         g += c.getFloatGreen() * w;
@@ -156,7 +156,7 @@ juce::Colour TerrainView::soundColour() const
         total += w;
     }
     if (total < 1.0e-3f)
-        return colour::tide;
+        return display::tide();
     return juce::Colour::fromFloatRGBA(r / total, g / total, b / total, 1.0f);
 }
 
@@ -187,12 +187,12 @@ void TerrainView::renderBackdrop()
     g.addTransform(juce::AffineTransform::scale(scale));
     const auto f = field();
     // Deep water: lighter at the top, like looking down into a pool.
-    g.setGradientFill(juce::ColourGradient(juce::Colour(0xff253842), f.getX(), f.getY(), juce::Colour(0xff151d23), f.getX(), f.getBottom(), false));
+    g.setGradientFill(juce::ColourGradient(juce::Colour(0xff26383e), f.getX(), f.getY(), juce::Colour(0xff141c1f), f.getX(), f.getBottom(), false));
     g.fillRoundedRectangle(f, metric::radius + 2.0f);
 
     // A dot grid, like a pad surface.
     const auto inner = f.reduced(kInset);
-    g.setColour(colour::wellLine);
+    g.setColour(display::wellLine());
     for (int i = 0; i <= 16; ++i)
         for (int j = 0; j <= 10; ++j)
         {
@@ -202,7 +202,7 @@ void TerrainView::renderBackdrop()
             g.fillEllipse(x - s * 0.5f, y - s * 0.5f, s, s);
         }
     // Gentle contour lines.
-    g.setColour(colour::wellLine.withAlpha(0.6f));
+    g.setColour(display::wellLine().withAlpha(0.6f));
     for (int k = 0; k < 9; ++k)
     {
         juce::Path p;
@@ -302,7 +302,7 @@ void TerrainView::tick()
         const float lv = f.modeLevel[m];
         if (lv > lastModes[m] * 1.6f + 0.02f && ripples.size() < 40 && energy > 0.05f) // only strikes you can hear
             ripples.push_back({ at + juce::Point<float>(rng.nextFloat() * 40.0f - 20.0f, rng.nextFloat() * 40.0f - 20.0f), 0.0f,
-                                juce::jlimit(0.2f, 1.0f, lv * 4.0f) * std::min(1.0f, energy * 1.5f), colour::live });
+                                juce::jlimit(0.2f, 1.0f, lv * 4.0f) * std::min(1.0f, energy * 1.5f), display::live() });
         lastModes[m] = lv;
     }
     for (std::size_t v = 0; v < lastBloom.size(); ++v)
@@ -310,7 +310,7 @@ void TerrainView::tick()
         const bool active = f.bloomVoices[v].active;
         if (active && ! lastBloom[v] && ripples.size() < 40 && energy > 0.05f)
             ripples.push_back({ at + juce::Point<float>(rng.nextFloat() * 60.0f - 30.0f, rng.nextFloat() * 60.0f - 30.0f), 0.0f, 1.0f,
-                                colour::forScene(static_cast<int>(v) + 2) });
+                                display::forScene(static_cast<int>(v) + 2) });
         lastBloom[v] = active;
     }
     for (auto& r : ripples)
@@ -353,7 +353,7 @@ void TerrainView::paint(juce::Graphics& g)
             lg.addTransform(juce::AffineTransform::translation(-f.getX(), -f.getY()).scaled(kLayerScale));
             for (std::size_t k = 0; k < scenes.size(); ++k)
             {
-                const auto c = colour::forScene(static_cast<int>(k));
+                const auto c = display::forScene(static_cast<int>(k));
                 const float w = k < shownWeights.size() ? shownWeights[k] : 0.0f;
                 drawGlow(lg, toScreen(scenes[k].position), big * (0.12f + 0.28f * w), c.withAlpha(0.08f + 0.22f * w * (0.4f + 0.6f * energy)));
             }
@@ -386,8 +386,8 @@ void TerrainView::paint(juce::Graphics& g)
             g.strokePath(p, stroke);
     };
     const bool following = juce::roundToInt(model.value(engine::P::TerrainWanderStyle)) == 4;
-    drawPath(shownPath, colour::tide, following ? 0.7f : 0.3f, true);
-    drawPath(drawing, colour::accent, 0.9f, false);
+    drawPath(shownPath, display::tide(), following ? 0.7f : 0.3f, true);
+    drawPath(drawing, display::accent(), 0.9f, false);
 
     // Trail of where the sound has been.
     for (std::size_t i = 1; i < trail.size(); ++i)
@@ -425,7 +425,7 @@ void TerrainView::paint(juce::Graphics& g)
         const float rad = 22.0f + 9.0f * static_cast<float>(v);
         const auto p = at + juce::Point<float>(std::cos(ang) * rad, std::sin(ang) * rad * 0.7f);
         const float s = 3.0f + 4.0f * level;
-        g.setColour(colour::text.withAlpha(0.25f + 0.6f * level));
+        g.setColour(display::text().withAlpha(0.25f + 0.6f * level));
         g.fillEllipse(juce::Rectangle<float>(s, s).withCentre(p));
     }
 
@@ -433,27 +433,27 @@ void TerrainView::paint(juce::Graphics& g)
     const auto cur = toScreen(shownCursor);
     if (! presentation)
     {
-        g.setColour(colour::tide.withAlpha(0.22f));
+        g.setColour(display::tide().withAlpha(0.22f));
         g.drawLine(f.getX(), cur.y, f.getRight(), cur.y, 1.0f);
         g.drawLine(cur.x, f.getY(), cur.x, f.getBottom(), 1.0f);
     }
-    g.setColour(colour::tide.withAlpha(presentation ? 0.35f : 1.0f));
+    g.setColour(display::tide().withAlpha(presentation ? 0.35f : 1.0f));
     g.drawEllipse(juce::Rectangle<float>(18.0f, 18.0f).withCentre(cur), 2.0f);
 
     // The sound.
     g.setColour(tint.withAlpha(0.5f));
     g.fillEllipse(juce::Rectangle<float>(16.0f, 16.0f).withCentre(at));
-    g.setColour(colour::text);
+    g.setColour(display::text());
     g.fillEllipse(juce::Rectangle<float>(8.0f, 8.0f).withCentre(at));
 
     // Scenes: coloured markers with a weight ring and a name pill.
     for (std::size_t k = 0; k < scenes.size(); ++k)
     {
-        const auto c = colour::forScene(static_cast<int>(k));
+        const auto c = display::forScene(static_cast<int>(k));
         const auto s = toScreen(scenes[k].position);
         const float w = k < shownWeights.size() ? shownWeights[k] : 0.0f;
         const bool hover = static_cast<int>(k) == hoverScene;
-        g.setColour(colour::well);
+        g.setColour(display::well());
         g.fillEllipse(juce::Rectangle<float>(20.0f, 20.0f).withCentre(s));
         g.setColour(c);
         g.fillEllipse(juce::Rectangle<float>(12.0f, 12.0f).withCentre(s));
@@ -483,7 +483,7 @@ void TerrainView::paint(juce::Graphics& g)
         pill = pill.withX(juce::jlimit(f.getX() + 2.0f, std::max(f.getX() + 2.0f, f.getRight() - pill.getWidth() - 2.0f), pill.getX()));
         g.setColour(c.withAlpha(hover ? 1.0f : 0.85f));
         g.fillRoundedRectangle(pill, 3.0f);
-        g.setColour(colour::well);
+        g.setColour(display::well());
         g.drawText(name, pill, juce::Justification::centred, false);
     }
 
@@ -491,7 +491,7 @@ void TerrainView::paint(juce::Graphics& g)
     if (presentation)
         return;
     g.setFont(font(12.0f, 500));
-    g.setColour(colour::textFaint);
+    g.setColour(display::textFaint());
     if (drawMode)
         g.drawText("Draw a loop: the sound will travel it on its own.", f.reduced(12.0f), juce::Justification::topLeft, true);
     else if (scenes.empty())

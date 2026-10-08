@@ -31,7 +31,7 @@ AppCore::AppCore(Host& h)
     };
     gestures.onTakeFinished = [this] {
         const auto& t = gestures.getTake();
-        status("Gesture recorded: " + juce::String(static_cast<int>(t.events.size())) + " moves over "
+        status("Take recorded: " + juce::String(static_cast<int>(t.events.size())) + " moves over "
                + juce::String(static_cast<double>(t.length) / t.sampleRate, 1) + " s. Press G (or the pad) to play it.");
     };
     catcher.onRejected = [this](const std::string& reason) { status(reason, true); };

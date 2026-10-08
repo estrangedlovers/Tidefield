@@ -47,10 +47,10 @@ void ParamComponent::tick()
 juce::Colour ParamComponent::valueColour() const
 {
     if (model.isLearning(param))
-        return colour::learn;
+        return colour::learn();
     if (model.isLive(param))
-        return colour::live;
-    return colour::accent;
+        return colour::live();
+    return colour::accent();
 }
 
 void ParamComponent::mouseDown(const juce::MouseEvent& e)
@@ -103,7 +103,7 @@ void Knob::paint(juce::Graphics& g)
     const bool over = isMouseOverOrDragging();
 
     g.setFont(font(11.0f, 500));
-    g.setColour(over ? colour::text : colour::textDim);
+    g.setColour(over ? colour::text() : colour::textDim());
     g.drawFittedText(label, r.removeFromTop(15.0f).toNearestInt(), juce::Justification::centred, 1, 0.7f);
 
     auto valueArea = r.removeFromBottom(15.0f);
@@ -116,7 +116,7 @@ void Knob::paint(juce::Graphics& g)
 
     juce::Path track;
     track.addCentredArc(c.x, c.y, radius, radius, 0.0f, kArcStart, kArcEnd, true);
-    g.setColour(colour::well);
+    g.setColour(colour::track());
     g.strokePath(track, juce::PathStrokeType(4.0f, juce::PathStrokeType::curved, juce::PathStrokeType::rounded));
 
     // Bipolar parameters fill from the centre.
@@ -128,21 +128,21 @@ void Knob::paint(juce::Graphics& g)
     g.strokePath(arc, juce::PathStrokeType(4.0f, juce::PathStrokeType::curved, juce::PathStrokeType::rounded));
 
     // Needle.
-    g.setColour(colour::text);
+    g.setColour(colour::text());
     g.drawLine(juce::Line<float>(c.getPointOnCircumference(radius * 0.25f, angle), c.getPointOnCircumference(radius - 4.0f, angle)), 2.0f);
 
     // Soft takeover: which way to turn the controller.
     const int pickup = model.pickup(param);
     if (pickup != 0)
     {
-        g.setColour(colour::learn);
+        g.setColour(colour::learn());
         g.setFont(font(10.0f, 600));
         g.drawText(pickup > 0 ? juce::String::fromUTF8("\xe2\x96\xb2") : juce::String::fromUTF8("\xe2\x96\xbc"),
                    dial.withSizeKeepingCentre(12.0f, 12.0f).translated(radius + 4.0f, -radius), juce::Justification::centred);
     }
 
     g.setFont(font(11.0f, dragging ? 600 : 400));
-    g.setColour(dragging ? colour::accent : colour::text);
+    g.setColour(dragging ? colour::accent() : colour::text());
     g.drawText(formatter ? formatter(model.value(param)) : valueText(), valueArea, juce::Justification::centred, true);
 }
 
@@ -185,14 +185,14 @@ void Fader::paint(juce::Graphics& g)
     g.setGradientFill(juce::ColourGradient(col.withAlpha(0.95f), filled.getX(), filled.getY(), col.withAlpha(0.45f), filled.getX(), filled.getBottom(), false));
     g.fillRoundedRectangle(filled, 2.0f);
     // Handle line.
-    g.setColour(colour::text);
+    g.setColour(display::text());
     g.fillRect(juce::Rectangle<float>(filled.getX(), filled.getY() - 1.0f, filled.getWidth(), 2.0f));
 
     g.setFont(font(12.0f, 600));
-    g.setColour(dragging ? colour::accent : colour::text);
+    g.setColour(dragging ? colour::accent() : colour::text());
     g.drawText(valueText(), valueArea, juce::Justification::centred, true);
     g.setFont(font(11.5f, 500));
-    g.setColour(isMouseOverOrDragging() ? colour::text : colour::textDim);
+    g.setColour(isMouseOverOrDragging() ? colour::text() : colour::textDim());
     g.drawText(label, nameArea, juce::Justification::centred, true);
 }
 
@@ -223,9 +223,9 @@ void Toggle::paint(juce::Graphics& g)
 {
     const bool on = model.value(param) > 0.5f;
     auto r = getLocalBounds().toFloat().reduced(0.5f);
-    g.setColour(on ? onColour : (isMouseOver() ? colour::panelHi.brighter(0.08f) : colour::panelHi));
+    g.setColour(on ? onColour : (isMouseOver() ? colour::lift(colour::panelHi(), 0.08f) : colour::panelHi()));
     g.fillRoundedRectangle(r, metric::radius);
-    g.setColour(on ? colour::well : colour::text);
+    g.setColour(on ? colour::well() : colour::text());
     g.setFont(font(12.0f, 600));
     g.drawText(text, r.reduced(6.0f, 0.0f), juce::Justification::centred, true);
 }
@@ -287,9 +287,9 @@ void Choice::paint(juce::Graphics& g)
         const auto r = cell(i).toFloat().reduced(1.0f);
         const bool on = i == selected;
         const bool hover = isMouseOver() && cell(i).contains(mouse);
-        g.setColour(on ? valueColour() : (hover ? colour::panelHi.brighter(0.08f) : colour::panelHi));
+        g.setColour(on ? valueColour() : (hover ? colour::lift(colour::panelHi(), 0.08f) : colour::panelHi()));
         g.fillRoundedRectangle(r, metric::radius);
-        g.setColour(on ? colour::well : colour::text);
+        g.setColour(on ? colour::well() : colour::text());
         if (captions.isEmpty())
         {
             g.setFont(font(11.5f, on ? 600 : 500));
@@ -301,7 +301,7 @@ void Choice::paint(juce::Graphics& g)
             g.setFont(font(12.0f, 600));
             g.drawText(items[i], t.removeFromTop(t.getHeight() * 0.55f), juce::Justification::bottomLeft, true);
             g.setFont(font(10.0f));
-            g.setColour(on ? colour::well.withAlpha(0.8f) : colour::textFaint);
+            g.setColour(on ? colour::well().withAlpha(0.8f) : colour::textFaint());
             g.drawText(captions[i], t, juce::Justification::topLeft, true);
         }
     }
@@ -353,31 +353,50 @@ void Pad::paint(juce::Graphics& g)
 {
     auto r = getLocalBounds().toFloat().reduced(0.5f);
     const bool on = shownLit || pressed;
-    g.setColour(isMouseOver() ? colour::panelHi.brighter(0.06f) : colour::panelHi);
-    g.fillRoundedRectangle(r, metric::radius + 1.0f);
+    const float corner = tileCorner(r);
+    juce::Path tile;
+    tile.addRoundedRectangle(r, corner);
+    g.setColour(isMouseOver() ? colour::lift(colour::panelHi(), 0.06f) : colour::panelHi());
+    g.fillPath(tile);
 
-    // Level fills from the bottom in the pad's colour.
-    if (shownLevel > 0.001f)
     {
-        auto f = r.withTop(r.getBottom() - r.getHeight() * shownLevel);
-        g.setColour(colour.withAlpha(0.35f + 0.4f * shownLevel));
-        g.fillRoundedRectangle(f, metric::radius + 1.0f);
+        juce::Graphics::ScopedSaveState save(g);
+        g.reduceClipRegion(tile);
+        const float swell = std::min(4.0f, r.getHeight() * 0.06f);
+        const float y = r.getBottom() - 5.0f - (r.getHeight() - 5.0f) * shownLevel;
+        juce::Path surface;
+        surface.startNewSubPath(r.getX() - 2.0f, y + swell);
+        surface.cubicTo(r.getX() + r.getWidth() * 0.35f, y - swell, r.getX() + r.getWidth() * 0.6f, y + swell * 1.5f, r.getRight() + 2.0f, y - swell);
+        auto water = surface;
+        water.lineTo(r.getRight() + 2.0f, r.getBottom() + 2.0f);
+        water.lineTo(r.getX() - 2.0f, r.getBottom() + 2.0f);
+        water.closeSubPath();
+        g.setColour(colour.withAlpha(0.2f + 0.45f * shownLevel));
+        g.fillPath(water);
+        g.setColour(colour.withAlpha(on || shownLevel > 0.01f ? 1.0f : 0.7f));
+        g.strokePath(surface, juce::PathStrokeType(1.5f, juce::PathStrokeType::curved, juce::PathStrokeType::rounded));
     }
     if (on)
     {
         g.setColour(colour);
-        g.drawRoundedRectangle(r.reduced(1.0f), metric::radius + 1.0f, 2.0f);
+        g.drawRoundedRectangle(r.reduced(1.0f), corner - 1.0f, 2.0f);
     }
-    // Colour tab, like a clip's.
-    g.setColour(colour);
-    g.fillRoundedRectangle(r.withHeight(4.0f).reduced(8.0f, 0.0f).translated(0.0f, 6.0f), 2.0f);
 
-    auto t = r.reduced(10.0f, 8.0f);
-    t.removeFromTop(8.0f);
-    g.setColour(colour::text);
+    auto t = r.reduced(10.0f, 7.0f);
+    t.removeFromBottom(6.0f);
+    if (keyCap.isNotEmpty())
+    {
+        g.setFont(font(10.0f, 600));
+        const auto cap = juce::Rectangle<float>(16.0f, 16.0f).withPosition(t.getRight() - 16.0f, t.getY() + 1.0f);
+        g.setColour(colour::textFaint().withAlpha(0.6f));
+        g.drawRoundedRectangle(cap, 4.0f, 1.0f);
+        g.setColour(colour::textDim());
+        g.drawText(keyCap, cap, juce::Justification::centred, false);
+    }
+    g.setColour(colour::text());
     g.setFont(font(13.0f, 600));
-    g.drawText(title, t.removeFromTop(t.getHeight() * 0.55f), juce::Justification::bottomLeft, true);
-    g.setColour(on ? colour::text : colour::textDim);
+    g.drawText(title, t.removeFromTop(t.getHeight() * 0.5f).withTrimmedRight(keyCap.isNotEmpty() ? 20.0f : 0.0f), juce::Justification::bottomLeft, true);
+    g.setColour(on ? colour::text() : colour::textDim());
     g.setFont(font(10.5f, 500));
     g.drawText(shownSub.isNotEmpty() ? shownSub : sub, t, juce::Justification::topLeft, true);
 }
@@ -419,14 +438,14 @@ void FlatButton::paintButton(juce::Graphics& g, bool over, bool down)
 {
     auto r = getLocalBounds().toFloat().reduced(0.5f);
     const bool on = getToggleState();
-    auto bg = on ? onColour : colour::panelHi;
+    auto bg = on ? onColour : colour::panelHi();
     if (down)
-        bg = bg.brighter(0.15f);
+        bg = colour::lift(bg, 0.15f);
     else if (over)
-        bg = bg.brighter(0.07f);
+        bg = colour::lift(bg, 0.07f);
     g.setColour(isEnabled() ? bg : bg.withAlpha(0.4f));
     g.fillRoundedRectangle(r, metric::radius);
-    g.setColour(on ? colour::well : colour::text);
+    g.setColour(on ? colour::well() : colour::text());
     g.setFont(font(12.0f, 600));
     g.drawText(getButtonText(), r.reduced(6.0f, 0.0f), juce::Justification::centred, true);
 }

@@ -120,7 +120,7 @@ juce::StringArray Model::choices(P p) const
     else if (id == "loops.target")
         c = { "Bloom", "Resonator", "Both" };
     else if (id == "master.autoTarget")
-        c = { "Quiet -23", "Streaming -16", "Loud -14" };
+        c = { "Broadcast -23", "Streaming -16", "Loud -14" };
     else if (spec(p).flags & engine::ParamFlag::kDiscrete && spec(p).minValue == 0.0f && spec(p).maxValue == 1.0f)
         c = { "Off", "On" };
     return c;

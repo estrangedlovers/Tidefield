@@ -95,7 +95,7 @@ inline constexpr unsigned kDiscrete = 1u << 4;      // integer choice; scenes pi
     X(HushDepth,        "hush.depth",         "Hush Depth",        0.0f,   1.0f,    0.6f, Linear,  Exponential,    0.2f,  "",   kMidiLearnable) \
     X(SlowHold,         "slow.hold",          "Slow Time",         0.0f,   1.0f,    0.0f, Linear,  Linear,         0.0f,  "",   kMidiLearnable | kDiscrete | kPerformance) \
     X(SeasonsDepth,     "seasons.depth",      "Seasons",           0.0f,   1.0f,    1.0f, Linear,  Exponential,    0.5f,  "",   kMidiLearnable | kPerformance) \
-    X(LoopsOn,          "loops.on",           "Loops",             0.0f,   1.0f,    0.0f, Linear,  Linear,         0.0f,  "",   kMidiLearnable | kDiscrete | kPerformance) \
+    X(LoopsOn,          "loops.on",           "Cycles",            0.0f,   1.0f,    0.0f, Linear,  Linear,         0.0f,  "",   kMidiLearnable | kDiscrete | kPerformance) \
     X(LoopsCount,       "loops.count",        "Voices",            1.0f,   8.0f,    5.0f, Linear,  Linear,         0.0f,  "",   TF_TB_ML | kDiscrete) \
     X(LoopsRate,        "loops.rate",         "Pace",              0.25f,  4.0f,    1.0f, Log,     LogExponential, 0.5f,  "x",  TF_TB_ML | kTideScaled) \
     X(LoopsDensity,     "loops.density",      "Density",           0.0f,   1.0f,    0.85f, Linear, Exponential,    0.3f,  "",   TF_TB_ML) \

@@ -134,7 +134,7 @@ class MainWindow final : public juce::DocumentWindow
 {
 public:
     MainWindow(const juce::String& name, juce::Component* content)
-        : DocumentWindow(name, gui::colour::window, DocumentWindow::allButtons)
+        : DocumentWindow(name, gui::colour::window(), DocumentWindow::allButtons)
     {
         setUsingNativeTitleBar(true);
         setContentOwned(content, true);

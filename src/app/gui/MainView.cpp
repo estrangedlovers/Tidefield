@@ -6,6 +6,7 @@
 
 #include <juce_audio_utils/juce_audio_utils.h>
 
+#include <algorithm>
 #include <string_view>
 #include <thread>
 
@@ -20,7 +21,8 @@ constexpr int kStatusH = 24;
 constexpr int kBrowserW = 214;
 constexpr int kMacroW = 244;
 constexpr int kPadsH = 78;
-int openViews = 0; // message thread only
+std::vector<MainView*> openViews; // message thread only
+constexpr const char* kThemeKey = "theme";
 
 /** One button for gestures: record, stop, play, stop. Shift (or recordNew) always
     records a new take. */
@@ -32,7 +34,7 @@ void gestureToggle(AppCore& core, bool recordNew)
     else if (recordNew || ! core.gestures.hasTake())
     {
         core.gestures.record();
-        core.status("Recording a gesture: play, move, turn. Press G again to stop.");
+        core.status("Recording a take: play, move, turn. Press G again to stop.");
     }
     else
         core.gestures.play();
@@ -42,7 +44,7 @@ void showGestureMenu(AppCore& core, juce::Component* owner)
 {
     juce::PopupMenu m;
     const auto state = core.latest().gestureState;
-    m.addSectionHeader("Gesture");
+    m.addSectionHeader("Take");
     m.addItem(1, "Record a new take");
     m.addItem(2, "Play", core.gestures.hasTake() && state == engine::GestureState::Idle);
     m.addItem(3, "Stop", state != engine::GestureState::Idle);
@@ -73,15 +75,15 @@ public:
     void paint(juce::Graphics& g) override
     {
         auto r = getLocalBounds().toFloat().reduced(0.5f);
-        g.setColour(isMouseOver() ? colour::panelHi.brighter(0.07f) : colour::panelHi);
+        g.setColour(isMouseOver() ? colour::lift(colour::panelHi(), 0.07f) : colour::panelHi());
         g.fillRoundedRectangle(r, metric::radius);
-        g.setColour(valueColour() == colour::accent ? colour::text : valueColour());
+        g.setColour(valueColour() == colour::accent() ? colour::text() : valueColour());
         g.setFont(font(12.0f, 600));
         g.drawText(valueText(), r.reduced(8.0f, 0.0f), juce::Justification::centredLeft, true);
         juce::Path arrow;
         const float cx = r.getRight() - 11.0f, cy = r.getCentreY();
         arrow.addTriangle(cx - 4.0f, cy - 2.0f, cx + 4.0f, cy - 2.0f, cx, cy + 3.0f);
-        g.setColour(colour::textDim);
+        g.setColour(colour::textDim());
         g.fillPath(arrow);
     }
     void mouseDown(const juce::MouseEvent& e) override
@@ -123,11 +125,11 @@ public:
     void paint(juce::Graphics& g) override
     {
         auto r = getLocalBounds().toFloat().reduced(0.5f);
-        g.setColour(shownOn ? colour::warn : (isMouseOver() ? colour::panelHi.brighter(0.07f) : colour::panelHi));
+        g.setColour(shownOn ? colour::warn() : (isMouseOver() ? colour::lift(colour::panelHi(), 0.07f) : colour::panelHi()));
         g.fillRoundedRectangle(r, metric::radius);
-        g.setColour(shownOn ? colour::text : colour::warn);
+        g.setColour(shownOn ? colour::text() : colour::warn());
         g.fillEllipse(juce::Rectangle<float>(9.0f, 9.0f).withCentre({ r.getX() + 14.0f, r.getCentreY() }));
-        g.setColour(colour::text);
+        g.setColour(colour::text());
         g.setFont(font(12.0f, 600));
         g.drawText(shown + (model.core.getRecordStems() ? "  stems" : ""), r.withTrimmedLeft(24.0f), juce::Justification::centredLeft, true);
     }
@@ -205,23 +207,23 @@ public:
         auto r = getLocalBounds().toFloat().reduced(0.5f);
         auto syncArea = r.removeFromLeft(54.0f);
         auto tapArea = r.removeFromRight(38.0f);
-        g.setColour(shownOn ? colour::tide : colour::panelHi);
+        g.setColour(shownOn ? colour::tide() : colour::panelHi());
         g.fillRoundedRectangle(syncArea, metric::radius);
-        g.setColour(shownOn ? colour::well : colour::text);
+        g.setColour(shownOn ? colour::well() : colour::text());
         g.setFont(font(12.0f, 600));
         g.drawText("Sync", syncArea.withTrimmedRight(10.0f), juce::Justification::centred);
-        g.setColour((shownOn ? colour::well : colour::textFaint).withAlpha(0.35f + 0.65f * shownBeat));
+        g.setColour((shownOn ? colour::well() : colour::textFaint()).withAlpha(0.35f + 0.65f * shownBeat));
         g.fillEllipse(juce::Rectangle<float>(6.0f, 6.0f).withCentre({ syncArea.getRight() - 9.0f, syncArea.getCentreY() }));
 
         auto field = r.reduced(3.0f, 0.0f);
         drawWell(g, field);
-        g.setColour(shownHost ? colour::tide : colour::text);
+        g.setColour(shownHost ? display::tide() : display::text());
         g.setFont(font(13.0f, 600));
         g.drawText(juce::String(shownBpm, 1), field, juce::Justification::centred);
 
-        g.setColour(isMouseOver() && tapArea.contains(getMouseXYRelative().toFloat()) ? colour::panelHi.brighter(0.08f) : colour::panelHi);
+        g.setColour(isMouseOver() && tapArea.contains(getMouseXYRelative().toFloat()) ? colour::lift(colour::panelHi(), 0.08f) : colour::panelHi());
         g.fillRoundedRectangle(tapArea, metric::radius);
-        g.setColour(colour::text);
+        g.setColour(colour::text());
         g.setFont(font(11.5f, 600));
         g.drawText("Tap", tapArea, juce::Justification::centred);
     }
@@ -289,7 +291,7 @@ class ProjectorWindow final : public juce::DocumentWindow
 {
 public:
     ProjectorWindow(Model& m, juce::Component* mainWindow, std::function<void()> closed)
-        : juce::DocumentWindow("Tidefield - Projector", colour::well, juce::DocumentWindow::allButtons), view(m, true), onClosed(std::move(closed))
+        : juce::DocumentWindow("Tidefield - Projector", colour::well(), juce::DocumentWindow::allButtons), view(m, true), onClosed(std::move(closed))
     {
         setUsingNativeTitleBar(true);
         setContentNonOwned(&view, false);
@@ -340,7 +342,7 @@ private:
 class TopBar final : public juce::Component, public Animated
 {
 public:
-    TopBar(Model& m, MainView& v) : model(m), view(v), meter(m, -1, true), rec(m), autoMaster(m, P::MasterAuto, "Auto master", {}, colour::good), tempo(m)
+    TopBar(Model& m, MainView& v) : model(m), view(v), meter(m, -1, true), rec(m), autoMaster(m, P::MasterAuto, "Auto master", {}, colour::good()), tempo(m)
     {
         model.add(this);
         sessionButton.setHelp(&model, "new, open, save (Cmd+N, Cmd+O, Cmd+S)");
@@ -353,6 +355,10 @@ public:
             menu.addItem(4, "Save as...");
             menu.addSeparator();
             menu.addItem(5, "Projector window (Cmd+P)", true, view.isProjectorOpen());
+            juce::PopupMenu appearance;
+            appearance.addItem(6, "Slate", true, theme() == Theme::slate);
+            appearance.addItem(7, "Paper", true, theme() == Theme::paper);
+            menu.addSubMenu("Appearance", appearance);
             showMenu(menu, this, [this](int r) {
                 auto& s = model.core.session;
                 if (r == 1) s.newSession();
@@ -360,6 +366,7 @@ public:
                 else if (r == 3) s.save();
                 else if (r == 4) s.saveAs();
                 else if (r == 5) view.toggleProjector();
+                else if (r == 6 || r == 7) MainView::switchTheme(model.core, r == 7 ? Theme::paper : Theme::slate);
             });
         };
         fade.setHelp(&model, "fade the whole instrument in or out over the fade length (Space)");
@@ -425,12 +432,12 @@ public:
 
     void paint(juce::Graphics& g) override
     {
-        g.fillAll(colour::header);
-        g.setColour(colour::line);
+        g.fillAll(colour::header());
+        g.setColour(colour::line());
         g.fillRect(getLocalBounds().removeFromBottom(1));
 
         // The mark and the lowercase name, as on the icon.
-        drawWordmark(g, getLocalBounds().reduced(12, 0).removeFromLeft(110).toFloat(), 18.0f, colour::text);
+        drawWordmark(g, getLocalBounds().reduced(12, 0).removeFromLeft(110).toFloat(), 18.0f, colour::text());
 
         // Device and load.
         const auto& f = model.frame();
@@ -440,22 +447,22 @@ public:
         const auto output = model.core.host.describeOutput();
         if (output.isEmpty())
         {
-            g.setColour(colour::warn);
+            g.setColour(colour::warn());
             g.drawText("No audio output", a, juce::Justification::centredRight);
             return;
         }
         const int pct = juce::roundToInt(load * 100.0f);
-        g.setColour(pct > 70 ? colour::warn : colour::textDim);
+        g.setColour(pct > 70 ? colour::warn() : colour::textDim());
         const auto cpu = juce::String(pct) + "% CPU" + (f.guardLevel > 0 ? "  lite " + juce::String(f.guardLevel) : juce::String());
         g.drawText(cpu, a.removeFromRight(90.0f), juce::Justification::centredRight);
-        g.setColour(colour::textFaint);
+        g.setColour(colour::textFaint());
         g.drawText(output, a, juce::Justification::centredRight, true);
     }
 
 private:
     Model& model;
     MainView& view;
-    FlatButton sessionButton { "Untitled" }, fade { "Fade in", colour::good }, panic { "Panic", colour::warn }, keys { "Keys", colour::tide },
+    FlatButton sessionButton { "Untitled" }, fade { "Fade in", colour::good() }, panic { "Panic", colour::warn() }, keys { "Keys", colour::tide() },
         audio { "Audio" };
     Meter meter;
     RecordButton rec;
@@ -571,7 +578,7 @@ private:
             const bool hover = static_cast<int>(i) == list.hover && row.kind != Row::Header;
             if (hover)
             {
-                g.setColour(colour::panelHi);
+                g.setColour(colour::panelHi());
                 g.fillRoundedRectangle(r.reduced(2.0f, 1.0f), metric::radius);
             }
             r = r.reduced(8.0f, 0.0f);
@@ -579,7 +586,7 @@ private:
             {
                 case Row::Header:
                     g.setFont(caps(10.0f));
-                    g.setColour(colour::textFaint);
+                    g.setColour(colour::textFaint());
                     g.drawText(row.text, r.withTrimmedTop(6.0f), juce::Justification::centredLeft, true);
                     break;
                 case Row::Scene:
@@ -590,24 +597,24 @@ private:
                     r.removeFromLeft(8.0f);
                     const float w = static_cast<std::size_t>(row.index) < shownWeights.size() ? shownWeights[static_cast<std::size_t>(row.index)] : 0.0f;
                     auto bar = r.removeFromRight(34.0f).withSizeKeepingCentre(34.0f, 4.0f);
-                    g.setColour(colour::well);
+                    g.setColour(colour::track());
                     g.fillRoundedRectangle(bar, 2.0f);
                     g.setColour(c);
                     g.fillRoundedRectangle(bar.withWidth(bar.getWidth() * juce::jlimit(0.0f, 1.0f, w)), 2.0f);
-                    g.setColour(colour::textFaint);
+                    g.setColour(colour::textFaint());
                     g.setFont(font(10.5f, 500));
                     g.drawText(row.detail, r.removeFromRight(16.0f), juce::Justification::centred);
-                    g.setColour(w > 0.3f ? colour::text : colour::textDim);
+                    g.setColour(w > 0.3f ? colour::text() : colour::textDim());
                     g.setFont(font(12.5f, w > 0.3f ? 600 : 500));
                     g.drawText(row.text, r, juce::Justification::centredLeft, true);
                     break;
                 }
                 case Row::Capture:
                 case Row::Disk:
-                    g.setColour(hover ? colour::accent : colour::textDim);
+                    g.setColour(hover ? colour::accent() : colour::textDim());
                     g.setFont(font(12.0f, 500));
                     g.drawText(row.text, r, juce::Justification::centredLeft, true);
-                    g.setColour(colour::textFaint);
+                    g.setColour(colour::textFaint());
                     g.drawText(row.detail, r, juce::Justification::centredRight);
                     break;
                 case Row::Sound:
@@ -615,13 +622,13 @@ private:
                     juce::Path note;
                     const auto icon = r.removeFromLeft(10.0f).withSizeKeepingCentre(8.0f, 8.0f);
                     note.addEllipse(icon);
-                    g.setColour(colour::tide.withAlpha(0.8f));
+                    g.setColour(colour::tide().withAlpha(0.8f));
                     g.fillPath(note);
                     r.removeFromLeft(8.0f);
-                    g.setColour(colour::textFaint);
+                    g.setColour(colour::textFaint());
                     g.setFont(font(10.5f, 500));
                     g.drawText(row.detail, r.removeFromRight(30.0f), juce::Justification::centredRight);
-                    g.setColour(colour::text);
+                    g.setColour(colour::text());
                     g.setFont(font(12.5f, 500));
                     g.drawText(row.text, r, juce::Justification::centredLeft, true);
                     break;
@@ -750,7 +757,7 @@ public:
     {
         drawPanel(g, getLocalBounds().toFloat(), "Performance");
         g.setFont(font(11.0f, 500));
-        g.setColour(colour::textDim);
+        g.setColour(colour::textDim());
         for (const auto& [r, text] : labels)
             g.drawText(text, r, juce::Justification::bottomLeft);
     }
@@ -770,31 +777,34 @@ class PadRow final : public juce::Component
 public:
     explicit PadRow(Model& m) : model(m), shape(m)
     {
-        auto hold = [this](const char* title, const char* sub, juce::Colour c, const char* help, P p, std::function<float()> level) {
+        auto hold = [this](const char* title, const char* key, const char* sub, juce::Colour c, const char* help, P p, std::function<float()> level) {
             auto pad = std::make_unique<Pad>(model, title, sub, c, help);
+            pad->keyCap = key;
             pad->onPress = [this, p] { model.set(p, 1.0f); };
             pad->onRelease = [this, p] { model.set(p, 0.0f); };
             pad->level = std::move(level);
             pad->lit = [this, p] { return model.value(p) > 0.5f; };
             pads.push_back(std::move(pad));
         };
-        auto toggle = [this](const char* title, const char* sub, juce::Colour c, const char* help, P p, std::function<float()> level) {
+        auto toggle = [this](const char* title, const char* key, const char* sub, juce::Colour c, const char* help, P p, std::function<float()> level) {
             auto pad = std::make_unique<Pad>(model, title, sub, c, help);
+            pad->keyCap = key;
             pad->onPress = [this, p] { model.toggle(p); };
             pad->level = std::move(level);
             pad->lit = [this, p] { return model.value(p) > 0.5f; };
             pads.push_back(std::move(pad));
         };
         const auto& f = [this]() -> const engine::TelemetryFrame& { return model.frame(); };
-        hold("Swell", "hold S", colour::accent, "hold to swell: sends bloom and filters open; let go and it ebbs back", P::SwellHold, [f] { return f().swell; });
-        hold("Hush", "hold H", colour::forScene(4), "hold to hush: every source sinks while the reverb and delay ring on", P::HushHold, [f] { return f().hush; });
-        hold("Slow", "hold T", colour::forScene(2), "hold to slow time to a quarter: every drift and cycle with it", P::SlowHold, [f] { return f().slow; });
-        toggle("Freeze all", "the moment, F", colour::tide, "hold the last two seconds as a cloud while the rest steps back", P::FreezeOn,
+        hold("Swell", "S", "sends bloom", colour::accent(), "hold to swell: sends bloom and filters open; let go and it ebbs back", P::SwellHold, [f] { return f().swell; });
+        hold("Hush", "H", "sources sink", colour::forScene(4), "hold to hush: every source sinks while the reverb and delay ring on", P::HushHold, [f] { return f().hush; });
+        hold("Slow", "T", "quarter time", colour::forScene(2), "hold to slow time to a quarter: every drift and cycle with it", P::SlowHold, [f] { return f().slow; });
+        toggle("Freeze all", "F", "the moment", colour::tide(), "hold the last two seconds as a cloud while the rest steps back", P::FreezeOn,
                [f] { return f().freezeGain; });
-        toggle("Hold input", "spectral, I", colour::forScene(9), "hold the live input's sound forever as a spectral pad", P::InputFreeze,
+        toggle("Hold input", "I", "spectral pad", colour::forScene(9), "hold the live input's sound forever as a spectral pad", P::InputFreeze,
                [f] { return f().inputFreeze; });
 
-        auto loop = std::make_unique<Pad>(model, "Loop", "L", colour::warn, "record, close the loop, overdub; every pass wears the tape a little more");
+        auto loop = std::make_unique<Pad>(model, "Loop", "", colour::warn(), "record, close the loop, overdub; every pass wears the tape a little more");
+        loop->keyCap = "L";
         loop->onPress = [this] {
             if (juce::ModifierKeys::currentModifiers.isShiftDown())
                 model.engine.command(engine::Command::LoopClear);
@@ -804,20 +814,21 @@ public:
         loop->level = [f] { return f().loopState >= 2 ? f().loopPosition : (f().loopState == 1 ? 1.0f : 0.0f); };
         loop->lit = [f] { return f().loopState == 1 || f().loopState == 3; };
         loop->subText = [f] {
-            static const char* s[] = { "tap to record, L", "recording: tap to close", "looping: tap to dub", "overdubbing", "clearing" };
+            static const char* s[] = { "empty", "recording", "looping", "overdubbing", "clearing" };
             return juce::String(s[juce::jlimit(0, 4, f().loopState)]);
         };
         pads.push_back(std::move(loop));
 
-        toggle("Loops", "never align, E", colour::forScene(7), "notes on long cycles that never line up, always in the key", P::LoopsOn, [f] {
+        toggle("Cycles", "E", "never align", colour::forScene(7), "notes on long cycles that never line up, always in the key", P::LoopsOn, [f] {
             float m = 0.0f;
             for (float v : f().loopFlash)
                 m = std::max(m, v);
             return m * 0.8f;
         });
 
-        auto gesture = std::make_unique<Pad>(model, "Gesture", "G", colour::learn,
+        auto gesture = std::make_unique<Pad>(model, "Take", "", colour::learn(),
                                              "record your moves (knobs, terrain, notes) and play them back, looped; right-click for more");
+        gesture->keyCap = "G";
         gesture->onPress = [this] { gestureToggle(model.core, juce::ModifierKeys::currentModifiers.isShiftDown()); };
         gesture->onMenu = [this] { showGestureMenu(model.core, this); };
         gesture->level = [f] {
@@ -833,11 +844,12 @@ public:
                 return "recording " + juce::String(fr.gestureSeconds, 1) + " s";
             if (fr.gestureState == engine::GestureState::Playing)
                 return "playing " + juce::String(std::fmod(fr.gestureSeconds, std::max(0.01f, fr.gestureLength)), 1) + " / " + juce::String(fr.gestureLength, 1) + " s";
-            return model.core.gestures.hasTake() ? "tap to play, G" : juce::String("tap to record, G");
+            return model.core.gestures.hasTake() ? "ready" : juce::String("empty");
         };
         pads.push_back(std::move(gesture));
 
-        auto catchPad = std::make_unique<Pad>(model, "Catch", "last seconds, K", colour::live, "grab what just happened into a cloud, where it keeps playing");
+        auto catchPad = std::make_unique<Pad>(model, "Catch", "last seconds", colour::live(), "grab what just happened into a cloud, where it keeps playing");
+        catchPad->keyCap = "K";
         catchPad->onPress = [this] { model.engine.command(engine::Command::Catch); };
         pads.push_back(std::move(catchPad));
 
@@ -910,25 +922,25 @@ public:
 
     void paint(juce::Graphics& g) override
     {
-        g.fillAll(colour::header);
-        g.setColour(colour::line);
+        g.fillAll(colour::header());
+        g.setColour(colour::line());
         g.fillRect(getLocalBounds().removeFromTop(1));
         auto r = getLocalBounds().reduced(10, 0).toFloat();
         g.setFont(font(11.5f, 500));
         if (keysText.isNotEmpty())
         {
-            g.setColour(colour::tide);
+            g.setColour(colour::tide());
             g.drawText(keysText, r.removeFromRight(190.0f), juce::Justification::centredRight);
         }
         if (message.isNotEmpty() && alpha > 0.0f)
         {
-            g.setColour((warn ? colour::warn : colour::accent).withAlpha(alpha));
+            g.setColour((warn ? colour::warn() : colour::accent()).withAlpha(alpha));
             const float w = std::min(r.getWidth() * 0.5f, juce::GlyphArrangement::getStringWidth(g.getCurrentFont(), message) + 20.0f);
             g.drawText(message, r.removeFromRight(w), juce::Justification::centredRight, true);
         }
-        g.setColour(colour::textDim);
+        g.setColour(colour::textDim());
         g.drawText(help.isNotEmpty() ? help
-                                     : juce::String("Space fade   Esc panic   drag the terrain to move   1-9 scenes   C capture   S/H/T hold gestures   G record a gesture   P draw a path   M keys   Tab pages"),
+                                     : juce::String("Space fade   Esc panic   drag the terrain to move   1-9 scenes   C capture   S/H/T hold gestures   G record a take   P draw a path   M keys   Tab pages"),
                    r, juce::Justification::centredLeft, true);
     }
 
@@ -945,21 +957,17 @@ private:
 
 MainView::MainView(AppCore& c) : core(c), model(c)
 {
-    ++openViews;
+    if (openViews.empty())
+    {
+        setTheme(core.host.getSettings().getValue(kThemeKey) == "paper" ? Theme::paper : Theme::slate);
+        lookAndFeel->applyPalette();
+    }
+    openViews.push_back(this);
     juce::LookAndFeel::setDefaultLookAndFeel(&lookAndFeel.get());
     setOpaque(true);
     setWantsKeyboardFocus(true);
 
-    topBar = std::make_unique<TopBar>(model, *this);
-    browser = std::make_unique<Browser>(model, *this);
-    terrain = std::make_unique<TerrainView>(model);
-    macros = std::make_unique<MacroPanel>(model);
-    pads = std::make_unique<PadRow>(model);
-    devices = std::make_unique<DeviceView>(model);
-    status = std::make_unique<StatusBar>(model, *this);
-    devices->onLoadSample = [this](int slot) { chooseSample(slot); };
-    for (auto* comp : std::initializer_list<juce::Component*> { topBar.get(), browser.get(), terrain.get(), macros.get(), pads.get(), devices.get(), status.get() })
-        addAndMakeVisible(comp);
+    buildInterface();
 
     model.onHover = [this](const juce::String& h) { status->setHelp(h); };
     core.onStatus = [this](const juce::String& m, bool warning) { status->showMessage(m, warning); };
@@ -976,13 +984,34 @@ MainView::MainView(AppCore& c) : core(c), model(c)
 MainView::~MainView()
 {
     stopTimer();
-    projector.reset(); // its terrain is registered with the model
+    projector.reset();
     vblank.reset();
     releaseHolds();
     core.onStatus = nullptr;
     core.onSessionChanged = nullptr;
     model.onHover = nullptr;
-    // Children unregister from the model as they go; destroy them before it.
+    teardownInterface();
+    openViews.erase(std::remove(openViews.begin(), openViews.end(), this), openViews.end());
+    if (openViews.empty())
+        juce::LookAndFeel::setDefaultLookAndFeel(nullptr);
+}
+
+void MainView::buildInterface()
+{
+    topBar = std::make_unique<TopBar>(model, *this);
+    browser = std::make_unique<Browser>(model, *this);
+    terrain = std::make_unique<TerrainView>(model);
+    macros = std::make_unique<MacroPanel>(model);
+    pads = std::make_unique<PadRow>(model);
+    devices = std::make_unique<DeviceView>(model);
+    status = std::make_unique<StatusBar>(model, *this);
+    devices->onLoadSample = [this](int slot) { chooseSample(slot); };
+    for (auto* comp : std::initializer_list<juce::Component*> { topBar.get(), browser.get(), terrain.get(), macros.get(), pads.get(), devices.get(), status.get() })
+        addAndMakeVisible(comp);
+}
+
+void MainView::teardownInterface()
+{
     status.reset();
     devices.reset();
     pads.reset();
@@ -990,8 +1019,39 @@ MainView::~MainView()
     terrain.reset();
     browser.reset();
     topBar.reset();
-    if (--openViews == 0) // the last window (several plugin instances may be open)
-        juce::LookAndFeel::setDefaultLookAndFeel(nullptr);
+}
+
+void MainView::rebuildInterface()
+{
+    const int page = devices->getPage();
+    const int chain = devices->getEffectsChain();
+    const bool projecting = projector != nullptr;
+    projector.reset();
+    teardownInterface();
+    buildInterface();
+    if (page == DeviceView::Effects)
+        devices->showEffectsFor(chain);
+    else
+        devices->show(page);
+    if (projecting)
+        toggleProjector();
+    resized();
+    repaint();
+}
+
+void MainView::switchTheme(AppCore& core, Theme t)
+{
+    if (t == theme())
+        return;
+    core.host.getSettings().setValue(kThemeKey, t == Theme::paper ? "paper" : "slate");
+    core.host.getSettings().saveIfNeeded();
+    setTheme(t);
+    if (openViews.empty())
+        return;
+    auto* first = openViews.front();
+    first->lookAndFeel->applyPalette();
+    for (auto* v : openViews)
+        later(v, [v] { v->rebuildInterface(); });
 }
 
 void MainView::toggleProjector()
@@ -1037,7 +1097,7 @@ void MainView::parentHierarchyChanged()
     });
 }
 
-void MainView::paint(juce::Graphics& g) { g.fillAll(colour::window); }
+void MainView::paint(juce::Graphics& g) { g.fillAll(colour::window()); }
 
 void MainView::resized()
 {
@@ -1321,7 +1381,7 @@ void MainView::showAudioSettings()
     juce::DialogWindow::LaunchOptions options;
     options.content.setOwned(selector.release());
     options.dialogTitle = "Audio Settings";
-    options.dialogBackgroundColour = colour::panel;
+    options.dialogBackgroundColour = colour::panel();
     options.useNativeTitleBar = true;
     options.resizable = false;
     options.launchAsync();

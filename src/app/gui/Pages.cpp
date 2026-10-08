@@ -45,7 +45,7 @@ juce::String helpFor(P p)
         { P::MasterAutoAmount, "how far the tonal correction goes" },
         { P::MasterCeiling, "true-peak ceiling of the safety limiter" },
         { P::MasterFadeSecs, "length of the Space-bar fade" },
-        { P::LoopsRate, "pace of every loop; they never line up" },
+        { P::LoopsRate, "pace of every cycle; they never line up" },
         { P::LoopsPattern, "which set of cycle lengths and notes" },
         { P::SeasonsDepth, "scales every season at once" },
     };
@@ -69,7 +69,7 @@ std::function<juce::String(float)> fxFormatter(const dsp::ProcessorControl& c)
 class FxDevice final : public Device, public Animated
 {
 public:
-    FxDevice(Model& m, int s) : Device(m, engine::kFxSlots[static_cast<std::size_t>(s)].name, colour::tide), slot(s)
+    FxDevice(Model& m, int s) : Device(m, engine::kFxSlots[static_cast<std::size_t>(s)].name, colour::tide()), slot(s)
     {
         model.add(this);
         menu = setTop(std::make_unique<juce::ComboBox>(), 24, 4 * metric::knobW);
@@ -196,32 +196,32 @@ public:
         const float target = targets[juce::jlimit(0, 2, juce::roundToInt(model.value(P::MasterAutoTarget)))];
 
         g.setFont(font(22.0f, 600));
-        g.setColour(on ? colour::text : colour::textFaint);
+        g.setColour(on ? display::text() : display::textFaint());
         const float lufs = a[0];
         g.drawText(lufs > -69.0f ? juce::String(lufs, 1) : juce::String("--"), r.removeFromTop(28.0f), juce::Justification::centredLeft);
         g.setFont(font(10.5f, 500));
-        g.setColour(colour::textDim);
+        g.setColour(display::textDim());
         g.drawText("LUFS short-term, target " + juce::String(target, 0) + (on ? "" : "   (off)"), r.removeFromTop(16.0f), juce::Justification::centredLeft);
         r.removeFromTop(6.0f);
 
         auto bar = [&](const juce::String& name, float v, float range, const juce::String& text) {
             auto row = r.removeFromTop(17.0f);
-            g.setColour(colour::textDim);
+            g.setColour(display::textDim());
             g.drawText(name, row.removeFromLeft(54.0f), juce::Justification::centredLeft);
             auto val = row.removeFromRight(56.0f);
             auto track = row.reduced(0.0f, 5.0f);
-            g.setColour(colour::panelHi);
+            g.setColour(display::panelHi());
             g.fillRoundedRectangle(track, 2.0f);
             const float c = track.getCentreX();
             const float x = c + juce::jlimit(-1.0f, 1.0f, v / range) * track.getWidth() * 0.5f;
-            g.setColour(on ? colour::accent : colour::textFaint);
+            g.setColour(on ? display::accent() : display::textFaint());
             g.fillRoundedRectangle(juce::Rectangle<float>(std::min(c, x), track.getY(), std::abs(x - c) + 1.0f, track.getHeight()), 2.0f);
-            g.setColour(colour::text);
+            g.setColour(display::text());
             g.drawText(text, val, juce::Justification::centredRight);
         };
         auto db = [](float v) { return (v > 0.0f ? "+" : "") + juce::String(v, 1) + " dB"; };
         bar("Low", a[2], 6.0f, db(a[2]));
-        bar("Mud", a[3], 6.0f, db(a[3]));
+        bar("Low mid", a[3], 6.0f, db(a[3]));
         bar("High", a[4], 6.0f, db(a[4]));
         bar("Glue", -a[6], 6.0f, db(-a[6]));
         bar("Width", a[5] - 1.0f, 0.5f, juce::String(juce::roundToInt(a[5] * 100.0f)) + "%");
@@ -277,26 +277,26 @@ public:
         const auto ring = juce::Rectangle<float>(size, size).withCentre({ r.getX() + size * 0.5f + 12.0f, r.getCentreY() });
         juce::Path track, fill;
         track.addCentredArc(ring.getCentreX(), ring.getCentreY(), size * 0.5f, size * 0.5f, 0.0f, 0.0f, juce::MathConstants<float>::twoPi, true);
-        g.setColour(colour::panelHi);
+        g.setColour(display::panelHi());
         g.strokePath(track, juce::PathStrokeType(5.0f));
         if (st >= 2)
         {
             fill.addCentredArc(ring.getCentreX(), ring.getCentreY(), size * 0.5f, size * 0.5f, 0.0f, 0.0f,
                                juce::MathConstants<float>::twoPi * f.loopPosition, true);
-            g.setColour(st == 3 ? colour::warn : colour::accent);
+            g.setColour(st == 3 ? display::warn() : display::accent());
             g.strokePath(fill, juce::PathStrokeType(5.0f, juce::PathStrokeType::curved, juce::PathStrokeType::rounded));
         }
         else if (st == 1)
         {
-            g.setColour(colour::warn);
+            g.setColour(display::warn());
             g.fillEllipse(ring.withSizeKeepingCentre(14.0f, 14.0f));
         }
         auto text = r.withLeft(ring.getRight() + 14.0f).reduced(0.0f, 8.0f);
         g.setFont(font(16.0f, 600));
-        g.setColour(colour::text);
+        g.setColour(display::text());
         g.drawText(states[st], text.removeFromTop(24.0f), juce::Justification::centredLeft);
         g.setFont(font(11.5f, 500));
-        g.setColour(colour::textDim);
+        g.setColour(display::textDim());
         if (st > 0)
             g.drawText(juce::String(f.loopSeconds, 1) + " s" + (st >= 2 ? ", pass " + juce::String(f.loopPasses) : juce::String()),
                        text.removeFromTop(18.0f), juce::Justification::centredLeft);
@@ -350,7 +350,7 @@ public:
         if (list.empty())
         {
             g.setFont(font(11.5f));
-            g.setColour(colour::textFaint);
+            g.setColour(display::textFaint());
             g.drawText("No seasons yet. A season moves one parameter slowly back and forth for as long as you play.", r,
                        juce::Justification::centred, true);
             return;
@@ -361,12 +361,12 @@ public:
         {
             auto row = r.removeFromTop(19.0f);
             const auto& s = list[k];
-            g.setColour(colour::forScene(static_cast<int>(k)));
+            g.setColour(display::forScene(static_cast<int>(k)));
             g.fillRoundedRectangle(row.removeFromLeft(4.0f).reduced(0.0f, 3.0f), 1.0f);
             row.removeFromLeft(6.0f);
-            g.setColour(colour::text);
+            g.setColour(display::text());
             g.drawText(juce::String(model.registry.spec(s.param).id), row.removeFromLeft(150.0f), juce::Justification::centredLeft, true);
-            g.setColour(colour::textDim);
+            g.setColour(display::textDim());
             g.drawText((s.depth > 0 ? "+" : "") + juce::String(juce::roundToInt(s.depth * 100.0f)) + "%", row.removeFromLeft(48.0f),
                        juce::Justification::centredLeft);
             g.drawText(s.periodSeconds >= 60.0f ? juce::String(s.periodSeconds / 60.0f, 1) + " min" : juce::String(juce::roundToInt(s.periodSeconds)) + " s",
@@ -374,12 +374,12 @@ public:
             g.drawText(shapes[static_cast<int>(s.shape)], row.removeFromLeft(60.0f), juce::Justification::centredLeft);
             // Where the cycle is now.
             auto lane = row.removeFromLeft(110.0f).reduced(0.0f, 7.0f);
-            g.setColour(colour::panelHi);
+            g.setColour(display::panelHi());
             g.fillRoundedRectangle(lane, 2.0f);
             const float v = model.frame().seasonValue[k];
-            g.setColour(colour::forScene(static_cast<int>(k)));
+            g.setColour(display::forScene(static_cast<int>(k)));
             g.fillEllipse(juce::Rectangle<float>(7.0f, 7.0f).withCentre({ lane.getCentreX() + v * lane.getWidth() * 0.5f, lane.getCentreY() }));
-            g.setColour(colour::textFaint);
+            g.setColour(display::textFaint());
             g.drawText("edit", row.removeFromLeft(36.0f), juce::Justification::centred);
             g.drawText("remove", row.removeFromLeft(50.0f), juce::Justification::centred);
         }
@@ -490,7 +490,7 @@ public:
         model.add(this);
         list.setModel(this);
         list.setRowHeight(20);
-        list.setColour(juce::ListBox::backgroundColourId, colour::well);
+        list.setColour(juce::ListBox::backgroundColourId, colour::well());
         addAndMakeVisible(list);
 
         const std::pair<engine::MidiAction, const char*> actions[] = {
@@ -502,7 +502,7 @@ public:
         };
         for (const auto& [action, name] : actions)
         {
-            auto b = std::make_unique<FlatButton>(name, colour::learn);
+            auto b = std::make_unique<FlatButton>(name, colour::learn());
             b->setHelp(&model, "press, then move a pad or button on your controller to trigger this");
             b->onClick = [this, action = action] { model.core.midi.learnAction(action); };
             addAndMakeVisible(*b);
@@ -582,7 +582,7 @@ public:
     void paint(juce::Graphics& g) override
     {
         g.setFont(caps());
-        g.setColour(colour::textFaint);
+        g.setColour(colour::textFaint());
         g.drawText(model.core.midi.isLearning() ? "LEARNING: MOVE A CONTROL" : "MAPPINGS", 0, 0, 300, 14, juce::Justification::centredLeft);
         g.drawText("LEARN A PAD FOR", 310, 0, 240, 14, juce::Justification::centredLeft);
         g.drawText("NOTES AND DEVICES", 560, 0, 220, 14, juce::Justification::centredLeft);
@@ -592,11 +592,11 @@ public:
     void paintListBoxItem(int row, juce::Graphics& g, int w, int h, bool selected) override
     {
         if (selected)
-            g.fillAll(colour::panelHi);
+            g.fillAll(display::panelHi());
         g.setFont(font(11.5f));
-        g.setColour(colour::text);
+        g.setColour(display::text());
         g.drawText(texts[row], 8, 0, w - 40, h, juce::Justification::centredLeft, true);
-        g.setColour(colour::textFaint);
+        g.setColour(display::textFaint());
         g.drawText("x", w - 24, 0, 18, h, juce::Justification::centred);
     }
     void listBoxItemClicked(int row, const juce::MouseEvent& e) override
@@ -615,7 +615,7 @@ private:
             return resized();
         for (const auto& d : model.core.midiInputs->getDevices())
         {
-            auto b = std::make_unique<FlatButton>(d.info.name + (d.enabled && ! d.open ? " (unavailable)" : ""), colour::good);
+            auto b = std::make_unique<FlatButton>(d.info.name + (d.enabled && ! d.open ? " (unavailable)" : ""), colour::good());
             b->setToggleState(d.enabled, juce::dontSendNotification);
             b->setHelp(&model, "listen to this MIDI device");
             const auto id = d.info.identifier;
@@ -631,7 +631,7 @@ private:
     juce::ListBox list;
     juce::StringArray texts;
     std::vector<std::unique_ptr<FlatButton>> learnButtons, deviceButtons;
-    FlatButton defaults { "Default mapping" }, clearAll { "Clear all" }, notesToDrone { "Notes move the drone", colour::good };
+    FlatButton defaults { "Default mapping" }, clearAll { "Clear all" }, notesToDrone { "Notes move the drone", colour::good() };
     juce::ComboBox channel;
     juce::String signature;
     int frames = 9;
@@ -654,9 +654,9 @@ public:
         for (int i = 0; i < count; ++i)
         {
             const auto r = cell(i).toFloat().reduced(1.0f);
-            g.setColour(i == current ? colour::tide : (cell(i).contains(getMouseXYRelative()) && isMouseOver() ? colour::panelHi.brighter(0.08f) : colour::panelHi));
+            g.setColour(i == current ? colour::tide() : (cell(i).contains(getMouseXYRelative()) && isMouseOver() ? colour::lift(colour::panelHi(), 0.08f) : colour::panelHi()));
             g.fillRoundedRectangle(r, metric::radius);
-            g.setColour(i == current ? colour::well : colour::text);
+            g.setColour(i == current ? colour::well() : colour::text());
             g.setFont(font(11.0f, 500));
             g.drawText(nameFor(i), r.reduced(5.0f, 0.0f), juce::Justification::centredLeft, true);
         }
@@ -780,12 +780,12 @@ void Device::resized()
 
 void Device::paint(juce::Graphics& g)
 {
-    drawPanel(g, getLocalBounds().toFloat(), title, colour::text);
+    drawPanel(g, getLocalBounds().toFloat(), title, colour::text());
     // The device's colour tab on its title bar.
     g.setColour(tab);
     g.fillRoundedRectangle(juce::Rectangle<float>(3.0f, 6.0f, 3.0f, static_cast<float>(metric::header) - 12.0f), 1.0f);
     g.setFont(font(11.0f, 500));
-    g.setColour(colour::textDim);
+    g.setColour(colour::textDim());
     for (const auto& it : items)
         if (auto* c = dynamic_cast<Choice*>(it.c); c != nullptr && c->isVisible())
             g.drawText(model.name(c->getParam()), c->getX(), c->getY() - 16, c->getWidth(), 14, juce::Justification::centredLeft);
@@ -793,9 +793,9 @@ void Device::paint(juce::Graphics& g)
     if (! presetKind.empty())
     {
         const auto b = presetButton().toFloat();
-        g.setColour(presetHover ? colour::panelHi.brighter(0.1f) : colour::panelHi);
+        g.setColour(presetHover ? colour::lift(colour::panelHi(), 0.1f) : colour::panelHi());
         g.fillRoundedRectangle(b, metric::radius);
-        g.setColour(presetHover ? colour::text : colour::textDim);
+        g.setColour(presetHover ? colour::text() : colour::textDim());
         g.setFont(font(10.5f, 600));
         g.drawText(juce::String::fromUTF8("Presets \xe2\x96\xbe"), b, juce::Justification::centred);
     }
@@ -946,7 +946,7 @@ DeviceView::~DeviceView()
 
 juce::String DeviceView::pageName(int p)
 {
-    static const char* names[] = { "Drone", "Clouds", "Resonator", "Bloom", "Input", "Looper", "Weather", "Gestures", "Loops", "Seasons", "Mixer", "Effects", "Master", "MIDI" };
+    static const char* names[] = { "Drone", "Clouds", "Resonator", "Bloom", "Input", "Looper", "Weather", "Gestures", "Cycles", "Seasons", "Mixer", "Effects", "Master", "MIDI" };
     return names[juce::jlimit(0, NumPages - 1, p)];
 }
 
@@ -977,7 +977,7 @@ void DeviceView::showEffectsFor(int chain)
 
 void DeviceView::paint(juce::Graphics& g)
 {
-    g.setColour(colour::window);
+    g.setColour(colour::window());
     g.fillRect(getLocalBounds().removeFromTop(kTabH));
     for (int i = 0; i < NumPages; ++i)
     {
@@ -985,21 +985,21 @@ void DeviceView::paint(juce::Graphics& g)
         const bool on = i == page;
         if (on || i == hoverTab)
         {
-            g.setColour(on ? colour::panel : colour::panel.withAlpha(0.45f));
+            g.setColour(on ? colour::panel() : colour::panel().withAlpha(0.45f));
             juce::Path p;
             p.addRoundedRectangle(r.getX(), r.getY() + 3.0f, r.getWidth(), r.getHeight() - 3.0f, metric::radius, metric::radius, true, true, false, false);
             g.fillPath(p);
         }
         if (on)
         {
-            g.setColour(colour::accent);
+            g.setColour(colour::accent());
             g.fillRect(r.getX() + 6.0f, r.getY() + 3.0f, r.getWidth() - 12.0f, 2.0f);
         }
         g.setFont(font(12.0f, on ? 600 : 500));
-        g.setColour(on ? colour::text : colour::textDim);
+        g.setColour(on ? colour::text() : colour::textDim());
         g.drawText(pageName(i), r.withTrimmedTop(3.0f), juce::Justification::centred);
     }
-    g.setColour(colour::panel);
+    g.setColour(colour::panel());
     g.fillRect(getLocalBounds().withTrimmedTop(kTabH));
 }
 
@@ -1054,7 +1054,7 @@ void DeviceView::build()
         row.removeChildComponent(d.get());
     devices.clear();
 
-    auto device = [&](juce::String title, juce::Colour tab = colour::accent) -> Device& {
+    auto device = [&](juce::String title, juce::Colour tab = colour::accent()) -> Device& {
         devices.push_back(std::make_unique<Device>(model, std::move(title), tab));
         return *devices.back();
     };
@@ -1156,7 +1156,7 @@ void DeviceView::build()
             params(f, { P::InputFreeze, P::InputFreezeLevel, P::InputFreezeDrift });
             auto& c = device("Catch", sceneTint(4));
             params(c, { P::CatchSource, P::CatchTarget, P::CatchSeconds });
-            auto catchButton = std::make_unique<FlatButton>("Catch now", colour::accent);
+            auto catchButton = std::make_unique<FlatButton>("Catch now", colour::accent());
             catchButton->setHelp(&model, "grab the last seconds into a cloud (K)");
             catchButton->onClick = [this] { model.engine.command(engine::Command::Catch); };
             c.add(std::move(catchButton), 2 * metric::knobW, 26);
@@ -1165,7 +1165,7 @@ void DeviceView::build()
         }
         case Looper:
         {
-            auto& d = device("Disintegration looper", sceneTint(5));
+            auto& d = device("Tape looper", sceneTint(5));
             d.add(std::make_unique<LooperView>(model), 260, 0);
             params(d, { P::LoopSource, P::LoopErosion, P::LoopFlakes, P::LoopOverdub });
             d.setPresets("looper", "loop.", { P::LoopErosion, P::LoopFlakes, P::LoopOverdub });
@@ -1182,27 +1182,27 @@ void DeviceView::build()
         }
         case Gestures:
         {
-            auto& s = device("Swell", colour::accent);
+            auto& s = device("Swell", colour::accent());
             params(s, { P::SwellDepth, P::SwellAttack, P::SwellRelease });
-            auto& h = device("Hush", colour::accent);
+            auto& h = device("Hush", colour::accent());
             params(h, { P::HushDepth });
-            auto& f = device("Freeze all", colour::tide);
+            auto& f = device("Freeze all", colour::tide());
             params(f, { P::FreezeOn, P::FreezeDuck, P::FreezeTexture });
-            auto& t = device("Terrain", colour::tide);
+            auto& t = device("Terrain", colour::tide());
             params(t, { P::TerrainWanderStyle, P::TerrainGlide, P::TerrainFocus, P::TerrainWander, P::TerrainWanderRate, P::TideRate, P::HarmonyMorph });
-            auto& m = device("Medium", colour::live);
+            auto& m = device("Medium", colour::live());
             params(m, { P::MediumType, P::MediumAge, P::MediumNoise, P::MediumWobble, P::MediumDrive, P::MediumMix });
             m.setPresets("medium", "medium.", { P::MediumType, P::MediumAge, P::MediumNoise, P::MediumWobble, P::MediumDrive, P::MediumMix });
-            strip(static_cast<int>(engine::StripId::Freeze), colour::tide);
+            strip(static_cast<int>(engine::StripId::Freeze), colour::tide());
             break;
         }
         case Loops:
         {
-            auto& d = device("Incommensurate loops", sceneTint(7));
+            auto& d = device("Cycles", sceneTint(7));
             params(d, { P::LoopsOn, P::LoopsTarget, P::LoopsCount, P::LoopsPattern, P::LoopsRate, P::LoopsDensity, P::LoopsRegister, P::LoopsSpread,
                         P::LoopsVelocity });
             d.setPresets("loops", "loops.", { P::LoopsCount, P::LoopsRate, P::LoopsDensity, P::LoopsRegister, P::LoopsSpread, P::LoopsVelocity, P::LoopsPattern });
-            auto& t = device("Tempo", colour::tide);
+            auto& t = device("Tempo", colour::tide());
             params(t, { P::SyncOn, P::SyncBpm });
             break;
         }
@@ -1225,14 +1225,14 @@ void DeviceView::build()
                 d.addKnob(info.sendA, "Reverb", {}, 52, 62);
                 d.addKnob(info.sendB, "Delay", {}, 52, 62);
             }
-            auto& r = device("Returns", colour::tide);
+            auto& r = device("Returns", colour::tide());
             r.add(std::make_unique<FaderMeter>(model, P::BusALevel, -1, "Reverb"), 58, 0);
             r.add(std::make_unique<FaderMeter>(model, P::BusBLevel, -1, "Delay"), 58, 0);
             break;
         }
         case Effects:
         {
-            auto& pick = device("Chain", colour::tide);
+            auto& pick = device("Chain", colour::tide());
             pick.add(std::make_unique<ChainPicker>(fxChain, [this](int i) { later(this, [this, i] { showEffectsFor(i); }); }), 220, 0);
             const int firstSlot = fxChain < engine::kNumStrips ? fxChain * 2 : engine::kBusASlot + (fxChain - engine::kNumStrips) * 2;
             for (int k = 0; k < 2; ++k)
@@ -1241,13 +1241,13 @@ void DeviceView::build()
         }
         case Master:
         {
-            auto& d = device("Master", colour::accent);
+            auto& d = device("Master", colour::accent());
             d.add(std::make_unique<FaderMeter>(model, P::MasterLevel, -1, "Master"), 64, 0);
             params(d, { P::MasterFadeSecs, P::MasterCeiling });
-            auto& a = device("Auto master", colour::good);
+            auto& a = device("Auto master", colour::good());
             params(a, { P::MasterAuto, P::MasterAutoTarget, P::MasterAutoAmount });
             a.add(std::make_unique<AutoMasterView>(model), 250, 0);
-            auto& fx = device("Master effects", colour::tide);
+            auto& fx = device("Master effects", colour::tide());
             auto open = std::make_unique<FlatButton>("Master inserts");
             open->onClick = [this] { later(this, [this] { showEffectsFor(engine::kNumStrips + 2); }); };
             fx.add(std::move(open), 2 * metric::knobW, 26);
@@ -1261,7 +1261,7 @@ void DeviceView::build()
         }
         case Midi:
         {
-            auto& d = device("MIDI", colour::learn);
+            auto& d = device("MIDI", colour::learn());
             d.add(std::make_unique<MidiView>(model), 800, 0);
             break;
         }

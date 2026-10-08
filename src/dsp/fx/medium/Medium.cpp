@@ -13,7 +13,7 @@ namespace {
 
 inline float softClip(float x) noexcept { return std::tanh(x); }
 
-constexpr const char* kTypeNames[] = { "Digital", "Cassette", "Vinyl", "Noisy sampler" };
+constexpr const char* kTypeNames[] = { "Digital", "Cassette", "Vinyl", "Sampler" };
 
 } // namespace
 

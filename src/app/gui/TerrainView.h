@@ -96,7 +96,7 @@ private:
     std::uint64_t shownPathVersion = 0;
     std::uint64_t shownSceneVersion = ~std::uint64_t { 0 };
     bool needsRepaint = true; // something changed that the motion check cannot see
-    FlatButton drawButton { "Draw path", colour::tide }, clearButton { "Clear path" };
+    FlatButton drawButton { "Draw path", display::tide() }, clearButton { "Clear path" };
 };
 
 } // namespace tf::app::gui

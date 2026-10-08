@@ -46,8 +46,12 @@ public:
     /** Opens or closes the projector window (a full-screen terrain for the audience). */
     void toggleProjector();
     bool isProjectorOpen() const noexcept { return projector != nullptr; }
+    static void switchTheme(AppCore& core, Theme t);
 
 private:
+    void buildInterface();
+    void teardownInterface();
+    void rebuildInterface();
     void frame();
     void timerCallback() override;
     void releaseHolds();

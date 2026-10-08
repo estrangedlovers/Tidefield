@@ -58,7 +58,7 @@ and glass in Bloom.
 | Freeze all | F | holds the last two seconds as a cloud while the rest steps back |
 | Loop | L, Shift+L clears | a disintegrating tape loop: record, close, overdub; it wears away each pass |
 | Hold input | I | freezes the live input's sound into a spectral pad |
-| Loops | E | Eno-style note loops on long, never-aligning cycles, in the key |
+| Cycles | E | Eno-style note loops on long, never-aligning cycles, in the key |
 | Catch | K | last N seconds of the output (or input) into a cloud |
 | Capture scene | C | saves what you hear at the cursor |
 | Release | R | hands held controls back to the terrain |
@@ -68,7 +68,7 @@ and glass in Bloom.
 | Scenes | 1-9, Shift jumps | glide to a scene |
 | Nudge | arrows, Shift fine | move the cursor |
 | Draw path | P | draw a loop for the sound to travel (Path wander) |
-| Gesture | G, Shift+G new take | record your moves (knobs, terrain, notes), then play them back, looped |
+| Take | G, Shift+G new take | record your moves (knobs, terrain, notes), then play them back, looped |
 | Projector | Cmd+P | the terrain alone in its own window, full screen on a second display |
 | Keys | M | letter rows play Bloom; Z/X octave, C/V velocity |
 | Pages | Tab, Shift+Tab | step through the device tabs at the bottom |

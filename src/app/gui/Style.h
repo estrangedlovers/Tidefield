@@ -2,52 +2,86 @@
 
 #include <juce_gui_basics/juce_gui_basics.h>
 
+#include <algorithm>
 #include <array>
 #include <functional>
 
 namespace tf::app::gui {
 
-/** Tidefield's native look: mid-grey working surfaces in the spirit of a studio
-    instrument (flat panels, 1 px lines, compact type, one bright accent), a dark
-    "well" for the terrain and displays so light and colour read against it, and a
-    vivid colour per scene, the way clips are coloured in a session view. */
+enum class Theme { slate, paper };
+
+struct Palette
+{
+    juce::Colour window, panel, panelHi, header, well, wellLine, line, track;
+    juce::Colour text, textDim, textFaint, wellText, wellTextDim;
+    juce::Colour accent, tide, live, learn, warn, good;
+    std::array<juce::Colour, 10> scenes;
+};
+
+const Palette& palette();
+const Palette& displayPalette();
+Theme theme();
+void setTheme(Theme t);
+
 namespace colour {
-inline const juce::Colour window { 0xff46474b };     // the frame between panels
-inline const juce::Colour panel { 0xff55565b };      // panels and device boxes
-inline const juce::Colour panelHi { 0xff65666c };    // raised: buttons, hovered rows
-inline const juce::Colour header { 0xff5e5f64 };     // panel title bars
-inline const juce::Colour well { 0xff1d2429 };       // terrain, meters, displays
-inline const juce::Colour wellLine { 0xff303b42 };
-inline const juce::Colour line { 0xff3a3b3f };       // separators
-inline const juce::Colour text { 0xfff0efea };
-inline const juce::Colour textDim { 0xffc4c3bd };
-inline const juce::Colour textFaint { 0xff9a9993 };
-
-inline const juce::Colour accent { 0xffff9f43 };     // orange: selection, values, on
-inline const juce::Colour accentDim { 0x55ff9f43 };
-inline const juce::Colour tide { 0xff3fd0c5 };       // teal: motion, the terrain cursor
-inline const juce::Colour live { 0xffffd75e };       // yellow: held in the live layer
-inline const juce::Colour learn { 0xffff6fb5 };      // pink: MIDI learn
-inline const juce::Colour warn { 0xffff6b5e };       // red: panic, record, warnings
-inline const juce::Colour good { 0xff9be05a };
-
-/** Scene colours, in order (like clip colours). */
-inline const std::array<juce::Colour, 10> scenes { {
-    juce::Colour(0xffff9f43), juce::Colour(0xff3fd0c5), juce::Colour(0xffb08cff), juce::Colour(0xffffd75e),
-    juce::Colour(0xff59b7ff), juce::Colour(0xffff7ab6), juce::Colour(0xff9be05a), juce::Colour(0xffff6b5e),
-    juce::Colour(0xff7fe6ff), juce::Colour(0xffe6b37f),
-} };
-
-inline juce::Colour forScene(int i) { return scenes[static_cast<std::size_t>(((i % 10) + 10) % 10)]; }
+inline juce::Colour window() { return palette().window; }
+inline juce::Colour panel() { return palette().panel; }
+inline juce::Colour panelHi() { return palette().panelHi; }
+inline juce::Colour header() { return palette().header; }
+inline juce::Colour well() { return palette().well; }
+inline juce::Colour wellLine() { return palette().wellLine; }
+inline juce::Colour line() { return palette().line; }
+inline juce::Colour track() { return palette().track; }
+inline juce::Colour text() { return palette().text; }
+inline juce::Colour textDim() { return palette().textDim; }
+inline juce::Colour textFaint() { return palette().textFaint; }
+inline juce::Colour wellText() { return palette().wellText; }
+inline juce::Colour wellTextDim() { return palette().wellTextDim; }
+inline juce::Colour accent() { return palette().accent; }
+inline juce::Colour accentDim() { return palette().accent.withAlpha(0.33f); }
+inline juce::Colour tide() { return palette().tide; }
+inline juce::Colour live() { return palette().live; }
+inline juce::Colour learn() { return palette().learn; }
+inline juce::Colour warn() { return palette().warn; }
+inline juce::Colour good() { return palette().good; }
+inline juce::Colour lift(juce::Colour c, float amount) { return theme() == Theme::paper ? c.darker(amount * 0.6f) : c.brighter(amount); }
+inline juce::Colour forScene(int i) { return palette().scenes[static_cast<std::size_t>(((i % 10) + 10) % 10)]; }
 } // namespace colour
+
+namespace display {
+inline juce::Colour window() { return displayPalette().window; }
+inline juce::Colour panel() { return displayPalette().panel; }
+inline juce::Colour panelHi() { return displayPalette().panelHi; }
+inline juce::Colour header() { return displayPalette().header; }
+inline juce::Colour well() { return displayPalette().well; }
+inline juce::Colour wellLine() { return displayPalette().wellLine; }
+inline juce::Colour line() { return displayPalette().line; }
+inline juce::Colour track() { return displayPalette().track; }
+inline juce::Colour text() { return displayPalette().text; }
+inline juce::Colour textDim() { return displayPalette().textDim; }
+inline juce::Colour textFaint() { return displayPalette().textFaint; }
+inline juce::Colour wellText() { return displayPalette().wellText; }
+inline juce::Colour wellTextDim() { return displayPalette().wellTextDim; }
+inline juce::Colour accent() { return displayPalette().accent; }
+inline juce::Colour accentDim() { return displayPalette().accent.withAlpha(0.33f); }
+inline juce::Colour tide() { return displayPalette().tide; }
+inline juce::Colour live() { return displayPalette().live; }
+inline juce::Colour learn() { return displayPalette().learn; }
+inline juce::Colour warn() { return displayPalette().warn; }
+inline juce::Colour good() { return displayPalette().good; }
+inline juce::Colour forScene(int i) { return displayPalette().scenes[static_cast<std::size_t>(((i % 10) + 10) % 10)]; }
+} // namespace display
 
 namespace metric {
 inline constexpr int gap = 6;          // between panels
 inline constexpr int pad = 10;         // inside panels
-inline constexpr float radius = 3.0f;  // corner radius: nearly square, like the rest of the studio
+inline constexpr float radius = 3.0f;
+inline constexpr float tileRadius = 0.225f;
 inline constexpr int header = 22;      // panel title bar
 inline constexpr int knobW = 58, knobH = 70;
 } // namespace metric
+
+inline float tileCorner(juce::Rectangle<float> r) { return std::min(12.0f, std::min(r.getWidth(), r.getHeight()) * metric::tileRadius); }
 
 /** Inter, embedded (one family, three weights). */
 juce::Font font(float size, int weight = 400);
@@ -58,7 +92,7 @@ juce::Font brandFont(float size);
 void drawWordmark(juce::Graphics& g, juce::Rectangle<float> r, float markSize, juce::Colour textColour);
 
 /** A flat panel with an optional title bar, the basic container everywhere. */
-void drawPanel(juce::Graphics& g, juce::Rectangle<float> r, const juce::String& title = {}, juce::Colour titleColour = colour::textDim);
+void drawPanel(juce::Graphics& g, juce::Rectangle<float> r, const juce::String& title = {}, juce::Colour titleColour = colour::textDim());
 
 /** A dark display well (terrain, meters, readouts). */
 void drawWell(juce::Graphics& g, juce::Rectangle<float> r);
@@ -95,6 +129,7 @@ class LookAndFeel final : public juce::LookAndFeel_V4
 {
 public:
     LookAndFeel();
+    void applyPalette();
     juce::Typeface::Ptr getTypefaceForFont(const juce::Font& f) override;
     juce::Font getPopupMenuFont() override { return font(13.0f, 500); }
     juce::Font getComboBoxFont(juce::ComboBox&) override { return font(12.0f, 500); }

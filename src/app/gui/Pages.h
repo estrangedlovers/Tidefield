@@ -15,7 +15,7 @@ namespace tf::app::gui {
 class Device : public juce::Component
 {
 public:
-    Device(Model& m, juce::String title, juce::Colour tab = colour::accent);
+    Device(Model& m, juce::String title, juce::Colour tab = colour::accent());
 
     /** Adds the natural control for a parameter: a knob, a switch or a row of choices. */
     ParamComponent* add(engine::P p, juce::String help = {});
@@ -87,6 +87,7 @@ public:
 
     void show(int page);
     int getPage() const noexcept { return page; }
+    int getEffectsChain() const noexcept { return fxChain; }
     /** Effects page: which chain (strip index, or kNumStrips + 0/1/2 for the buses and master). */
     void showEffectsFor(int chain);
 

@@ -80,7 +80,7 @@ public:
 class Toggle final : public ParamComponent
 {
 public:
-    Toggle(Model& m, engine::P p, juce::String text, juce::String help = {}, juce::Colour on = colour::accent);
+    Toggle(Model& m, engine::P p, juce::String text, juce::String help = {}, juce::Colour on = colour::accent());
     void paint(juce::Graphics& g) override;
     void mouseDown(const juce::MouseEvent& e) override;
 
@@ -118,6 +118,7 @@ public:
     std::function<float()> level;               // 0..1 glow
     std::function<bool()> lit;                  // latched on
     std::function<juce::String()> subText;      // live sub-line
+    juce::String keyCap;
 
     void paint(juce::Graphics& g) override;
     void tick() override;
@@ -138,7 +139,7 @@ private:
 class FlatButton final : public juce::Button
 {
 public:
-    explicit FlatButton(const juce::String& text, juce::Colour onColour = colour::accent);
+    explicit FlatButton(const juce::String& text, juce::Colour onColour = colour::accent());
     void paintButton(juce::Graphics& g, bool over, bool down) override;
     void setHelp(Model* m, juce::String h) { model = m; help = std::move(h); }
     void mouseEnter(const juce::MouseEvent& e) override;

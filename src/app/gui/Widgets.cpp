@@ -55,18 +55,18 @@ void Meter::paint(juce::Graphics& g)
     r = r.reduced(2.0f);
     auto lane = [&](juce::Rectangle<float> a, float v, float hold) {
         const float n = meterNorm(v), hn = meterNorm(hold);
-        const auto col = v > 0.89f ? colour::warn : (v > 0.5f ? colour::live : colour::good);
+        const auto col = v > 0.89f ? display::warn() : (v > 0.5f ? display::live() : display::good());
         g.setColour(col.withAlpha(0.9f));
         if (horizontal)
         {
             g.fillRect(a.withWidth(a.getWidth() * n));
-            g.setColour(colour::text.withAlpha(0.7f));
+            g.setColour(display::text().withAlpha(0.7f));
             g.fillRect(juce::Rectangle<float>(a.getX() + a.getWidth() * hn - 1.0f, a.getY(), 1.5f, a.getHeight()));
         }
         else
         {
             g.fillRect(a.withTop(a.getBottom() - a.getHeight() * n));
-            g.setColour(colour::text.withAlpha(0.7f));
+            g.setColour(display::text().withAlpha(0.7f));
             g.fillRect(juce::Rectangle<float>(a.getX(), a.getBottom() - a.getHeight() * hn, a.getWidth(), 1.5f));
         }
     };
@@ -147,7 +147,7 @@ void Waveform::paint(juce::Graphics& g)
     if (shown == nullptr)
     {
         g.setFont(font(11.5f, 500));
-        g.setColour(isMouseOver() ? colour::text : colour::textFaint);
+        g.setColour(isMouseOver() ? display::text() : display::textFaint());
         g.drawText("Click to load a sound", r, juce::Justification::centred);
         return;
     }
@@ -171,27 +171,27 @@ void Waveform::paint(juce::Graphics& g)
             const float x = r.getX() + gv.position * r.getWidth();
             const float y = mid - gv.pan * r.getHeight() * 0.35f;
             const float a = juce::jlimit(0.15f, 1.0f, gv.amplitude * 2.0f);
-            g.setColour(colour::text.withAlpha(a));
+            g.setColour(display::text().withAlpha(a));
             g.fillEllipse(x - 2.5f, y - 2.5f, 5.0f, 5.0f);
         }
         // Where the cloud is reading from.
         const float pos = model.value(static_cast<engine::P>(engine::idx(engine::kCloudFirstParam[s]) + 2));
-        g.setColour(colour::accent);
+        g.setColour(display::accent());
         g.fillRect(r.getX() + pos * r.getWidth() - 0.75f, r.getY(), 1.5f, r.getHeight());
     }
     else
     {
         const float pos = model.value(engine::P::BloomPosition);
-        g.setColour(colour::accent);
+        g.setColour(display::accent());
         g.fillRect(r.getX() + pos * r.getWidth() - 0.75f, r.getY(), 1.5f, r.getHeight());
     }
 
     const auto caption = juce::String(shown->name) + "  " + juce::String(shown->seconds(), 1) + " s";
     g.setFont(font(10.5f, 600));
     const auto pill = juce::Rectangle<float>(r.getX(), r.getY(), juce::GlyphArrangement::getStringWidth(g.getCurrentFont(), caption) + 12.0f, 16.0f);
-    g.setColour(colour::well.withAlpha(0.8f));
+    g.setColour(display::well().withAlpha(0.8f));
     g.fillRoundedRectangle(pill, 3.0f);
-    g.setColour(colour::text);
+    g.setColour(display::text());
     g.drawText(caption, pill, juce::Justification::centred, false);
 }
 
@@ -249,12 +249,12 @@ void ShapePad::paint(juce::Graphics& g)
     // A soft gradient: dark to bright left to right, close to far bottom to top.
     g.setGradientFill(juce::ColourGradient(juce::Colour(0x332c4a8a), r.getX(), r.getCentreY(), juce::Colour(0x33ffcf7a), r.getRight(), r.getCentreY(), false));
     g.fillRoundedRectangle(r, metric::radius);
-    g.setColour(colour::wellLine);
+    g.setColour(display::wellLine());
     g.drawLine(r.getCentreX(), r.getY() + 4.0f, r.getCentreX(), r.getBottom() - 4.0f, 1.0f);
     g.drawLine(r.getX() + 4.0f, r.getCentreY(), r.getRight() - 4.0f, r.getCentreY(), 1.0f);
 
     g.setFont(font(9.5f, 600));
-    g.setColour(colour::textFaint);
+    g.setColour(display::textFaint());
     g.drawText("DARK", r.reduced(5.0f), juce::Justification::centredLeft);
     g.drawText("BRIGHT", r.reduced(5.0f), juce::Justification::centredRight);
     g.drawText("FAR", r.reduced(5.0f), juce::Justification::centredTop);
@@ -262,7 +262,7 @@ void ShapePad::paint(juce::Graphics& g)
 
     const juce::Point<float> p { r.getX() + (shownC + 1.0f) * 0.5f * r.getWidth(), r.getY() + (1.0f - shownS) * 0.5f * r.getHeight() };
     const bool live = model.isLive(engine::P::PerformColour) || model.isLive(engine::P::PerformSpace);
-    const auto c = live ? colour::live : colour::accent;
+    const auto c = live ? display::live() : display::accent();
     g.setColour(c.withAlpha(0.25f));
     g.fillEllipse(juce::Rectangle<float>(26.0f, 26.0f).withCentre(p));
     g.setColour(c);
@@ -371,19 +371,19 @@ void KeyboardStrip::paint(juce::Graphics& g)
         const auto k = keyRect(n).reduced(0.5f);
         const bool black = isBlack(n);
         const float l = lit[static_cast<std::size_t>(n)];
-        auto base = black ? colour::well : juce::Colour(0xffdcdbd5);
+        auto base = black ? colour::well() : juce::Colour(0xffe9e8e1);
         if (n % 12 == root)
             base = black ? base.brighter(0.25f) : base.darker(0.06f);
-        g.setColour(l > 0.0f ? base.interpolatedWith(colour::accent, 0.45f + 0.55f * l) : base);
+        g.setColour(l > 0.0f ? base.interpolatedWith(colour::accent(), 0.45f + 0.55f * l) : base);
         g.fillRoundedRectangle(k, 2.0f);
         if (n == heldNote)
         {
-            g.setColour(colour::tide);
+            g.setColour(colour::tide());
             g.drawRoundedRectangle(k.reduced(1.0f), 2.0f, 2.0f);
         }
         if (! black && n % 12 == 0)
         {
-            g.setColour(colour::well.withAlpha(0.6f));
+            g.setColour(colour::well().withAlpha(0.6f));
             g.setFont(font(9.5f, 600));
             g.drawText(Model::noteName(static_cast<float>(n)), k.withTop(k.getBottom() - 14.0f), juce::Justification::centred);
         }

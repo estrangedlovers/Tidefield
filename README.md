@@ -2,8 +2,8 @@
 
 <img src="resources/icon/logo.png" alt="tidefield" width="240">
 
-A desktop instrument for performing ambient music live. There are no tracks and no
-timeline. A small ecosystem of sound sources drifts on its own, and you steer the
+A desktop instrument for performing ambient music live. There are no tracks to
+arrange. A small ecosystem of sound sources drifts on its own, and you steer the
 whole of it: where it sits on the terrain, how fast time moves, which key it settles
 into, and the gestures you make on top.
 
@@ -81,26 +81,38 @@ Gravity, reverb return, Cloud 1 density and master level.
 
 ## What is inside
 
-- **Sources**: drone, four granular clouds, resonator bank, live input (with spectral
-  hold), Bloom one-shot keyboard, disintegrating looper, weather (wind, rain, surf),
-  freeze all.
+- **Sources**: a deep drone (five waves, eight chord voicings, sub, filter types, drive,
+  vibrato and tremolo), four granular clouds, resonator bank, live input (with spectral
+  hold), Bloom (several sounds across the keyboard, tuned automatically, MPE),
+  disintegrating looper, weather (wind, rain, surf), freeze all.
 - **Recording type** (on the master, heard live): digital, cassette, vinyl, sampler.
-- **Effects** for any of 28 slots: reverb with infinite hold, tape delay, worn echo
-  (a Medium inside the feedback), ensemble, spectral blur, sympathetic strings, Medium.
-  Your own JUCE effects plug in through `src/fx_juce/UserEffects.cpp`.
+- **Effects** for any of 28 slots: reverb with infinite hold, tape delay, worn echo,
+  ensemble, spectral blur, sympathetic strings, Medium, filter, pitch shimmer, phaser,
+  tremolo, saturator, grain delay, glue compressor and lo-fi. In the app, any slot can
+  also host an Audio Unit or VST3 effect, with its knobs pointed at any of the
+  plugin's parameters.
+- **Modulation**: four LFOs, two random sources, input and mix followers, velocity,
+  pitch, mod wheel, pressure and the terrain, routed to any control (up to 16 routes).
 - **Over time**: seasons (minutes-long curves on any parameter), harmonic gravity with
   crossfaded key changes, Tide.
-- **Safety**: lookahead limiter, DC blocker, NaN guard, panic, CPU guardrails that
-  lighten the load before it glitches.
-- **Sessions**: one `.tidefield` file with every setting, scene, season, path, mapping
-  and sample inside.
-- **Sounds**: 59 original factory sounds in five groups (tonal, pads, drones, textures
-  and one-shots), all synthesised by `tools/scripts/make_samples.py`, and anything you
-  load from disk.
-- **Tempo sync**: the loops lock to the beat and the delays to note lengths, following
-  a DAW's tempo and song position (or the Tempo field and Tap in the app).
-- **Presets** for every device and effect (the menu in each device's title bar), 34 to
-  start from, yours saved in `~/Music/Tidefield/Presets`.
+- **The timeline**: record a whole performance, replay it from any point, erase, mute,
+  smooth and trim lanes, and render it offline to a master, stems or a seamless loop.
+- **Space**: stereo, a binaural headphone mode, or a ring of 4, 6 or 8 speakers, with a
+  direction for every source, spread and rotation.
+- **Sync and remote**: host tempo, MIDI clock in and out, OSC in and out, MPE, and
+  Ableton Link as a build option.
+- **Installation mode**: opens a session at launch, fades in, follows a daily schedule,
+  keeps the computer awake, recovers a lost audio device and logs it all.
+- **Undo and redo** for controls, scenes, routes, seasons, effects and timeline edits.
+- **Safety**: lookahead true-peak limiter, DC blocker, NaN guard, panic, CPU guardrails
+  that lighten the load before it glitches.
+- **Sessions**: one `.tidefield` file with every setting, scene, season, route, path,
+  mapping, plugin state and sample inside.
+- **Sounds**: original factory sounds in five groups (tonal, pads, drones, textures and
+  one-shots), all synthesised by `tools/scripts/make_samples.py`, with search, preview
+  and favourites, and anything you load from disk.
+- **Presets** for every device and effect (the menu in each device's title bar), yours
+  saved in `~/Music/Tidefield/Presets`.
 - **Formats**: standalone app, Audio Unit and VST3.
 
 ## Build from source

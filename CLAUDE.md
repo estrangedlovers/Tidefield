@@ -44,7 +44,7 @@ own JUCE modules, so JUCE module code is never linked twice.
 - New sound source: DSP class in `src/dsp/sources/<name>`, a strip in
   `engine/mix/Layout.h`, its parameters in `ParamDefs.h`, wiring in `Engine.cpp`.
 - New effect: implement `dsp::Processor` and register it in `ProcessorFactory`; it is
-  then loadable into any of the 22 FX slots with no engine changes. JUCE-based
+  then loadable into any of the 28 FX slots with no engine changes. JUCE-based
   effects (the imported shimmer and fuzz) live in a separate library and register
   themselves at startup.
 - Anything that allocates or touches files: message thread or worker, handed to the

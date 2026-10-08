@@ -11,10 +11,7 @@
 #include <cmath>
 
 namespace tf::engine {
-
 namespace {
-
-// Offsets inside a TF_CLOUD block (see ParamDefs.h).
 enum CloudOffset : int { kDensity, kGrainMs, kPosition, kSpray, kScan, kPitch, kPitchSpread, kHarmonize, kReverse, kShape, kStereo, kGravity };
 
 P offsetParam(P first, int offset) noexcept { return static_cast<P>(idx(first) + offset); }
@@ -26,8 +23,7 @@ dsp::Scale scaleFrom(float root, float scaleIndex) noexcept
     const int s = std::clamp(toInt(scaleIndex), 0, static_cast<int>(dsp::kScaleTypes.size()) - 1);
     return { dsp::kScaleTypes[static_cast<std::size_t>(s)].mask, std::clamp(toInt(root), 0, 11) };
 }
-
-} // namespace
+}
 
 Engine::Engine() : Engine(Config {}) {}
 
@@ -48,8 +44,6 @@ Engine::Engine(const Config& c)
 
 void Engine::prepare(double newSampleRate, int maxBlockSize)
 {
-    // Sample time restarts: a recording in progress ends here (its end marker goes out
-    // from the audio thread later), playback stops.
     stopGesture(false);
     hostSampleTime = 0;
     hostPlaying = false;
@@ -145,7 +139,6 @@ void Engine::prepare(double newSampleRate, int maxBlockSize)
     telemetryInterval = std::max(1, static_cast<int>(sampleRate / config.telemetryRateHz));
     telemetryCountdown = telemetryInterval;
 
-    // Prime the first tick so ramps start from settled values rather than zero.
     controlTick();
     for (auto& strip : strips)
         strip.settle();
@@ -206,7 +199,6 @@ bool Engine::copyCatch(const EngineNotice& notice, dsp::SampleBuffer& out) const
         return false;
     const bool fromInput = notice.source == 1;
     const auto written = (fromInput ? inputWritten : catchWritten).load(std::memory_order_acquire);
-    // The writer must not have lapped the region's start.
     if (written > notice.start + catchCapacity)
         return false;
 
@@ -228,7 +220,6 @@ bool Engine::copyCatch(const EngineNotice& notice, dsp::SampleBuffer& out) const
             out.right[i] = catchR[idx];
         }
     }
-    // Re-check: if the writer reached the region while copying, the copy is torn.
     const auto after = (fromInput ? inputWritten : catchWritten).load(std::memory_order_acquire);
     return after <= notice.start + catchCapacity;
 }
@@ -247,7 +238,6 @@ void Engine::writeCatch(const float* l, const float* r, int n) noexcept
 
 void Engine::requestCatch() noexcept
 {
-    // Settings, not sound: read targets so values posted with the command apply to it.
     const bool fromInput = toInt(params.target(idx(P::CatchSource))) == 1;
     const auto written = (fromInput ? inputWritten : catchWritten).load(std::memory_order_relaxed);
     const auto wanted = static_cast<std::uint64_t>(params.target(idx(P::CatchSeconds)) * sampleRate);
@@ -292,7 +282,7 @@ void Engine::collectGarbage()
 
 void Engine::notify(EngineNotice::Type type) noexcept
 {
-    noticeQueue.push(EngineNotice { type, sampleTime }); // dropped if the UI is not reading
+    noticeQueue.push(EngineNotice { type, sampleTime });
 }
 
 bool Engine::terrainActive() const noexcept
@@ -318,7 +308,6 @@ void Engine::drainControl() noexcept
     gestureChannel.acquire();
     if (midiMapChannel.acquire())
     {
-        // A new map: every binding must pick up again.
         pickups.fill({});
         std::fill(midiPickup.begin(), midiPickup.end(), std::int8_t { 0 });
     }
@@ -346,8 +335,8 @@ void Engine::fireMidiAction(MidiAction action) noexcept
             applyCommand(st == FadeState::Silent || st == FadeState::FadingOut ? Command::FadeIn : Command::FadeOut);
             break;
         }
-        case MidiAction::CaptureScene: notify(EngineNotice::Type::CaptureSceneRequest); break; // needs the message thread
-        case MidiAction::RecordToggle: notify(EngineNotice::Type::RecordToggleRequest); break;  // files open there too
+        case MidiAction::CaptureScene: notify(EngineNotice::Type::CaptureSceneRequest); break;
+        case MidiAction::RecordToggle: notify(EngineNotice::Type::RecordToggleRequest); break;
         case MidiAction::LoopRecord: looper.record(); break;
         case MidiAction::LoopClear: looper.clear(); break;
         case MidiAction::FreezeToggle:
@@ -375,7 +364,6 @@ void Engine::applyMidiBinding(std::size_t index, const MidiBinding& b, int value
     if (b.param >= registry.size())
         return;
 
-    // Controller position -> normalised parameter position, through range and curve.
     const float v = static_cast<float>(value) / 127.0f;
     float shaped = v;
     if (b.curve > 0.0f)
@@ -390,7 +378,6 @@ void Engine::applyMidiBinding(std::size_t index, const MidiBinding& b, int value
 
     if (b.pickup)
     {
-        // Something else (terrain, UI, a scene) moved the parameter: pick up again.
         if (st.caught && std::fabs(current - st.lastSent) > kTolerance)
             st.caught = false;
         if (! st.caught)
@@ -417,7 +404,7 @@ void Engine::applyMidiBinding(std::size_t index, const MidiBinding& b, int value
 
 void Engine::handleMidi(const RawMidi& m) noexcept
 {
-    midiMonitor.push(m); // for learn and activity; dropped if the UI is behind
+    midiMonitor.push(m);
 
     const auto* map = midiMapChannel.current();
     const int ch = m.channel();
@@ -438,11 +425,11 @@ void Engine::handleMidi(const RawMidi& m) noexcept
                     applyMidiBinding(bi, map->bindings[bi], value);
             }
             if (src == 1 && count > 0)
-                return; // a pad bound to an action does not also play Bloom
+                return;
         }
         if (m.isCc())
         {
-            if (m.data1 == 64) // sustain pedal
+            if (m.data1 == 64)
             {
                 sustainPedal = m.data2 >= 64;
                 bloom.setSustain(sustainPedal);
@@ -459,7 +446,6 @@ void Engine::handleMidi(const RawMidi& m) noexcept
         bloom.noteOn(m.data1, static_cast<float>(m.data2) / 127.0f);
         if (map != nullptr && map->notesToDrone)
         {
-            // Fold into the drone's range by octaves.
             int root = m.data1;
             while (root > 60)
                 root -= 12;
@@ -476,8 +462,6 @@ void Engine::handleMidi(const RawMidi& m) noexcept
 
 void Engine::recordGesture(const ControlEvent& e) noexcept
 {
-    // Only what a performer does: terrain blending, scores and the take's own
-    // playback are not moves, and transport commands are not part of a gesture.
     if (gestureState != GestureState::Recording || e.source == ControlSource::Terrain || e.source == ControlSource::Score)
         return;
     if (e.type == ControlEvent::Type::SnapParam)
@@ -486,7 +470,6 @@ void Engine::recordGesture(const ControlEvent& e) noexcept
         return;
     if (e.type == ControlEvent::Type::Note)
         recordHeld.set(e.param & 127u, e.value > 0.0f);
-    // A full queue drops the move; it never blocks.
     gestureOut.push({ sampleTime - gestureStart, e, recordGeneration });
 }
 
@@ -503,15 +486,11 @@ void Engine::stopGesture(bool onAudioThread) noexcept
     if (gestureState == GestureState::Recording)
     {
         const auto end = sampleTime - gestureStart;
-        // Keys still held end with the take, so playback never leaves a note hanging.
         if (onAudioThread)
             for (int n = 0; n < 128; ++n)
                 if (recordHeld.test(static_cast<std::size_t>(n)))
                     gestureOut.push({ end, ControlEvent::note(n, 0.0f), recordGeneration });
         recordHeld.reset();
-        // The end marker carries the take's length and the rate it was counted in. It
-        // is sent from the audio thread (the queue's one producer), retrying until
-        // there is room.
         endMarker = { end, ControlEvent::makeCommand(Command::None), recordGeneration };
         endMarker.event.value = static_cast<float>(sampleRate);
         endPending = true;
@@ -521,7 +500,7 @@ void Engine::stopGesture(bool onAudioThread) noexcept
     if (onAudioThread)
         releasePlayedNotes();
     else
-        playHeld.reset(); // prepare(): the voices are reset anyway
+        playHeld.reset();
     gestureState = GestureState::Idle;
     pendingPlayVersion = 0.0f;
 }
@@ -537,8 +516,6 @@ void Engine::updateGesture() noexcept
     flushGestureEnd();
     const auto* take = gestureChannel.current();
 
-    // Play waits until the take it was asked for has arrived (it is published just
-    // before the command and may land a block later).
     if (pendingPlayVersion > 0.0f && take != nullptr && static_cast<float>(take->version) >= pendingPlayVersion)
     {
         pendingPlayVersion = 0.0f;
@@ -555,10 +532,9 @@ void Engine::updateGesture() noexcept
     if (take == nullptr || take->length == 0 || take->version != gesturePlayedVersion)
     {
         releasePlayedNotes();
-        gestureState = GestureState::Idle; // the take was replaced or cleared
+        gestureState = GestureState::Idle;
         return;
     }
-    // Times are scaled if the take was recorded at another sample rate.
     const double scale = take->sampleRate > 0.0 ? sampleRate / take->sampleRate : 1.0;
     const auto length = std::max<std::uint64_t>(1, static_cast<std::uint64_t>(static_cast<double>(take->length) * scale));
     auto pos = sampleTime - gestureStart;
@@ -581,7 +557,7 @@ void Engine::updateGesture() noexcept
             gestureState = GestureState::Idle;
             break;
         }
-        gestureStart += length; // next pass
+        gestureStart += length;
         gestureIndex = 0;
         pos = sampleTime - gestureStart;
     }
@@ -595,7 +571,6 @@ void Engine::applyEvent(const ControlEvent& e) noexcept
         case ControlEvent::Type::SetParam:
             if (e.param >= registry.size())
                 return;
-            // A performer touching a terrain-driven parameter takes it over.
             if ((paramFlags[e.param] & ParamFlag::kTerrainBound) != 0 && terrainActive() && e.source != ControlSource::Terrain)
                 live[e.param] = 1;
             params.setTarget(e.param, e.value);
@@ -623,7 +598,7 @@ void Engine::applyEvent(const ControlEvent& e) noexcept
             else if (e.command == Command::GesturePlay)
             {
                 stopGesture(true);
-                pendingPlayVersion = std::max(1.0f, e.value); // starts in updateGesture()
+                pendingPlayVersion = std::max(1.0f, e.value);
             }
             else
                 applyCommand(e.command);
@@ -642,8 +617,6 @@ void Engine::applyCommand(Command c) noexcept
 {
     switch (c)
     {
-        // Fade length is a time setting, not a sound parameter: use the latest target so a
-        // length posted in the same batch as the fade applies to it.
         case Command::FadeIn:
             master.setFadeSeconds(params.target(idx(P::MasterFadeSecs)));
             master.fadeIn();
@@ -662,7 +635,7 @@ void Engine::applyCommand(Command c) noexcept
         case Command::Catch: requestCatch(); break;
         case Command::LoopRecord: looper.record(); break;
         case Command::LoopClear: looper.clear(); break;
-        case Command::GestureRecord: // handled in applyEvent (they carry data)
+        case Command::GestureRecord:
         case Command::GesturePlay: break;
         case Command::GestureStop: stopGesture(true); break;
         case Command::None: break;
@@ -753,7 +726,7 @@ void Engine::updateSources(float t) noexcept
         c.shape = get(kShape);
         c.stereo = get(kStereo);
         c.gravity = get(kGravity) * globalGravity;
-        c.rootNote = params.current(P::DroneRoot) + 12.0f; // samples are assumed to sit near the drone's key
+        c.rootNote = params.current(P::DroneRoot) + 12.0f;
         clouds[static_cast<std::size_t>(k)].cloud.setParams(c);
     }
 
@@ -808,7 +781,6 @@ void Engine::updateSources(float t) noexcept
     wp.distance = params.current(P::WeatherDistance);
     weather.setParams(wp);
 
-    // Freeze all: texture runs from a fine shimmer to long, overlapping smears.
     const float tex = params.current(P::FreezeTexture);
     dsp::GranularCloud::Params fc;
     fc.density = 25.0f + 60.0f * tex;
@@ -819,7 +791,7 @@ void Engine::updateSources(float t) noexcept
     fc.reverse = 0.3f * tex;
     fc.stereo = 0.9f;
     freezeCloud.setParams(fc);
-    (void) t; // sources receive Tide in process(); kept for symmetry with updateFx
+    (void) t;
 }
 
 std::array<float, 6> Engine::slotControls(int slot) const noexcept
@@ -884,7 +856,7 @@ void Engine::controlTick() noexcept
         st.width = params.current(info.width);
         st.sendADb = params.current(info.sendA);
         st.sendBDb = params.current(info.sendB);
-        st.gate = 1.0f; // the input's monitor arm gates only the live signal (in processChunk), not its frozen pad
+        st.gate = 1.0f;
         strips[static_cast<std::size_t>(s)].update(st);
     }
 
@@ -897,8 +869,6 @@ void Engine::updateModulation(float dt) noexcept
 {
     params.clearModulation();
 
-    // Swell: a held gesture that blooms every send and opens the filters, rising over
-    // swell.attack and ebbing over swell.release (stretched or hurried by Tide).
     const float hold = params.current(P::SwellHold);
     const float time = hold > swellEnv ? params.current(P::SwellAttack) : params.current(P::SwellRelease) / std::max(0.05f, tide);
     swellEnv += (hold - swellEnv) * (1.0f - std::exp(-3.0f * dt / std::max(0.01f, time)));
@@ -916,11 +886,9 @@ void Engine::updateModulation(float dt) noexcept
         params.addModulation(idx(P::BloomTone), 0.25f * e);
         params.addModulation(idx(P::BusALevel), 0.05f * e);
         for (auto first : kCloudFirstParam)
-            params.addModulation(idx(first), 0.15f * e); // density
+            params.addModulation(idx(first), 0.15f * e);
     }
 
-    // Shape pad: two macros. Colour darkens or brightens every source; Space pushes
-    // everything back into the reverb and widens it, or pulls it close and dry.
     const float colour = params.current(P::PerformColour);
     if (colour != 0.0f)
     {
@@ -942,7 +910,6 @@ void Engine::updateModulation(float dt) noexcept
         params.addModulation(idx(P::WeatherDistance), 0.4f * space);
     }
 
-    // Hush: every source sinks (up to 30 dB) while the reverb and delay tails ring on.
     {
         const float hushHold = params.current(P::HushHold);
         const float hushTime = hushHold > hushEnv ? 1.2f : 3.0f / std::max(0.05f, tide);
@@ -953,7 +920,6 @@ void Engine::updateModulation(float dt) noexcept
                 params.addModulation(idx(info.level), -0.45f * h);
     }
 
-    // Slow time: Tide eases down to a quarter of its setting, and back.
     {
         const float slowHold = params.current(P::SlowHold);
         slowEnv = dsp::flushDenormal(slowEnv + (slowHold - slowEnv) * (1.0f - std::exp(-3.0f * dt / 2.0f)));
@@ -961,7 +927,6 @@ void Engine::updateModulation(float dt) noexcept
             params.addModulation(idx(P::TideRate), -0.273f * dsp::smoothstep(std::clamp(slowEnv, 0.0f, 1.0f)));
     }
 
-    // Seasons: minutes-long curves, scaled together by seasons.depth.
     const auto* set = seasonChannel.current();
     if (set == nullptr)
         return;
@@ -1002,7 +967,6 @@ void Engine::updateTempo(float dt) noexcept
     syncOn = params.current(P::SyncOn) > 0.5f;
     bpm = hostBpm > 0.0 ? static_cast<float>(std::clamp(hostBpm, 20.0, 400.0)) : params.current(P::SyncBpm);
     if (hostPlaying)
-        // Follow the host's song position, so a section plays back the same way.
         beatPos = hostPpq + static_cast<double>(sampleTime - hostSampleTime) / sampleRate * static_cast<double>(bpm) / 60.0;
     else
         beatPos += static_cast<double>(dt) * static_cast<double>(bpm) / 60.0;
@@ -1010,8 +974,6 @@ void Engine::updateTempo(float dt) noexcept
 
 void Engine::updateLoops(float dt) noexcept
 {
-    // Incommensurate loops (Music for Airports): each voice repeats one note on its
-    // own long, prime-ish period, so the combinations never line up the same way.
     static constexpr std::array<float, kMaxLoops> kPeriods { 17.0f, 19.7f, 23.3f, 26.3f, 29.9f, 31.7f, 37.1f, 41.3f };
 
     const int pattern = toInt(params.current(P::LoopsPattern));
@@ -1036,9 +998,6 @@ void Engine::updateLoops(float dt) noexcept
     const int target = std::clamp(toInt(params.current(P::LoopsTarget)), 0, 2);
     const float flashDecay = std::exp(-dt / 0.4f);
 
-    // Synced: each voice repeats every prime number of beats, so they still never line
-    // up; Pace halves or doubles where the primes start (23 beats at Pace 1), and each
-    // voice takes the next prime up. Notes fall on the beat itself.
     static constexpr std::array<int, 40> kPrimes { 2,  3,  5,  7,  11, 13, 17, 19, 23, 29, 31, 37, 41, 43, 47, 53, 59, 61, 67, 71,
                                                    73, 79, 83, 89, 97, 101, 103, 107, 109, 113, 127, 131, 137, 139, 149, 151, 157, 163, 167, 173 };
     const double paceSteps = std::clamp(std::round(std::log2(static_cast<double>(std::max(0.01f, params.current(P::LoopsRate))))), -2.0, 2.0);
@@ -1056,8 +1015,7 @@ void Engine::updateLoops(float dt) noexcept
             continue;
         if (syncOn)
         {
-            const double period = kPrimes[firstPrime + uk]; // whole beats
-            // The voice's offset, rounded to whole beats so it fires on a beat.
+            const double period = kPrimes[firstPrime + uk];
             const double offsetBeats = std::round(static_cast<double>(loopOffset[uk]) * period);
             const double t = (beatPos + offsetBeats) / period;
             const auto cycle = static_cast<std::int64_t>(std::floor(t));
@@ -1066,8 +1024,6 @@ void Engine::updateLoops(float dt) noexcept
             loopCycle[uk] = cycle;
             const bool periodChanged = loopSyncPeriod[uk] != period;
             loopSyncPeriod[uk] = period;
-            // First tick, a jump in the song, or Pace changed the period (which renumbers
-            // the cycles): re-anchor without a burst of notes.
             if (periodChanged || cycle != previous + 1)
                 continue;
         }
@@ -1086,7 +1042,7 @@ void Engine::updateLoops(float dt) noexcept
         if (target != 1)
         {
             bloom.noteOn(note, vel);
-            bloom.noteOff(note); // the note still lasts bloom.length
+            bloom.noteOff(note);
         }
         if (target != 0)
             resonator.strike(vel);
@@ -1108,7 +1064,6 @@ void Engine::processChunk(const float* const* inputs, int numInputs, int inputOf
     auto L = [&](StripId s) { return stripL[static_cast<std::size_t>(s)].data() + o; };
     auto R = [&](StripId s) { return stripR[static_cast<std::size_t>(s)].data() + o; };
 
-    // 1. Live input (mono).
     float* in = inputMono.data() + o;
     liveInput.process(inputs, numInputs, inputOffset, in, n);
     {
@@ -1118,7 +1073,6 @@ void Engine::processChunk(const float* const* inputs, int numInputs, int inputOf
         inputWritten.store(pos, std::memory_order_release);
     }
 
-    // 2. Drone (skipped while its strip is fully muted and nothing listens to it).
     const bool droneHeard = ! strips[static_cast<std::size_t>(StripId::Drone)].isSilent() || params.current(P::ResExciteDrone) > 0.0f;
     if (droneHeard)
         drone.process(L(StripId::Drone), R(StripId::Drone), n, tide);
@@ -1128,7 +1082,6 @@ void Engine::processChunk(const float* const* inputs, int numInputs, int inputOf
         std::fill_n(R(StripId::Drone), n, 0.0f);
     }
 
-    // 3. Clouds, with fade-out / swap / fade-in when a new sample arrives.
     const float swapStep = 1.0f / static_cast<float>(kCloudSwapSeconds * sampleRate);
     for (int k = 0; k < kNumClouds; ++k)
     {
@@ -1163,7 +1116,7 @@ void Engine::processChunk(const float* const* inputs, int numInputs, int inputOf
             }
             if (slot.swap == CloudSlot::Swap::FadingOut && slot.swapGain <= 0.0f)
             {
-                slot.buffers.acquire(); // retires the old buffer; grains stop in setBuffer
+                slot.buffers.acquire();
                 slot.cloud.setBuffer(rawBuffer(slot.buffers.current()));
                 slot.swap = CloudSlot::Swap::FadingIn;
             }
@@ -1174,7 +1127,6 @@ void Engine::processChunk(const float* const* inputs, int numInputs, int inputOf
         }
     }
 
-    // 4. Bloom. A new one-shot waits until sounding voices have released (20 ms).
     if (bloomBuffers.hasPending())
     {
         if (! bloomSwapping)
@@ -1191,7 +1143,6 @@ void Engine::processChunk(const float* const* inputs, int numInputs, int inputOf
     }
     bloom.process(L(StripId::Bloom), R(StripId::Bloom), n, tide);
 
-    // 5. Resonator, excited by its own rain plus input, drone, clouds and Bloom.
     const float exBloom = params.current(P::ResExciteBloom);
     const float exIn = params.current(P::ResExciteInput);
     const float exDrone = params.current(P::ResExciteDrone);
@@ -1216,8 +1167,6 @@ void Engine::processChunk(const float* const* inputs, int numInputs, int inputOf
         std::fill_n(R(StripId::Resonator), n, 0.0f);
     }
 
-    // 6. The input strip: the live signal (gated by the monitor arm, ramped across the
-    //    tick) plus the spectral freeze pad, which sounds whether or not it is armed.
     {
         const bool frozen = params.current(P::InputFreeze) > 0.5f;
         inputFreeze.setFrozen(frozen);
@@ -1241,8 +1190,6 @@ void Engine::processChunk(const float* const* inputs, int numInputs, int inputOf
         }
     }
 
-    // 7. Looper, fed by the live input or by the mix itself (read one prepared block
-    //    behind from the catch ring, so it is independent of the host's block size).
     {
         const float* li = in;
         const float* ri = in;
@@ -1268,7 +1215,6 @@ void Engine::processChunk(const float* const* inputs, int numInputs, int inputOf
         looper.process(li, ri, L(StripId::Loop), R(StripId::Loop), n);
     }
 
-    // 8. Weather.
     if (params.current(P::WeatherWind) + params.current(P::WeatherRain) + params.current(P::WeatherSurf) > 0.0f)
         weather.process(L(StripId::Weather), R(StripId::Weather), n, tide);
     else
@@ -1277,10 +1223,8 @@ void Engine::processChunk(const float* const* inputs, int numInputs, int inputOf
         std::fill_n(R(StripId::Weather), n, 0.0f);
     }
 
-    // 9. Freeze all.
     processFreeze(offset, n);
 
-    // 7. Inserts and strips.
     for (int s = 0; s < kNumStrips; ++s)
     {
         const auto sid = static_cast<StripId>(s);
@@ -1295,7 +1239,6 @@ void Engine::processChunk(const float* const* inputs, int numInputs, int inputOf
         }
         if (sid == StripId::Freeze)
         {
-            // While the mix is frozen, everything else steps back (freeze.duck).
             const float duck = params.current(P::FreezeDuck);
             const float* fg = freezeGainBuf.data() + o;
             if (duck > 0.0f && (fg[0] > 0.0f || fg[n - 1] > 0.0f))
@@ -1321,8 +1264,6 @@ void Engine::processChunk(const float* const* inputs, int numInputs, int inputOf
 
 void Engine::captureFreeze() noexcept
 {
-    // The last kFreezeSeconds of the pre-Medium mix, ending one prepared block back
-    // (that much is always written, whatever the host's block size).
     const auto len = static_cast<std::uint64_t>(freezeBuffer.size());
     const auto lag = static_cast<std::uint64_t>(maxBlock);
     const auto end = sampleTime > lag ? sampleTime - lag : 0;
@@ -1362,9 +1303,6 @@ void Engine::processFreeze(int offset, int n) noexcept
     }
 
     freezeCloud.process(l, r, n, tide);
-    // A dense granular sum (Hann windows normalised by sqrt(overlap), panned wide)
-    // sits ~8 dB under the material it reads; make it up so freezing holds the
-    // moment at the level it was playing rather than dropping away.
     constexpr float kFreezeMakeup = 2.5f;
     const float target = wanted ? 1.0f : 0.0f;
     const float fs = static_cast<float>(sampleRate);
@@ -1378,7 +1316,7 @@ void Engine::processFreeze(int offset, int n) noexcept
         r[i] *= freezeGain * kFreezeMakeup;
     }
     if (! wanted && freezeGain <= 0.0f)
-        freezeLoaded = false; // the next freeze captures afresh
+        freezeLoaded = false;
 }
 
 void Engine::process(const float* const* inputs, int numInputs, float* const* outputs, int numOutputs, int numSamples) noexcept
@@ -1419,7 +1357,6 @@ void Engine::process(const float* const* inputs, int numInputs, float* const* ou
             sampleTime += static_cast<std::uint64_t>(chunk);
         }
 
-        // Send buses, returned to master with a ramped level.
         auto runBus = [&](int firstSlot, std::vector<float>& bl, std::vector<float>& br, float startGain, P levelParam, int stem) {
             for (int slotIndex : { firstSlot, firstSlot + 1 })
             {
@@ -1453,7 +1390,6 @@ void Engine::process(const float* const* inputs, int numInputs, float* const* ou
         runBus(kBusASlot, busAL, busAR, busAStart, P::BusALevel, kNumStrips);
         runBus(kBusBSlot, busBL, busBR, busBStart, P::BusBLevel, kNumStrips + 1);
 
-        // Master inserts, then the Medium, then the safety chain.
         for (int slotIndex : { kMasterSlot, kMasterSlot + 1 })
         {
             auto& slot = fxSlots[static_cast<std::size_t>(slotIndex)];
@@ -1491,8 +1427,6 @@ void Engine::process(const float* const* inputs, int numInputs, float* const* ou
         if (ev.fadeOutCompleted)
             notify(EngineNotice::Type::FadeOutComplete);
 
-        // Write to the device. Mono outputs get the sum; extra channels are silent
-        // until multichannel output is designed in.
         if (numOutputs == 1)
         {
             for (int i = 0; i < block; ++i)
@@ -1556,7 +1490,7 @@ void Engine::applyGuardLimits(const GuardLimits& limits) noexcept
         slot.cloud.setGrainLimit(limits.cloudGrains);
     resonator.setModeLimit(limits.resonatorModes);
     bloom.setVoiceLimit(limits.bloomVoices);
-    droneVoiceCap = limits.droneVoices; // applied at the next control tick
+    droneVoiceCap = limits.droneVoices;
 }
 
 void Engine::accumulateTelemetry(const float* l, const float* r, int n) noexcept
@@ -1672,7 +1606,7 @@ void Engine::accumulateTelemetry(const float* l, const float* r, int n) noexcept
     }
     f.sustainPedal = sustainPedal;
 
-    telemetryQueue.push(f); // dropped if the UI is behind; the next frame supersedes it
+    telemetryQueue.push(f);
 
     accPeakL = accPeakR = 0.0f;
     accSumL = accSumR = 0.0;
@@ -1681,5 +1615,4 @@ void Engine::accumulateTelemetry(const float* l, const float* r, int n) noexcept
     accStripR.fill(0.0f);
     telemetryCountdown += telemetryInterval;
 }
-
-} // namespace tf::engine
+}

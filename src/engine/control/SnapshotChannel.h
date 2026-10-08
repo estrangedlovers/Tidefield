@@ -6,18 +6,6 @@
 #include <memory>
 
 namespace tf::engine {
-
-/** Hands immutable snapshots from the message thread to the audio thread without
-    the audio thread ever allocating or freeing.
-
-    Message thread: publish() a new object, call collectGarbage() regularly.
-    Audio thread:   acquire() at the top of each block, then read current().
-
-    Retired snapshots travel back through a second queue and are deleted by
-    collectGarbage() on the message thread. The publisher tracks how many objects are
-    in flight and refuses to publish beyond the queue capacity, so neither queue can
-    overflow and a retired pointer is never dropped (which would leak) or freed on the
-    audio thread. */
 template <typename T>
 class SnapshotChannel
 {
@@ -26,7 +14,6 @@ public:
 
     ~SnapshotChannel()
     {
-        // Both threads have stopped by the time the owner is destroyed.
         T* p = nullptr;
         while (toAudio.pop(p))
             delete p;
@@ -38,8 +25,6 @@ public:
     SnapshotChannel(const SnapshotChannel&) = delete;
     SnapshotChannel& operator=(const SnapshotChannel&) = delete;
 
-    /** Message thread. Returns false (and keeps ownership with the caller's
-        unique_ptr destroyed) if too many snapshots are still in flight. */
     bool publish(std::unique_ptr<T> snapshot)
     {
         collectGarbage();
@@ -52,7 +37,6 @@ public:
         return true;
     }
 
-    /** Message thread. Frees snapshots the audio thread has finished with. */
     void collectGarbage()
     {
         T* p = nullptr;
@@ -63,8 +47,6 @@ public:
         }
     }
 
-    /** Audio thread. Takes the newest published snapshot, retiring older ones.
-        Returns true if the current snapshot changed. */
     bool acquire() noexcept
     {
         T* incoming = nullptr;
@@ -72,26 +54,22 @@ public:
         while (toAudio.pop(incoming))
         {
             if (live != nullptr)
-                toRetire.push(live); // cannot fail: in-flight count is bounded
+                toRetire.push(live);
             live = incoming;
             changed = true;
         }
         return changed;
     }
 
-    /** Audio thread. True if a newer snapshot is waiting (lets the owner fade out
-        before acquire() swaps it in). */
     bool hasPending() const noexcept { return toAudio.sizeApprox() > 0; }
 
-    /** Audio thread. May be null before the first publish. */
     const T* current() const noexcept { return live; }
 
 private:
     SpscQueue<T*> toAudio;
     SpscQueue<T*> toRetire;
-    T* live = nullptr;          // owned by the audio side
-    std::size_t maxInFlight;    // message side only
-    std::size_t inFlight = 0;   // message side only: published and not yet deleted
+    T* live = nullptr;
+    std::size_t maxInFlight;
+    std::size_t inFlight = 0;
 };
-
-} // namespace tf::engine
+}

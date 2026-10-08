@@ -1,9 +1,4 @@
 #!/usr/bin/env python3
-"""Spectrogram + level plot for a rendered WAV, for checking renders by eye.
-
-    python3 tools/scripts/spectrogram.py out/ecosystem.wav [out.png]
-
-Needs numpy and matplotlib (dev tool only; not part of the build)."""
 import struct
 import sys
 
@@ -15,7 +10,6 @@ import numpy as np
 
 
 def read(path):
-    """Minimal RIFF reader: 16-bit PCM or 32-bit float (the wave module rejects float)."""
     with open(path, "rb") as f:
         data = f.read()
     pos, fmt, samples = 12, None, None

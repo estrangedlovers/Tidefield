@@ -15,13 +15,7 @@
 #include <iostream>
 
 namespace tf::app {
-
 namespace {
-
-/** `Tidefield --self-test`: checks the shipped app without a window or an audio
-    device (CI runs it on the built bundle). The bundled UI must be present, the
-    factory sounds must decode, and a few seconds of the full engine with every
-    effect type loaded must render finite, audible and under the ceiling. */
 int runSelfTest()
 {
     int failures = 0;
@@ -87,7 +81,6 @@ int runSelfTest()
         }
     }
 
-    // Every effect type in some slot, every source on.
     const auto& types = dsp::ProcessorFactory::instance().entries();
     for (std::size_t k = 0; k < types.size(); ++k)
         fx.setType(static_cast<int>(k % engine::kNumStrips) * 2, types[k].info->typeId, false);
@@ -127,8 +120,7 @@ int runSelfTest()
     std::cout << (failures == 0 ? "Self-test passed" : "Self-test FAILED") << std::endl;
     return failures == 0 ? 0 : 1;
 }
-
-} // namespace
+}
 
 class MainWindow final : public juce::DocumentWindow
 {
@@ -139,8 +131,6 @@ public:
         setUsingNativeTitleBar(true);
         setContentOwned(content, true);
         setResizable(true, true);
-        // Fit the screen: a 13-inch laptop at default scaling is smaller than the
-        // preferred 1440 x 900.
         int w = getWidth(), h = getHeight();
         if (const auto* display = juce::Desktop::getInstance().getDisplays().getPrimaryDisplay())
         {
@@ -151,7 +141,7 @@ public:
         setResizeLimits(std::min(1100, w), std::min(720, h), 10000, 10000);
         centreWithSize(std::max(w, 1), std::max(h, 1));
         setVisible(true);
-        toFront(true); // key window from the start, so the first key press reaches the instrument
+        toFront(true);
     }
 
     void closeButtonPressed() override { juce::JUCEApplication::getInstance()->systemRequestedQuit(); }
@@ -162,7 +152,7 @@ class TidefieldApplication final : public juce::JUCEApplication
 public:
     const juce::String getApplicationName() override { return JUCE_APPLICATION_NAME_STRING; }
     const juce::String getApplicationVersion() override { return JUCE_APPLICATION_VERSION_STRING; }
-    bool moreThanOneInstanceAllowed() override { return false; } // two copies would fight over the audio device
+    bool moreThanOneInstanceAllowed() override { return false; }
 
     void initialise(const juce::String& commandLine) override
     {
@@ -186,14 +176,22 @@ public:
         auto* view = new gui::MainView(*core);
         window = std::make_unique<MainWindow>(getApplicationName() + " - " + core->session.getName(), view);
 
-        // `--ui-test`: open the whole interface, visit every page, then quit cleanly
-        // (CI runs it on the shipped app; sanitizer builds use it for teardown).
         if (commandLine.contains("--ui-test"))
         {
             juce::Timer::callAfterDelay(500, [this] {
                 if (window != nullptr)
                     if (auto* v = dynamic_cast<gui::MainView*>(window->getContentComponent()))
-                        v->toggleProjector(); // open
+                        v->toggleProjector();
+            });
+            const auto original = gui::theme();
+            const auto other = original == gui::Theme::slate ? gui::Theme::paper : gui::Theme::slate;
+            juce::Timer::callAfterDelay(800 + (gui::DeviceView::NumPages / 2) * 250 + 125, [this, other] {
+                if (core != nullptr)
+                    gui::MainView::switchTheme(*core, other);
+            });
+            juce::Timer::callAfterDelay(800 + (gui::DeviceView::NumPages + 1) * 250 + 125, [this, original] {
+                if (core != nullptr)
+                    gui::MainView::switchTheme(*core, original);
             });
             for (int p = 0; p <= gui::DeviceView::NumPages; ++p)
                 juce::Timer::callAfterDelay(800 + p * 250, [this, p] {
@@ -205,8 +203,8 @@ public:
             juce::Timer::callAfterDelay(800 + (gui::DeviceView::NumPages + 2) * 250, [this] {
                 if (auto* v = window != nullptr ? dynamic_cast<gui::MainView*>(window->getContentComponent()) : nullptr)
                     if (v->isProjectorOpen())
-                        v->toggleProjector(); // and close
-                std::cout << "UI test passed: every page shown, projector opened and closed" << std::endl;
+                        v->toggleProjector();
+                std::cout << "UI test passed: every page shown, both themes, projector opened and closed" << std::endl;
                 systemRequestedQuit();
             });
         }
@@ -228,7 +226,6 @@ private:
     std::unique_ptr<AppCore> core;
     std::unique_ptr<MainWindow> window;
 };
-
-} // namespace tf::app
+}
 
 START_JUCE_APPLICATION(tf::app::TidefieldApplication)

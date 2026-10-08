@@ -2,7 +2,6 @@ include(FetchContent)
 
 set(FETCHCONTENT_QUIET OFF)
 
-# JUCE is only needed by the app, the render harness and io code.
 if(TIDEFIELD_BUILD_APP OR TIDEFIELD_BUILD_RENDER)
     FetchContent_Declare(JUCE
         GIT_REPOSITORY https://github.com/juce-framework/JUCE.git

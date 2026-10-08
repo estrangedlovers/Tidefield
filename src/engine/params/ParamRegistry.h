@@ -9,7 +9,6 @@
 #include <vector>
 
 namespace tf::engine {
-
 struct ParamSpec
 {
     std::string id;
@@ -24,13 +23,10 @@ struct ParamSpec
     unsigned flags = ParamFlag::kNone;
 
     float clamp(float v) const noexcept;
-    /** Maps a plain value to 0..1 using the taper (for UI controls and MIDI). */
     float toNormalised(float plain) const noexcept;
     float fromNormalised(float normalised) const noexcept;
 };
 
-/** Static description of every parameter. Built once; read-only afterwards, so it is
-    safe to read from any thread. Lookups by string are for the non-realtime side. */
 class ParamRegistry
 {
 public:
@@ -47,5 +43,4 @@ private:
     std::vector<ParamSpec> specs;
     std::unordered_map<std::string, ParamIndex> byId;
 };
-
-} // namespace tf::engine
+}

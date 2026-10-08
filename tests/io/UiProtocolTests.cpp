@@ -17,7 +17,6 @@ TEST_CASE("The schema describes every parameter and processor")
     REQUIRE(schema["processors"].size() >= 3);
     REQUIRE(schema["processors"][0]["controls"].size() == 6);
     REQUIRE(schema["scales"].size() == 12);
-    // Round-trips through JSON text.
     const auto text = juce::JSON::toString(schema, true);
     REQUIRE(juce::JSON::parse(text)["limits"]["scenes"].operator int() == engine::kMaxScenes);
 }
@@ -49,6 +48,5 @@ TEST_CASE("Telemetry sends every parameter once, then only changes")
     auto fourth = enc.encode(f);
     REQUIRE(fourth["p"].size() == static_cast<int>(engine::kNumParams));
 
-    // A frame stays well under ~16 KB of JSON once primed.
     REQUIRE(juce::JSON::toString(enc.encode(f), true).length() < 16000);
 }

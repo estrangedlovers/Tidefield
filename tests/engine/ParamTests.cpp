@@ -36,11 +36,11 @@ TEST_CASE("ParamState smooths toward clamped targets")
     ParamState st;
     st.prepare(r, 48000.0);
 
-    st.setTarget(idx(P::DroneCutoff), 1.0e6f); // clamped to max
+    st.setTarget(idx(P::DroneCutoff), 1.0e6f);
     st.advance(32);
     const float first = st.current(P::DroneCutoff);
     REQUIRE(first > r.spec(P::DroneCutoff).defaultValue);
-    REQUIRE(first < r.spec(P::DroneCutoff).maxValue); // smoothed, not jumped
+    REQUIRE(first < r.spec(P::DroneCutoff).maxValue);
 
     for (int i = 0; i < 48000 / 32 * 5; ++i)
         st.advance(32);

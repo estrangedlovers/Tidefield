@@ -7,7 +7,6 @@
 #include <functional>
 
 namespace tf::app::gui {
-
 enum class Theme { slate, paper };
 
 struct Palette
@@ -46,7 +45,7 @@ inline juce::Colour warn() { return palette().warn; }
 inline juce::Colour good() { return palette().good; }
 inline juce::Colour lift(juce::Colour c, float amount) { return theme() == Theme::paper ? c.darker(amount * 0.6f) : c.brighter(amount); }
 inline juce::Colour forScene(int i) { return palette().scenes[static_cast<std::size_t>(((i % 10) + 10) % 10)]; }
-} // namespace colour
+}
 
 namespace display {
 inline juce::Colour window() { return displayPalette().window; }
@@ -70,36 +69,28 @@ inline juce::Colour learn() { return displayPalette().learn; }
 inline juce::Colour warn() { return displayPalette().warn; }
 inline juce::Colour good() { return displayPalette().good; }
 inline juce::Colour forScene(int i) { return displayPalette().scenes[static_cast<std::size_t>(((i % 10) + 10) % 10)]; }
-} // namespace display
+}
 
 namespace metric {
-inline constexpr int gap = 6;          // between panels
-inline constexpr int pad = 10;         // inside panels
+inline constexpr int gap = 6;
+inline constexpr int pad = 10;
 inline constexpr float radius = 3.0f;
 inline constexpr float tileRadius = 0.225f;
-inline constexpr int header = 22;      // panel title bar
+inline constexpr int header = 22;
 inline constexpr int knobW = 58, knobH = 70;
-} // namespace metric
+}
 
 inline float tileCorner(juce::Rectangle<float> r) { return std::min(12.0f, std::min(r.getWidth(), r.getHeight()) * metric::tileRadius); }
 
-/** Inter, embedded (one family, three weights). */
 juce::Font font(float size, int weight = 400);
 inline juce::Font caps(float size = 10.5f) { return font(size, 600).withExtraKerningFactor(0.06f); }
-/** Quicksand Medium, embedded, for the lowercase wordmark only. */
 juce::Font brandFont(float size);
-/** The mark and the lowercase name, left-aligned and vertically centred in r. */
 void drawWordmark(juce::Graphics& g, juce::Rectangle<float> r, float markSize, juce::Colour textColour);
 
-/** A flat panel with an optional title bar, the basic container everywhere. */
 void drawPanel(juce::Graphics& g, juce::Rectangle<float> r, const juce::String& title = {}, juce::Colour titleColour = colour::textDim());
 
-/** A dark display well (terrain, meters, readouts). */
 void drawWell(juce::Graphics& g, juce::Rectangle<float> r);
 
-/** Shows a menu at the mouse. The callback runs only if an item was chosen and
-    `owner` still exists: a plugin window can close while a menu is open, and JUCE
-    still calls back (with 0) after it is dismissed. */
 inline void showMenu(juce::PopupMenu& menu, juce::Component* owner, std::function<void(int)> chosen)
 {
     juce::Component::SafePointer<juce::Component> safe(owner);
@@ -109,7 +100,6 @@ inline void showMenu(juce::PopupMenu& menu, juce::Component* owner, std::functio
     });
 }
 
-/** Runs on the message thread later, only if `owner` still exists. */
 inline void later(juce::Component* owner, std::function<void()> f)
 {
     juce::Component::SafePointer<juce::Component> safe(owner);
@@ -118,13 +108,9 @@ inline void later(juce::Component* owner, std::function<void()> f)
             f();
     });
 }
-
-} // namespace tf::app::gui
+}
 
 namespace tf::app::gui {
-
-/** Menus, combo boxes, sliders, text fields, scrollbars and dialogs in the same
-    flat style as the custom controls. Installed as the default for the whole app. */
 class LookAndFeel final : public juce::LookAndFeel_V4
 {
 public:
@@ -144,5 +130,4 @@ public:
     void drawScrollbar(juce::Graphics&, juce::ScrollBar&, int x, int y, int w, int h, bool vertical, int thumbStart, int thumbSize, bool over, bool down) override;
     int getDefaultScrollbarWidth() override { return 8; }
 };
-
-} // namespace tf::app::gui
+}

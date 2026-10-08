@@ -7,12 +7,10 @@
 #include <cmath>
 
 namespace tf::dsp {
-
 namespace {
 constexpr int kControlInterval = 32;
-// Bell-like partial ratios (approximate church-bell / free-bar spectrum).
 constexpr std::array<float, 8> kBellRatios { 1.0f, 2.0f, 2.4f, 3.0f, 4.08f, 5.43f, 6.8f, 8.2f };
-} // namespace
+}
 
 void ResonatorBank::prepare(const ProcessSpec& newSpec, std::uint64_t seed)
 {
@@ -54,21 +52,17 @@ float ResonatorBank::modeTargetNote(int i) const noexcept
     const float root = params.rootNote;
     const float fi = static_cast<float>(i);
 
-    // Harmonic series.
     const float harmonic = root + 12.0f * std::log2(fi + 1.0f);
 
-    // Scale tones: step through scale degrees from the root, two octaves below upward.
     float chordal = root + fi;
     if (harmony != nullptr)
     {
         const auto& scale = harmony->scaleFor(modes[static_cast<size_t>(i)].seed);
         const int base = static_cast<int>(std::lround(root));
         const int rootNote = base - (((base - scale.root) % 12 + 12) % 12);
-        // Spread degrees so modes cover ~3.5 octaves: skip every other degree.
         chordal = scale.degreeToNote(rootNote - 12, i * 2 - 2);
     }
 
-    // Inharmonic: bell ratios stacked by octave.
     const float ratio = kBellRatios[static_cast<size_t>(i % 8)] * std::exp2(static_cast<float>(i / 8));
     const float bell = root + 12.0f * std::log2(ratio);
 
@@ -83,15 +77,13 @@ void ResonatorBank::updateModes(float dt) noexcept
 {
     const float fs = static_cast<float>(spec.sampleRate);
     const float nyquistNote = 12.0f * std::log2(fs * 0.45f / 440.0f) + 69.0f;
-    const float glide = snapNextUpdate ? 1.0f : std::min(1.0f, dt / 1.5f); // ~1.5 s pitch glide
+    const float glide = snapNextUpdate ? 1.0f : std::min(1.0f, dt / 1.5f);
     snapNextUpdate = false;
     const float detune = 0.03f * tuningDrift.advance(dt);
     const float baseDecay = std::clamp(params.decaySeconds, 0.05f, 60.0f);
 
     const int active = std::min(params.modes, modeLimit);
     ringingModes = std::max(ringingModes, active);
-    // Modes above the count (lowered by the user or the CPU guardrails) are not cut:
-    // they stop taking excitation and ring out over ~80 ms, so a cut never clicks.
     const float dyingR = std::exp(-6.9078f / (0.08f * fs));
     for (int i = 0; i < kMaxModes; ++i)
     {
@@ -112,15 +104,11 @@ void ResonatorBank::updateModes(float dt) noexcept
 
         const float note = std::min(m.note + detune, nyquistNote);
         const float w = kTwoPi * midiToHz(note) / fs;
-        // Higher modes decay faster unless brightness is 1.
         const float ratio = midiToHz(note) / midiToHz(params.rootNote);
         const float t60 = baseDecay / (1.0f + (1.0f - params.brightness) * std::max(0.0f, ratio - 1.0f) * 0.5f);
-        // Pole radius from T60; strictly < 1 by construction.
         const float r = std::exp(-6.9078f / (t60 * fs));
         m.b1 = 2.0f * r * std::cos(w);
         m.b2 = r * r;
-        // Impulse-normalised: ring amplitude ~ kExcite * impulse area for every mode.
-        // Divided by sqrt(active modes) so the bank's total stays similar as modes change.
         constexpr float kExcite = 2.4f;
         m.inGain = std::sin(w) * kExcite * m.amp / std::sqrt(static_cast<float>(active));
     }
@@ -132,7 +120,6 @@ void ResonatorBank::process(const float* excite, float* left, float* right, int 
     std::fill_n(right, n, 0.0f);
 
     const float rainRate = 8.0f * std::clamp(params.rain, 0.0f, 1.0f) * std::max(timeScale, 0.0f);
-    // Strike width 3 ms (soft felt) to 0.3 ms (hard glass): narrower is brighter.
     const int strikeWidth = std::max(4, static_cast<int>(lerp(0.003f, 0.0003f, std::clamp(params.rainColour, 0.0f, 1.0f))
                                                          * static_cast<float>(spec.sampleRate)));
     constexpr float kDuckThreshold = 0.3f;
@@ -150,7 +137,6 @@ void ResonatorBank::process(const float* excite, float* left, float* right, int 
 
         for (int s = 0; s < chunk; ++s)
         {
-            // Rain: sparse mallet strikes with random loudness (Poisson timing).
             if (rainRate > 0.0f)
             {
                 samplesToBurst -= 1.0;
@@ -173,13 +159,11 @@ void ResonatorBank::process(const float* excite, float* left, float* right, int 
             float strike = 0.0f;
             if (strikePos < strikeLength)
             {
-                // Raised cosine with unit area per unit amplitude.
                 const float phase = static_cast<float>(strikePos) / static_cast<float>(strikeLength);
                 strike = strikeAmp * (2.0f / static_cast<float>(strikeLength)) * (0.5f - 0.5f * std::cos(kTwoPi * phase));
                 ++strikePos;
             }
 
-            // Duck all excitation when the bank is already loud.
             const float ratio = outputLevel / kDuckThreshold;
             const float duck = 1.0f / (1.0f + ratio * ratio);
             const float x = (strike + (excite != nullptr ? excite[i + s] * 0.05f : 0.0f)) * duck;
@@ -201,10 +185,6 @@ void ResonatorBank::process(const float* excite, float* left, float* right, int 
             outputLevel = flushDenormal(outputLevel + (level > outputLevel ? followAttack : followRelease) * (level - outputLevel));
         }
 
-        // Per-chunk level estimate for visuals, plus a floor: two-pole float
-        // recursions near r = 1 can settle into a self-sustaining rounding ripple
-        // around 1e-12 (a limit cycle) instead of reaching zero. Below -200 dB the mode
-        // is cleared, so silence is exact and the tail cannot idle forever.
         for (int k = 0; k < ringing; ++k)
         {
             auto& m = modes[static_cast<size_t>(k)];
@@ -214,7 +194,6 @@ void ResonatorBank::process(const float* excite, float* left, float* right, int 
             m.level = std::max(mag, m.level * 0.95f);
         }
 
-        // Dying modes leave the processed set once they are silent.
         const int active = std::min(params.modes, modeLimit);
         while (ringingModes > active)
         {
@@ -228,14 +207,12 @@ void ResonatorBank::process(const float* excite, float* left, float* right, int 
         samplesUntilControl -= chunk;
     }
 
-    // Modes outside the processed set must not keep stale state.
     for (int k = ringingModes; k < kMaxModes; ++k)
     {
         auto& m = modes[static_cast<size_t>(k)];
         m.y1 = m.y2 = m.x1 = m.x2 = m.level = 0.0f;
     }
 
-    // Spread: narrow the image toward mono as spread drops.
     const float spread = std::clamp(params.spread, 0.0f, 1.0f);
     if (spread < 1.0f)
         for (int s = 0; s < n; ++s)
@@ -255,5 +232,4 @@ float ResonatorBank::getModeNote(int mode) const noexcept
 {
     return mode >= 0 && mode < kMaxModes ? modes[static_cast<size_t>(mode)].note : 0.0f;
 }
-
-} // namespace tf::dsp
+}

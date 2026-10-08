@@ -12,7 +12,6 @@ using namespace tf::engine;
 using Catch::Approx;
 
 namespace {
-
 constexpr double kFs = 48000.0;
 
 RawMidi cc(int channel, int number, int value) { return { static_cast<std::uint8_t>(0xb0 | channel), static_cast<std::uint8_t>(number), static_cast<std::uint8_t>(value), 0 }; }
@@ -53,7 +52,6 @@ struct Rig
         }
     }
 
-    /** Runs long enough for at least one telemetry frame. */
     void settle() { run(12); }
 
     float target(P p) const { return last.paramTargets[idx(p)]; }
@@ -68,34 +66,32 @@ MidiBinding bind(int number, P p, bool pickup = true)
     b.pickup = pickup;
     return b;
 }
-
-} // namespace
+}
 
 TEST_CASE("Soft takeover waits for the controller to reach the value, then follows")
 {
     Rig rig;
-    rig.midi.addBinding(bind(21, P::TerrainX)); // terrain.x starts at 0.5
+    rig.midi.addBinding(bind(21, P::TerrainX));
     rig.settle();
 
-    rig.send(cc(0, 21, 0)); // controller far below
+    rig.send(cc(0, 21, 0));
     rig.settle();
     REQUIRE(rig.target(P::TerrainX) == Approx(0.5f));
     REQUIRE(rig.last.midiPickup[idx(P::TerrainX)] == -1);
 
     rig.send(cc(0, 21, 40));
     rig.settle();
-    REQUIRE(rig.target(P::TerrainX) == Approx(0.5f)); // still below, still waiting
+    REQUIRE(rig.target(P::TerrainX) == Approx(0.5f));
 
-    rig.send(cc(0, 21, 80)); // crosses 0.5 -> caught
+    rig.send(cc(0, 21, 80));
     rig.settle();
     REQUIRE(rig.target(P::TerrainX) == Approx(80.0f / 127.0f));
     REQUIRE(rig.last.midiPickup[idx(P::TerrainX)] == 0);
 
-    rig.send(cc(0, 21, 20)); // now follows freely
+    rig.send(cc(0, 21, 20));
     rig.settle();
     REQUIRE(rig.target(P::TerrainX) == Approx(20.0f / 127.0f));
 
-    // Something else moves the parameter: the controller must pick up again.
     rig.engine.setParam(P::TerrainX, 0.9f);
     rig.settle();
     rig.send(cc(0, 21, 30));
@@ -112,7 +108,7 @@ TEST_CASE("Without pickup, ranges and curves apply immediately")
     b.high = 0.6f;
     rig.midi.addBinding(b);
     auto c = bind(23, P::TideRate, false);
-    c.curve = 1.0f; // slow start: pow(v, 4)
+    c.curve = 1.0f;
     rig.midi.addBinding(c);
     rig.settle();
 
@@ -133,11 +129,11 @@ TEST_CASE("Channel-specific and any-channel bindings coexist on one CC")
     b.channel = 2;
     rig.midi.setBindings({ a, b });
     rig.settle();
-    rig.send(cc(0, 30, 127)); // channel 1: only the any-channel binding
+    rig.send(cc(0, 30, 127));
     rig.settle();
     REQUIRE(rig.target(P::TerrainX) == Approx(1.0f));
     REQUIRE(rig.target(P::TerrainY) == Approx(0.5f));
-    rig.send(cc(2, 30, 0)); // channel 3: both
+    rig.send(cc(2, 30, 0));
     rig.settle();
     REQUIRE(rig.target(P::TerrainX) == Approx(0.0f));
     REQUIRE(rig.target(P::TerrainY) == Approx(0.0f));
@@ -146,7 +142,7 @@ TEST_CASE("Channel-specific and any-channel bindings coexist on one CC")
 TEST_CASE("Buttons and pads fire actions once per press")
 {
     Rig rig;
-    rig.run(48000 * 6 / 256); // some audio in the catch ring
+    rig.run(48000 * 6 / 256);
     MidiBinding button;
     button.cc = 40;
     button.action = MidiAction::Catch;
@@ -159,9 +155,9 @@ TEST_CASE("Buttons and pads fire actions once per press")
     rig.notices.clear();
 
     rig.send(cc(0, 40, 127));
-    rig.send(cc(0, 40, 127)); // held: no second catch
+    rig.send(cc(0, 40, 127));
     rig.send(cc(0, 40, 0));
-    rig.send(cc(0, 40, 127)); // pressed again
+    rig.send(cc(0, 40, 127));
     rig.send(noteOn(9, 36, 100));
     rig.settle();
     int catches = 0, captures = 0;
@@ -185,7 +181,7 @@ TEST_CASE("Notes play Bloom, respect the note channel and the sustain pedal")
     rig.engine.loadBloomSample(sample);
     rig.engine.setParam(P::BloomLength, 0.5f);
     rig.engine.setParam(P::BloomRelease, 0.1f);
-    rig.engine.setParam(P::BloomTransform, 2.0f); // Freeze: sustains while held
+    rig.engine.setParam(P::BloomTransform, 2.0f);
     rig.midi.setNoteChannel(1);
     rig.settle();
 
@@ -196,16 +192,16 @@ TEST_CASE("Notes play Bloom, respect the note channel and the sustain pedal")
         return n;
     };
 
-    rig.send(noteOn(0, 60, 100)); // wrong channel
+    rig.send(noteOn(0, 60, 100));
     rig.settle();
     REQUIRE(active() == 0);
 
-    rig.send(cc(1, 64, 127)); // pedal down
+    rig.send(cc(1, 64, 127));
     rig.send(noteOn(1, 60, 100));
     rig.send(noteOff(1, 60));
-    rig.run(48000 * 2 / 256); // well past length + release
+    rig.run(48000 * 2 / 256);
     REQUIRE(rig.last.sustainPedal);
-    REQUIRE(active() == 1); // held by the pedal
+    REQUIRE(active() == 1);
 
     rig.send(cc(1, 64, 0));
     rig.run(48000 * 1 / 256);
@@ -217,7 +213,7 @@ TEST_CASE("Notes can set the drone root")
     Rig rig;
     rig.midi.setNotesToDrone(true);
     rig.settle();
-    rig.send(noteOn(0, 67, 90)); // G4 folds to G3 (55)
+    rig.send(noteOn(0, 67, 90));
     rig.settle();
     REQUIRE(rig.target(P::DroneRoot) == Approx(55.0f));
 }
@@ -229,7 +225,7 @@ TEST_CASE("Learn binds the next moved control and replaces its old target")
     rig.midi.onLearned = [&](const std::string& d) { learned = d; };
     rig.midi.learnParam(idx(P::TideRate));
     REQUIRE(rig.midi.isLearning());
-    rig.send(cc(3, 64, 10)); // sustain pedal is ignored by learn
+    rig.send(cc(3, 64, 10));
     rig.send(cc(3, 74, 10));
     rig.settle();
     REQUIRE_FALSE(rig.midi.isLearning());
@@ -252,7 +248,7 @@ TEST_CASE("The default layout maps eight knobs and keeps master level below 0 dB
     rig.midi.loadDefaultLayout();
     REQUIRE(rig.midi.getBindings().size() == 8);
     rig.settle();
-    rig.engine.setParam(P::MasterLevel, -60.0f); // start low so pickup catches on the way up
+    rig.engine.setParam(P::MasterLevel, -60.0f);
     rig.settle();
     for (int v = 0; v <= 127; v += 8)
         rig.send(cc(5, 28, v));

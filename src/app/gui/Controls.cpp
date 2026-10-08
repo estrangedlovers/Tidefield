@@ -1,14 +1,11 @@
 #include "Controls.h"
 
 namespace tf::app::gui {
-
 namespace {
 constexpr float kArcStart = juce::MathConstants<float>::pi * -0.75f;
 constexpr float kArcEnd = juce::MathConstants<float>::pi * 0.75f;
-constexpr float kDragPixels = 180.0f; // full range per vertical drag
-} // namespace
-
-// --- ParamComponent -------------------------------------------------------------------
+constexpr float kDragPixels = 180.0f;
+}
 
 ParamComponent::ParamComponent(Model& m, engine::P p, juce::String h) : model(m), param(p), help(std::move(h))
 {
@@ -19,8 +16,6 @@ ParamComponent::ParamComponent(Model& m, engine::P p, juce::String h) : model(m)
 
 ParamComponent::~ParamComponent()
 {
-    // Destroyed mid-drag (a page rebuilt under the mouse): let the value follow the
-    // engine again instead of freezing at the last local value.
     if (dragging)
         model.endTouch(param);
     model.remove(this);
@@ -30,9 +25,6 @@ void ParamComponent::tick()
 {
     const float v = model.value(param);
     const int flags = (model.isLive(param) ? 1 : 0) | (model.isLearning(param) ? 2 : 0) | ((model.pickup(param) + 1) << 2);
-    // A value easing toward its target changes by invisible amounts for a long time:
-    // repaint for visible moves at once, and catch up on the last digits a few times a
-    // second, so the shown number always ends exact.
     const bool visible = std::abs(model.toNorm(param, v) - model.toNorm(param, lastValue)) > 5.0e-4f;
     const bool settle = v != lastValue && ++framesSincePaint >= 15;
     if (visible || settle || flags != lastFlags)
@@ -95,8 +87,6 @@ void ParamComponent::mouseWheelMove(const juce::MouseEvent& e, const juce::Mouse
     setNorm(norm() + step);
 }
 
-// --- Knob -----------------------------------------------------------------------------
-
 void Knob::paint(juce::Graphics& g)
 {
     auto r = getLocalBounds().toFloat();
@@ -119,7 +109,6 @@ void Knob::paint(juce::Graphics& g)
     g.setColour(colour::track());
     g.strokePath(track, juce::PathStrokeType(4.0f, juce::PathStrokeType::curved, juce::PathStrokeType::rounded));
 
-    // Bipolar parameters fill from the centre.
     const bool bipolar = model.spec(param).minValue < 0.0f && model.spec(param).maxValue > 0.0f;
     const float from = bipolar ? 0.0f : kArcStart;
     juce::Path arc;
@@ -127,11 +116,9 @@ void Knob::paint(juce::Graphics& g)
     g.setColour(valueColour());
     g.strokePath(arc, juce::PathStrokeType(4.0f, juce::PathStrokeType::curved, juce::PathStrokeType::rounded));
 
-    // Needle.
     g.setColour(colour::text());
     g.drawLine(juce::Line<float>(c.getPointOnCircumference(radius * 0.25f, angle), c.getPointOnCircumference(radius - 4.0f, angle)), 2.0f);
 
-    // Soft takeover: which way to turn the controller.
     const int pickup = model.pickup(param);
     if (pickup != 0)
     {
@@ -167,8 +154,6 @@ void Knob::mouseDrag(const juce::MouseEvent& e)
         model.onHover(label + ": " + (formatter ? formatter(model.value(param)) : valueText()));
 }
 
-// --- Fader ----------------------------------------------------------------------------
-
 void Fader::paint(juce::Graphics& g)
 {
     auto r = getLocalBounds().toFloat();
@@ -184,7 +169,6 @@ void Fader::paint(juce::Graphics& g)
     const auto col = valueColour();
     g.setGradientFill(juce::ColourGradient(col.withAlpha(0.95f), filled.getX(), filled.getY(), col.withAlpha(0.45f), filled.getX(), filled.getBottom(), false));
     g.fillRoundedRectangle(filled, 2.0f);
-    // Handle line.
     g.setColour(display::text());
     g.fillRect(juce::Rectangle<float>(filled.getX(), filled.getY() - 1.0f, filled.getWidth(), 2.0f));
 
@@ -212,8 +196,6 @@ void Fader::mouseDrag(const juce::MouseEvent& e)
         model.onHover(label + ": " + valueText());
 }
 
-// --- Toggle ---------------------------------------------------------------------------
-
 Toggle::Toggle(Model& m, engine::P p, juce::String t, juce::String h, juce::Colour on)
     : ParamComponent(m, p, std::move(h)), text(std::move(t)), onColour(on)
 {
@@ -239,8 +221,6 @@ void Toggle::mouseDown(const juce::MouseEvent& e)
     }
     model.toggle(param);
 }
-
-// --- Choice ---------------------------------------------------------------------------
 
 Choice::Choice(Model& m, engine::P p, int cols, juce::String h) : ParamComponent(m, p, std::move(h)), columns(cols)
 {
@@ -319,8 +299,6 @@ void Choice::mouseDown(const juce::MouseEvent& e)
         model.set(param, model.spec(param).minValue + static_cast<float>(i));
 }
 
-// --- Pad ------------------------------------------------------------------------------
-
 Pad::Pad(Model& m, juce::String t, juce::String s, juce::Colour c, juce::String h)
     : model(m), title(std::move(t)), sub(std::move(s)), help(std::move(h)), colour(c)
 {
@@ -329,7 +307,6 @@ Pad::Pad(Model& m, juce::String t, juce::String s, juce::Colour c, juce::String 
 
 Pad::~Pad()
 {
-    // Destroyed while held (the window closed): end the gesture so it cannot latch on.
     if (pressed && onRelease)
         onRelease();
     model.remove(this);
@@ -430,8 +407,6 @@ void Pad::mouseEnter(const juce::MouseEvent&)
     repaint();
 }
 
-// --- FlatButton -----------------------------------------------------------------------
-
 FlatButton::FlatButton(const juce::String& text, juce::Colour on) : juce::Button(text), onColour(on) {}
 
 void FlatButton::paintButton(juce::Graphics& g, bool over, bool down)
@@ -456,5 +431,4 @@ void FlatButton::mouseEnter(const juce::MouseEvent& e)
     if (model != nullptr && model->onHover && help.isNotEmpty())
         model->onHover(getButtonText() + ": " + help);
 }
-
-} // namespace tf::app::gui
+}

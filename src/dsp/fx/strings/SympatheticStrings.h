@@ -8,12 +8,6 @@
 #include <array>
 
 namespace tf::dsp {
-
-/** Sympathetic strings: a bank of plucked-string resonators (Karplus-Strong loops)
-    tuned to the current key, excited quietly by whatever passes through, the way the
-    undamped strings of a sitar or a piano with the pedal down ring along. Notes in the
-    key bloom; everything else barely touches them. Retunes (gliding) when the key
-    changes. Outputs the input plus the strings. */
 class SympatheticStrings final : public Processor
 {
 public:
@@ -27,7 +21,6 @@ public:
     void process(float* left, float* right, int numSamples) noexcept override;
     float getTailSeconds() const noexcept override { return 20.0f; }
 
-    /** Current tuning (MIDI note) of string i, for tests. */
     float getStringNote(int i) const noexcept { return strings[static_cast<std::size_t>(i)].note; }
     int getStringCount() const noexcept { return count; }
 
@@ -53,5 +46,4 @@ private:
     int tunedRoot = -1, tunedOctave = -1, tunedCount = -1;
     float tunedDecay = -1.0f, tunedBrightness = -1.0f, tunedSpread = -1.0f;
 };
-
-} // namespace tf::dsp
+}

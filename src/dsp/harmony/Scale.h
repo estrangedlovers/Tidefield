@@ -5,12 +5,10 @@
 #include <cstdint>
 
 namespace tf::dsp {
-
-/** A set of pitch classes plus a root. Notes are MIDI note numbers (fractional ok). */
 struct Scale
 {
-    std::uint16_t mask = 0x0FFF; // bit n = pitch class (root + n) is in the scale
-    int root = 2;                // 0 = C ... 11 = B
+    std::uint16_t mask = 0x0FFF;
+    int root = 2;
 
     bool contains(int pitchClassFromC) const noexcept
     {
@@ -18,7 +16,6 @@ struct Scale
         return (mask >> degree) & 1u;
     }
 
-    /** Nearest scale tone to `note`. Ties resolve downward so results are stable. */
     float nearest(float note) const noexcept
     {
         const int centre = static_cast<int>(std::lround(note));
@@ -39,8 +36,6 @@ struct Scale
         return note;
     }
 
-    /** Scale degree `degree` (0 = root) counting from the root at octave `baseNote`'s
-        root. Negative degrees go down. */
     float degreeToNote(int baseRootNote, int degree) const noexcept
     {
         int count = 0;
@@ -67,7 +62,6 @@ struct Scale
     }
 };
 
-/** Built-in scales. Order is persisted by index in sessions: append only. */
 struct ScaleType
 {
     const char* name;
@@ -90,5 +84,4 @@ inline constexpr std::array<ScaleType, 12> kScaleTypes { {
 } };
 
 inline constexpr std::array<const char*, 12> kNoteNames { "C", "C#", "D", "D#", "E", "F", "F#", "G", "G#", "A", "A#", "B" };
-
-} // namespace tf::dsp
+}

@@ -9,15 +9,11 @@
 #include <cstdio>
 
 namespace tf::dsp {
-
 namespace {
-
-/** Smooth saturator: linear for small signals, approaches +-1.2. */
 inline float saturate(float x) noexcept { return 1.2f * std::tanh(x * (1.0f / 1.2f)); }
 
 constexpr float kMaxDelaySeconds = 2.2f;
-
-} // namespace
+}
 
 using Curve = DisplayMap::Curve;
 
@@ -43,7 +39,7 @@ void TapeDelay::prepare(const ProcessSpec& spec)
     dcL.prepare(fs);
     dcR.prepare(fs);
     wowDrift.setSeed(91);
-    glideCoeff = onePoleCoefficient(0.35f, fs); // time changes glide over ~0.35 s
+    glideCoeff = onePoleCoefficient(0.35f, fs);
     setControls({ 0.62f, 0.45f, 0.55f, 0.35f, 0.25f, 0.25f }, {});
     currentDelay = targetDelay;
     reset();
@@ -65,7 +61,6 @@ void TapeDelay::setControls(const std::array<float, 6>& c, const ModContext& ctx
 {
     targetDelay = syncedSeconds(timeMsFrom01(c[0]) * 0.001f, ctx.beatSeconds, 2.0f) * static_cast<float>(fs);
     feedback = feedbackFrom01(c[1]);
-    // Age narrows the band of each repeat: highs roll off lower, lows thin out.
     age = std::clamp(c[5], 0.0f, 1.0f);
     const float tone = toneHzFrom01(c[2]) * (1.0f - 0.6f * age);
     toneL.setCutoff(tone);
@@ -88,21 +83,18 @@ void TapeDelay::process(float* left, float* right, int n) noexcept
     {
         currentDelay += glideCoeff * (targetDelay - currentDelay);
 
-        // Wow (slow, random) + flutter (fast, periodic), both in samples of delay.
         const float wow = wowDrift.advance(dt * timeScale) * wobble * 0.004f * static_cast<float>(fs);
         flutterPhase += 7.3f * timeScale * dt;
         if (flutterPhase >= 1.0f)
             flutterPhase -= 1.0f;
         const float flutter = fastSin01(flutterPhase) * wobble * 0.0004f * static_cast<float>(fs);
 
-        // Spread offsets the right head (up to 1.5x the left) for wide, uneven echoes.
         const float dL = std::clamp(currentDelay + wow + flutter, 1.0f, maxDelay);
         const float dR = std::clamp(currentDelay * (1.0f + 0.5f * spread) - wow + flutter, 1.0f, maxDelay);
 
         const float echoL = lineL.read(dL);
         const float echoR = lineR.read(dR);
 
-        // Repeat path: tone, low cut, DC block, saturate. Spread cross-feeds for ping-pong.
         float fbL = lowCutL.processHigh(toneL.processLow(echoL));
         float fbR = lowCutR.processHigh(toneR.processLow(echoR));
         fbL = saturate(dcL.process(fbL) * drive) / drive;
@@ -117,5 +109,4 @@ void TapeDelay::process(float* left, float* right, int n) noexcept
         right[s] = echoR;
     }
 }
-
-} // namespace tf::dsp
+}

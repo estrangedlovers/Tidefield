@@ -8,7 +8,6 @@
 using namespace tf::dsp;
 
 namespace {
-
 std::vector<float> render(std::uint64_t seed, int seconds, const DroneGenerator::Params& p, int block = 32)
 {
     DroneGenerator d;
@@ -27,8 +26,7 @@ std::vector<float> render(std::uint64_t seed, int seconds, const DroneGenerator:
     }
     return out;
 }
-
-} // namespace
+}
 
 TEST_CASE("Drone output is deterministic for a seed and differs across seeds")
 {
@@ -62,8 +60,8 @@ TEST_CASE("Drone is finite, audible and bounded at extreme settings")
         peak = std::max(peak, std::fabs(x));
         sumSq += static_cast<double>(x) * x;
     }
-    REQUIRE(sumSq / static_cast<double>(out.size()) > 1.0e-5); // audible once faded in
-    REQUIRE(peak < 4.0f);                                      // limiter handles the rest
+    REQUIRE(sumSq / static_cast<double>(out.size()) > 1.0e-5);
+    REQUIRE(peak < 4.0f);
 }
 
 TEST_CASE("Drone output does not depend on the caller's block size")
@@ -93,5 +91,5 @@ TEST_CASE("Drone evolves on its own when evolve is high")
     for (int v = 0; v < 6; ++v)
         changed += d.getVoiceInterval(v) != before[static_cast<size_t>(v)];
     REQUIRE(changed >= 1);
-    REQUIRE(d.getVoiceInterval(0) == before[0]); // the root voice holds
+    REQUIRE(d.getVoiceInterval(0) == before[0]);
 }

@@ -9,7 +9,7 @@ using Catch::Approx;
 TEST_CASE("LinearSmoother reaches the target exactly after the ramp, without overshoot")
 {
     LinearSmoother s;
-    s.prepare(48000.0, 0.01f); // 480 samples
+    s.prepare(48000.0, 0.01f);
     s.reset(0.0f);
     s.setTarget(1.0f);
 
@@ -57,7 +57,6 @@ TEST_CASE("Log-domain smoother moves evenly in pitch")
     s.prepare(48000.0, 0.1f, true);
     s.reset(100.0f);
     s.setTarget(1600.0f);
-    // After one time constant the log-distance should be ~63% covered: 100 * 16^0.632.
     const float v = s.skip(4800);
     REQUIRE(v == Approx(100.0f * std::pow(16.0f, 0.632f)).epsilon(0.02));
 }

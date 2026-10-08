@@ -7,10 +7,9 @@
 #include <cmath>
 
 namespace tf::dsp {
-
 namespace {
 const char* const kFreezeChoices[] = { "Off", "On" };
-} // namespace
+}
 
 using Curve = DisplayMap::Curve;
 
@@ -73,7 +72,6 @@ void SpectralBlur::setControls(const std::array<float, 6>& c, const ModContext& 
 
 void SpectralBlur::updateTilt() noexcept
 {
-    // Slope in dB per octave around 1 kHz, computed only when Tone moves.
     const float slope = kInfo.controls[4].display.value(tone);
     const float binHz = static_cast<float>(fs) / kSize;
     for (int k = 0; k < kBins; ++k)
@@ -90,7 +88,6 @@ void SpectralBlur::hop(Channel& ch) noexcept
         ch.spectrum[static_cast<std::size_t>(i)] = { ch.in[static_cast<std::size_t>((pos + i) & (kSize - 1))] * window[static_cast<std::size_t>(i)], 0.0f };
     fft.forward(ch.spectrum.data());
 
-    // Magnitudes follow the input with the blur time constant (Tide stretches it).
     const float hopSeconds = static_cast<float>(kHop / fs) * std::max(0.01f, timeScale);
     const float follow = freeze ? 0.0f : (blurSeconds < 0.005f ? 1.0f : 1.0f - std::exp(-hopSeconds / blurSeconds));
     for (int k = 0; k < kBins; ++k)
@@ -100,7 +97,6 @@ void SpectralBlur::hop(Channel& ch) noexcept
         m = flushDenormal(m + follow * (std::sqrt(x.real() * x.real() + x.imag() * x.imag()) - m));
     }
 
-    // Smear: a box average across up to +-16 bins (prefix sums).
     const int width = static_cast<int>(smear * 16.0f);
     const float* mags = ch.mag.data();
     if (width > 0)
@@ -124,8 +120,6 @@ void SpectralBlur::hop(Channel& ch) noexcept
             m += shimmer * 0.7f * mags[uk / 2];
         m *= tilt[uk];
 
-        // Phase: the input's own, turned by a rotor that random-walks with Drift. Small
-        // rotations (cos ~ 1 - a^2/2, sin ~ a) plus renormalising keep it trig-free.
         float& rr = ch.rotRe[uk];
         float& ri = ch.rotIm[uk];
         if (jitter > 0.0f)
@@ -140,7 +134,6 @@ void SpectralBlur::hop(Channel& ch) noexcept
         }
         const auto x = ch.spectrum[uk];
         const float xm = std::sqrt(x.real() * x.real() + x.imag() * x.imag());
-        // Unit phase of the input bin (or of the rotor alone where the bin is empty).
         const float ur = xm > 1.0e-20f ? x.real() / xm : 1.0f;
         const float ui = xm > 1.0e-20f ? x.imag() / xm : 0.0f;
         ch.spectrum[uk] = { m * (ur * rr - ui * ri), m * (ur * ri + ui * rr) };
@@ -151,7 +144,6 @@ void SpectralBlur::hop(Channel& ch) noexcept
         ch.spectrum[static_cast<std::size_t>(kSize - k)] = std::conj(ch.spectrum[static_cast<std::size_t>(k)]);
     fft.inverse(ch.spectrum.data());
 
-    // Hann analysis and synthesis at 4x overlap sum to 1.5.
     constexpr float kScale = 1.0f / (static_cast<float>(kSize) * 1.5f);
     for (int i = 0; i < kSize; ++i)
         ch.ola[static_cast<std::size_t>((pos + i) & (kSize - 1))] += ch.spectrum[static_cast<std::size_t>(i)].real() * window[static_cast<std::size_t>(i)] * kScale;
@@ -179,5 +171,4 @@ void SpectralBlur::process(float* left, float* right, int n) noexcept
         }
     }
 }
-
-} // namespace tf::dsp
+}

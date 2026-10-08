@@ -30,8 +30,6 @@ target_link_libraries(tidefield_tests PRIVATE tidefield_engine Catch2::Catch2Wit
 
 catch_discover_tests(tidefield_tests)
 
-# JUCE-based io code (sessions, audio files) gets its own executable so the core
-# tests above stay free of JUCE.
 if(TARGET juce::juce_core)
     juce_add_console_app(tidefield_io_tests PRODUCT_NAME "tidefield_io_tests")
     target_sources(tidefield_io_tests PRIVATE io/SessionTests.cpp io/UiProtocolTests.cpp io/RecorderTests.cpp io/JuceEffectTests.cpp)

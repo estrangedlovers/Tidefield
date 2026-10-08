@@ -6,13 +6,9 @@
 #include <cmath>
 
 namespace tf::engine::terrain {
-
-/** Inverse-distance weights for every scene at position p. `focus` is the IDW power:
-    1 gives broad, even blends; 6 makes each scene an island with short transitions.
-    Weights sum to 1. Writes numScenes values into `weights`. */
 inline void computeWeights(const SceneSet& set, Point2 p, float focus, float* weights) noexcept
 {
-    constexpr float kEpsilon = 1.0e-5f; // keeps a cursor sitting on a scene finite
+    constexpr float kEpsilon = 1.0e-5f;
     const int n = set.numScenes;
     float total = 0.0f;
     for (int i = 0; i < n; ++i)
@@ -29,8 +25,6 @@ inline void computeWeights(const SceneSet& set, Point2 p, float focus, float* we
         weights[i] *= inv;
 }
 
-/** Interpolated plain value of one column given weights. Only scenes that define
-    the parameter take part; their weights are renormalised among themselves. */
 inline float blendColumn(const SceneSet& set, std::size_t column, const float* weights) noexcept
 {
     const auto blend = set.columns[column].blend;
@@ -71,5 +65,4 @@ inline int nearestScene(const SceneSet& set, Point2 p) noexcept
     }
     return best;
 }
-
-} // namespace tf::engine::terrain
+}

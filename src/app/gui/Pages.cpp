@@ -6,15 +6,12 @@
 #include <map>
 
 namespace tf::app::gui {
-
 using engine::P;
 
 namespace {
-
 constexpr int kGap = 4;
 constexpr int kTabH = 26;
 
-/** One-line explanations shown in the status bar while hovering. */
 juce::String helpFor(P p)
 {
     static const std::map<P, const char*> help {
@@ -53,7 +50,6 @@ juce::String helpFor(P p)
     return it != help.end() ? juce::String(it->second) : juce::String();
 }
 
-/** Display formatting for an FX slot control, from the loaded processor. */
 std::function<juce::String(float)> fxFormatter(const dsp::ProcessorControl& c)
 {
     return [c](float v) {
@@ -63,9 +59,6 @@ std::function<juce::String(float)> fxFormatter(const dsp::ProcessorControl& c)
     };
 }
 
-// --- Specialised devices --------------------------------------------------------------
-
-/** An FX slot: a type menu over six controls and mix, named by the loaded effect. */
 class FxDevice final : public Device, public Animated
 {
 public:
@@ -116,7 +109,6 @@ private:
             {
                 kn->setLabel(info->controls[static_cast<std::size_t>(k)].name);
                 kn->formatter = fxFormatter(info->controls[static_cast<std::size_t>(k)]);
-                // Delay times show the note length they lock to while synced.
                 if (k == 0 && (shownType == "tf.delay" || shownType == "tf.wornEcho"))
                     kn->formatter = [this, free = kn->formatter, control = info->controls[0]](float v) {
                         const auto& f = model.frame();
@@ -143,7 +135,6 @@ private:
     std::string shownType = "\x01";
 };
 
-/** A level fader with the strip's meter beside it. */
 class FaderMeter final : public juce::Component
 {
 public:
@@ -166,8 +157,6 @@ private:
     Meter meter;
 };
 
-/** What the auto master is doing: loudness against target, the EQ it applies, glue,
-    width and make-up. */
 class AutoMasterView final : public juce::Component, public Animated
 {
 public:
@@ -175,7 +164,6 @@ public:
     ~AutoMasterView() override { model.remove(this); }
     void tick() override
     {
-        // Repaint only when a reading or a setting moved.
         const auto& a = model.frame().autoMaster;
         const float settings = model.value(P::MasterAuto) + 10.0f * model.value(P::MasterAutoTarget);
         if (isShowing() && (a != shown || settings != shownSettings))
@@ -234,7 +222,6 @@ private:
     float shownSettings = -1.0f;
 };
 
-/** Looper state, the loop's ring and its two buttons. */
 class LooperView final : public juce::Component, public Animated
 {
 public:
@@ -312,7 +299,6 @@ private:
     float shownSig = -1.0f;
 };
 
-/** The seasons: slow cycles on any continuous parameter, minutes to an hour long. */
 class SeasonList final : public juce::Component, public Animated
 {
 public:
@@ -334,7 +320,6 @@ public:
             resized();
             repaint();
         }
-        // The seasons move over minutes: ten redraws a second are plenty.
         if (isShowing() && ++frames % 6 == 0)
             repaint();
     }
@@ -372,7 +357,6 @@ public:
             g.drawText(s.periodSeconds >= 60.0f ? juce::String(s.periodSeconds / 60.0f, 1) + " min" : juce::String(juce::roundToInt(s.periodSeconds)) + " s",
                        row.removeFromLeft(58.0f), juce::Justification::centredLeft);
             g.drawText(shapes[static_cast<int>(s.shape)], row.removeFromLeft(60.0f), juce::Justification::centredLeft);
-            // Where the cycle is now.
             auto lane = row.removeFromLeft(110.0f).reduced(0.0f, 7.0f);
             g.setColour(display::panelHi());
             g.fillRoundedRectangle(lane, 2.0f);
@@ -408,7 +392,6 @@ public:
 private:
     void showParamMenu(int index)
     {
-        // Continuous, terrain-bound parameters grouped by their prefix.
         std::map<juce::String, juce::PopupMenu> groups;
         for (engine::ParamIndex i = 0; i < engine::kNumParams; ++i)
         {
@@ -481,7 +464,6 @@ private:
     int frames = 0;
 };
 
-/** MIDI: what is mapped, learning actions, devices and the note channel. */
 class MidiView final : public juce::Component, public Animated, private juce::ListBoxModel
 {
 public:
@@ -525,7 +507,6 @@ public:
 
     void tick() override
     {
-        // Rebuild when anything visible changed; a few times a second is plenty.
         if (++frames % 10 != 0 || ! isShowing())
             return;
         juce::String sig = juce::String(model.core.midi.getBindings().size()) + (model.core.midi.isLearning() ? "L" : "-");
@@ -611,7 +592,7 @@ private:
         for (auto& b : deviceButtons)
             removeChildComponent(b.get());
         deviceButtons.clear();
-        if (model.core.midiInputs == nullptr) // in a DAW, MIDI comes from the track
+        if (model.core.midiInputs == nullptr)
             return resized();
         for (const auto& d : model.core.midiInputs->getDevices())
         {
@@ -637,7 +618,6 @@ private:
     int frames = 9;
 };
 
-/** Which effect chain to show on the Effects page. */
 class ChainPicker final : public juce::Component
 {
 public:
@@ -680,10 +660,7 @@ private:
     int current;
     std::function<void(int)> onPick;
 };
-
-} // namespace
-
-// --- Device ---------------------------------------------------------------------------
+}
 
 Device::Device(Model& m, juce::String t, juce::Colour c) : model(m), title(std::move(t)), tab(c) {}
 
@@ -745,7 +722,7 @@ int Device::preferredWidth(int height) const
     }
     width += colW;
     width = std::max(width, top.c != nullptr ? top.w : 0);
-    return std::max(width, presetKind.empty() ? 120 : 200) + 2 * (metric::pad - 2); // room for the title and Presets
+    return std::max(width, presetKind.empty() ? 120 : 200) + 2 * (metric::pad - 2);
 }
 
 void Device::resized()
@@ -768,7 +745,6 @@ void Device::resized()
             colW = 0;
             y = r.getY();
         }
-        // A switch or choice row with a label above it.
         if (dynamic_cast<Choice*>(it.c) != nullptr)
             it.c->setBounds(x, y + 16, it.w, it.h - 16);
         else
@@ -781,7 +757,6 @@ void Device::resized()
 void Device::paint(juce::Graphics& g)
 {
     drawPanel(g, getLocalBounds().toFloat(), title, colour::text());
-    // The device's colour tab on its title bar.
     g.setColour(tab);
     g.fillRoundedRectangle(juce::Rectangle<float>(3.0f, 6.0f, 3.0f, static_cast<float>(metric::header) - 12.0f), 1.0f);
     g.setFont(font(11.0f, 500));
@@ -927,8 +902,6 @@ io::Preset Device::capturePreset(const std::string& name) const
     }
     return p;
 }
-
-// --- DeviceView -----------------------------------------------------------------------
 
 DeviceView::DeviceView(Model& m) : model(m)
 {
@@ -1273,5 +1246,4 @@ void DeviceView::build()
     layoutRow();
     viewport.setViewPosition(0, 0);
 }
-
-} // namespace tf::app::gui
+}

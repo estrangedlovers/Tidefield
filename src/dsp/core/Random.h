@@ -3,8 +3,6 @@
 #include <cstdint>
 
 namespace tf::dsp {
-
-/** xoshiro128+ seeded through splitmix64. Small, fast, deterministic, allocation-free. */
 class Random
 {
 public:
@@ -38,10 +36,8 @@ public:
         return result;
     }
 
-    /** Uniform in [0, 1). */
     float nextFloat() noexcept { return static_cast<float>(nextUInt() >> 8) * (1.0f / 16777216.0f); }
 
-    /** Uniform in [-1, 1). */
     float nextBipolar() noexcept { return nextFloat() * 2.0f - 1.0f; }
 
     float nextRange(float lo, float hi) noexcept { return lo + (hi - lo) * nextFloat(); }
@@ -56,5 +52,4 @@ public:
 private:
     std::uint32_t s[4] {};
 };
-
-} // namespace tf::dsp
+}

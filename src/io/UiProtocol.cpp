@@ -13,10 +13,7 @@
 #include <cmath>
 
 namespace tf::io {
-
 namespace {
-
-/** Rounds for compact JSON (UI precision, not audio precision). */
 double q(float v, double scale = 10000.0) { return std::round(static_cast<double>(v) * scale) / scale; }
 
 juce::var arr(std::initializer_list<juce::var> items)
@@ -50,8 +47,7 @@ const char* curveName(dsp::DisplayMap::Curve c)
     }
     return "linear";
 }
-
-} // namespace
+}
 
 juce::var buildSchema(const engine::Engine& engine)
 {
@@ -285,7 +281,6 @@ juce::var TelemetryEncoder::encode(const engine::TelemetryFrame& f)
     o->setProperty("bloom", juce::var(bloom));
     o->setProperty("input", arr({ q(f.inputLevel, 1000.0), f.inputGateOpen, q(f.inputFreeze) }));
 
-    // Performance layer: swell, seasons, incommensurate loops, looper, weather, freeze.
     auto* perf = new juce::DynamicObject();
     perf->setProperty("swell", q(f.swell));
     perf->setProperty("hush", q(f.hush));
@@ -320,7 +315,6 @@ juce::var TelemetryEncoder::encode(const engine::TelemetryFrame& f)
     terrain->setProperty("w", weights);
     o->setProperty("terrain", juce::var(terrain));
 
-    // Parameter targets, live layer and MIDI pickup: only what changed.
     if (! primed)
     {
         lastTargets.assign(kNumParams, std::nanf(""));
@@ -357,5 +351,4 @@ juce::var TelemetryEncoder::encode(const engine::TelemetryFrame& f)
         o->setProperty("pickup", pickup);
     return juce::var(o);
 }
-
-} // namespace tf::io
+}

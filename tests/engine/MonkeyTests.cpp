@@ -18,9 +18,6 @@ namespace {
 constexpr double kFs = 48000.0;
 }
 
-/** Everything at once, at random: every parameter anywhere in its range, every
-    command, notes, scenes, seasons, FX swaps, varying block sizes and a noisy input.
-    The output must stay finite and under the limiter ceiling throughout. */
 TEST_CASE("Monkey: random everything never breaks the output", "[monkey]")
 {
     Engine engine;
@@ -52,7 +49,6 @@ TEST_CASE("Monkey: random everything never breaks the output", "[monkey]")
     engine.command(Command::FadeIn);
     while (t < 120.0)
     {
-        // A burst of random parameter moves (ceiling stays put: it is the safety net).
         for (int k = 0; k < 6; ++k)
         {
             const auto p = static_cast<ParamIndex>(rng.nextInt(static_cast<int>(kNumParams)));
@@ -77,10 +73,10 @@ TEST_CASE("Monkey: random everything never breaks the output", "[monkey]")
             s.param = static_cast<ParamIndex>(rng.nextInt(static_cast<int>(kNumParams)));
             s.depth = rng.nextBipolar();
             s.periodSeconds = 20.0f + 100.0f * rng.nextFloat();
-            seasons.set(static_cast<int>(seasons.getSeasons().size()) % kMaxSeasons, s); // discrete targets are refused
+            seasons.set(static_cast<int>(seasons.getSeasons().size()) % kMaxSeasons, s);
         }
         if (rng.chance(0.01f))
-            engine.command(Command::FadeIn); // keep it mostly audible
+            engine.command(Command::FadeIn);
 
         const int n = 1 + rng.nextInt(512);
         for (int i = 0; i < n; ++i)
@@ -107,5 +103,5 @@ TEST_CASE("Monkey: random everything never breaks the output", "[monkey]")
         while (engine.popNotice(notice)) {}
         t += n / kFs;
     }
-    CHECK(peak > 0.01f); // it did make sound
+    CHECK(peak > 0.01f);
 }

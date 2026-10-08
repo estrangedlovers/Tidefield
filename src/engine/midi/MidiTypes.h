@@ -7,8 +7,6 @@
 #include <vector>
 
 namespace tf::engine {
-
-/** A short MIDI message as it arrives from a device. Trivially copyable for SPSC. */
 struct RawMidi
 {
     std::uint8_t status = 0;
@@ -16,7 +14,7 @@ struct RawMidi
     std::uint8_t data2 = 0;
     std::uint8_t port = 0;
 
-    int channel() const noexcept { return status & 0x0f; }       // 0-15
+    int channel() const noexcept { return status & 0x0f; }
     int type() const noexcept { return status & 0xf0; }
     bool isCc() const noexcept { return type() == 0xb0; }
     bool isNoteOn() const noexcept { return type() == 0x90 && data2 > 0; }
@@ -26,8 +24,6 @@ struct RawMidi
 inline constexpr int kMaxMidiPorts = 4;
 inline constexpr int kMaxMidiBindings = 128;
 
-/** What a controller can drive besides parameters. Buttons fire on a rising edge
-    (value crossing 64 upward). */
 enum class MidiAction : std::uint8_t { None, Catch, FadeToggle, Panic, ReleaseLive, CaptureScene, RecordToggle, LoopRecord, LoopClear, FreezeToggle,
                                       InputFreezeToggle };
 
@@ -35,34 +31,29 @@ struct MidiBinding
 {
     enum class Source : std::uint8_t { Cc = 0, Note = 1 };
 
-    Source source = Source::Cc; // notes can only trigger actions (pads)
-    int channel = -1;          // -1 = any channel
-    int cc = 0;                // CC number, or note number for Source::Note
-    // Target: a parameter, or an action when `action` != None.
+    Source source = Source::Cc;
+    int channel = -1;
+    int cc = 0;
     ParamIndex param = 0;
     MidiAction action = MidiAction::None;
-    float low = 0.0f;          // normalised range the controller sweeps
+    float low = 0.0f;
     float high = 1.0f;
-    float curve = 0.0f;        // -1..1: 0 linear, >0 slow start, <0 fast start
-    bool pickup = true;        // soft takeover
+    float curve = 0.0f;
+    bool pickup = true;
 };
 
-/** Immutable, audio-thread form of the mapping, published through SnapshotChannel. */
 struct MidiMap
 {
     std::vector<MidiBinding> bindings;
 
-    /** For each (source, channel, number): a run of binding indices in `targets`.
-        Bindings for "any channel" appear under all 16 channels. A control may drive
-        several targets. */
     using Table16x128 = std::array<std::array<std::uint16_t, 128>, 16>;
     using Count16x128 = std::array<std::array<std::uint8_t, 128>, 16>;
     std::array<Table16x128, 2> start {};
     std::array<Count16x128, 2> count {};
     std::vector<std::uint16_t> targets;
 
-    int noteChannel = -1;      // -1 = omni
-    bool notesToDrone = false; // the last note sets the drone root
+    int noteChannel = -1;
+    bool notesToDrone = false;
     std::uint64_t version = 0;
 
     void rebuildLookup()
@@ -86,5 +77,4 @@ struct MidiMap
                 }
     }
 };
-
-} // namespace tf::engine
+}

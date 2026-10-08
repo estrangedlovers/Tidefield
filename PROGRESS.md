@@ -431,6 +431,21 @@ CI; every macOS CI run green on Apple Silicon.
 whether the auto master's target shape suits your material, how the new gestures
 feel, CPU on the M1 Pro under real load, and the app on your interface and controller.
 
+### Design pass (after 1.2.0)
+
+- Palette taken from the mark: Slate (default) and Paper themes, chosen under the
+  session menu's Appearance and saved in settings; the interface rebuilds in place.
+  Displays keep the deep-water colours in both (`display::` palette).
+- Pads use the mark's corner ratio, show level as a tide line and carry their key in
+  a keycap. Renamed for clarity: Loops to Cycles, Gesture to Take, Disintegration
+  looper to Tape looper, Noisy sampler to Sampler, auto master Mud to Low mid and
+  Quiet -23 to Broadcast -23. Parameter IDs are unchanged.
+- Every comment removed from `src/`, `tools/`, `tests/` and the CMake files, at the
+  owner's request; CLAUDE.md now says not to add them.
+- Verified: 143 tests, all eight scores strict, self-test, `--ui-test` (now switches
+  theme with the projector open) clean under AddressSanitizer, icon regenerates
+  byte-identical. Not seen on a Mac yet.
+
 ### Brand mark (after 1.2.0)
 
 - The logo is drawn in code: `src/app/gui/Logo.h` defines the layered-tide tile as

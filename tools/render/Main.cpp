@@ -1,15 +1,3 @@
-// tidefield_render: renders a score through the engine offline and writes a WAV plus
-// a JSON analysis report.
-//
-//   tidefield_render <score.json> [-o out.wav] [--report out.json] [--seed N] [--strict]
-//                    [--save-session out.tidefield] [--stems dir]
-//
-// --stems writes the take the way the app's recorder does (dir/master.wav plus
-// dir/stems/<strip>.wav), through the same record tap.
-//
-// --strict exits non-zero if the render contains non-finite samples or exceeds the
-// limiter ceiling, so scores can run as regression tests.
-
 #include "Analysis.h"
 #include "Score.h"
 
@@ -31,7 +19,6 @@
 #include <optional>
 
 namespace {
-
 struct Options
 {
     juce::File score;
@@ -114,14 +101,10 @@ bool writeWav(const juce::File& file, const std::vector<std::vector<float>>& cha
         ptrs.push_back(ch.data());
     return writer->writeFromFloatArrays(ptrs.data(), static_cast<int>(ptrs.size()), static_cast<int>(channels[0].size()));
 }
-
-} // namespace
+}
 
 int main(int argc, char** argv)
 {
-    // `tidefield_render --dump-schema file.json` writes the UI schema (used by the web
-    // UI's browser mock so it always matches the engine).
-    // `--check-schema file.json` fails if that copy is stale (run as a ctest).
     if (argc == 3 && (juce::String(argv[1]) == "--dump-schema" || juce::String(argv[1]) == "--check-schema"))
     {
         tf::engine::Engine engine;
@@ -237,12 +220,10 @@ int main(int argc, char** argv)
 
         while (pos < total)
         {
-            // Deliver every event due at or before this position.
             while (nextEvent < score.events.size() && score.events[nextEvent].sample <= pos)
                 engine.post(score.events[nextEvent++].event);
 
             int block = score.randomBlockSizes ? 1 + blockRng.nextInt(score.blockSize) : score.blockSize;
-            // Split blocks at event times so events land where the score says.
             if (nextEvent < score.events.size())
                 block = static_cast<int>(std::min<std::uint64_t>(static_cast<std::uint64_t>(block), score.events[nextEvent].sample - pos));
             block = static_cast<int>(std::min<std::uint64_t>(static_cast<std::uint64_t>(block), total - pos));
@@ -275,7 +256,7 @@ int main(int argc, char** argv)
             if (frame.sampleTime > 0)
                 lastFrame = frame;
             if (recorder != nullptr)
-                recorder->drainNow(); // offline runs faster than the writer thread polls
+                recorder->drainNow();
 
             pos += static_cast<std::uint64_t>(block);
         }
@@ -283,7 +264,7 @@ int main(int argc, char** argv)
         if (recorder != nullptr)
         {
             recorder->stop();
-            engine.getRecordTap().beginBlock(); // no more blocks: acknowledge the stop here
+            engine.getRecordTap().beginBlock();
             recorder->drainNow();
             if (const auto dropped = recorder->getStatus().droppedFrames; dropped > 0)
                 std::cerr << "warning: " << dropped << " frames were dropped from the stems\n";

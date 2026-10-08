@@ -6,17 +6,12 @@
 #include <cmath>
 
 namespace tf::dsp {
-
 namespace {
-
 constexpr std::array<float, 6> kInitialIntervals { 0.0f, 12.0f, 7.0f, -12.0f, 19.0f, 24.0f };
 constexpr std::array<float, 9> kIntervalPool { -12.0f, 0.0f, 5.0f, 7.0f, 12.0f, 14.0f, 17.0f, 19.0f, 24.0f };
 
-// Seconds for a voice to fade out or in while re-voicing, before Tide.
 constexpr float kRevoiceFadeSeconds = 4.0f;
-// Seconds for density changes to be followed, before Tide.
 constexpr float kDensityFadeSeconds = 3.0f;
-// Mean seconds between re-voicing events per voice at evolve = 1.
 constexpr float kRevoiceMeanSeconds = 25.0f;
 
 inline double polyBlep(double t, double dt) noexcept
@@ -33,8 +28,7 @@ inline double polyBlep(double t, double dt) noexcept
     }
     return 0.0;
 }
-
-} // namespace
+}
 
 void DroneGenerator::prepare(const ProcessSpec& newSpec, std::uint64_t seed)
 {
@@ -53,7 +47,7 @@ void DroneGenerator::prepare(const ProcessSpec& newSpec, std::uint64_t seed)
         v.filter.prepare(spec.sampleRate);
         v.interval = v.pendingInterval = kInitialIntervals[static_cast<size_t>(i)];
         v.basePan = (i % 2 == 0 ? -1.0f : 1.0f) * (0.2f + 0.15f * static_cast<float>(i / 2));
-        v.seed = (static_cast<float>(i) + 0.5f) / kMaxVoices; // voices migrate in a fixed order
+        v.seed = (static_cast<float>(i) + 0.5f) / kMaxVoices;
         for (auto& ph : v.phase)
             ph = static_cast<double>(rng.nextFloat());
     }
@@ -97,14 +91,12 @@ void DroneGenerator::updateControl(float dt) noexcept
             d->advance(dt);
         }
 
-        // Density: voice i is fully on when density >= i + 1, partially in between.
         const float densityTarget = std::clamp(density - static_cast<float>(i), 0.0f, 1.0f);
         if (v.densityGain < densityTarget)
             v.densityGain = std::min(densityTarget, v.densityGain + densityStep);
         else
             v.densityGain = std::max(densityTarget, v.densityGain - densityStep);
 
-        // Evolution: fade out, jump to a new interval while silent, fade back in.
         if (v.revoicing)
         {
             if (! v.fadingIn)
@@ -129,13 +121,10 @@ void DroneGenerator::updateControl(float dt) noexcept
         }
         else if (i > 0 && v.densityGain > 0.0f && rng.chance(revoiceChance))
         {
-            // Voice 0 holds the root so the drone keeps its centre.
             v.pendingInterval = kIntervalPool[static_cast<size_t>(rng.nextInt(static_cast<int>(kIntervalPool.size())))];
             v.revoicing = v.pendingInterval != v.interval;
         }
 
-        // Pitch: root + interval pulled toward the key, gliding to new targets (key
-        // changes, re-voicing), then slow drift (up to +-12 cents) and detune on top.
         float target = p.rootNote + v.interval;
         if (harmony != nullptr && p.gravity > 0.0f)
             target = harmony->quantize(target, v.seed, p.gravity);
@@ -150,11 +139,9 @@ void DroneGenerator::updateControl(float dt) noexcept
             v.increment[o] = std::min(hz / spec.sampleRate, 0.45);
         }
 
-        // Filter: drifts up to +-1.5 octaves around the base cutoff.
         const float cutoff = p.cutoffHz * std::exp2(1.5f * depth * v.cutoffDrift.getValue());
         v.filter.setCutoff(cutoff, p.resonance);
 
-        // Amplitude and pan.
         const float ampDrift = dbToGain(3.0f * depth * v.ampDrift.getValue());
         const float amp = v.densityGain * smoothstep(v.revoiceGain) * ampDrift;
         const float pan = std::clamp(p.spread * (v.basePan + 0.4f * depth * v.panDrift.getValue()), -1.0f, 1.0f);
@@ -190,8 +177,6 @@ float DroneGenerator::renderVoiceSample(Voice& v) noexcept
 
 void DroneGenerator::process(float* left, float* right, int numSamples, float timeScale) noexcept
 {
-    // Sized so the default patch (3 voices, -3 dB pan law) sits near -20 dBFS RMS with
-    // peaks around -8 dBFS: healthy level into the master without leaning on the limiter.
     constexpr float kVoiceGain = 0.55f;
     int i = 0;
     while (i < numSamples)
@@ -208,7 +193,6 @@ void DroneGenerator::process(float* left, float* right, int numSamples, float ti
 
         for (int s = 0; s < chunk; ++s)
         {
-            // Interpolate gains across the control interval to avoid steps.
             const float frac = static_cast<float>(chunkStart + s + 1) / static_cast<float>(kControlInterval);
             float outL = 0.0f;
             float outR = 0.0f;
@@ -243,5 +227,4 @@ float DroneGenerator::getVoiceNote(int voice) const noexcept
 {
     return voice >= 0 && voice < kMaxVoices ? voices[static_cast<size_t>(voice)].note : 0.0f;
 }
-
-} // namespace tf::dsp
+}

@@ -19,6 +19,4 @@ target_link_libraries(tidefield_render PRIVATE
     juce::juce_recommended_config_flags
     juce::juce_recommended_lto_flags)
 
-# Put the binary at build/<preset>/tools/render/tidefield_render instead of JUCE's
-# per-config artefacts folder, so scripts and docs can use one path.
 set_target_properties(tidefield_render PROPERTIES RUNTIME_OUTPUT_DIRECTORY ${CMAKE_CURRENT_BINARY_DIR})

@@ -8,19 +8,6 @@
 #include <vector>
 
 namespace tf::dsp {
-
-/** Smears sound in time and frequency (2048-point STFT, 4x overlap).
-
-      Blur     each bin's magnitude follows the input with this time constant, so
-               attacks melt into washes (up to ~20 s; Freeze holds it)
-      Smear    averages neighbouring bins: a chord turns into a coloured band
-      Drift    lets phases wander from the input's: from intact to breathy
-      Shimmer  adds the spectrum an octave up, a ghostly upper partial layer
-      Tone     tilts the spectrum dark or bright
-      Freeze   holds the current spectrum indefinitely
-
-    With every control at zero it resynthesises the input unchanged (one window of
-    latency, which is not reported: it is a wet texture effect). */
 class SpectralBlur final : public Processor
 {
 public:
@@ -40,7 +27,7 @@ public:
 private:
     struct Channel
     {
-        std::vector<float> in, ola, mag, rotRe, rotIm; // rotor: each bin's wandering phase offset
+        std::vector<float> in, ola, mag, rotRe, rotIm;
         std::vector<Fft::Complex> spectrum;
     };
     void hop(Channel& ch) noexcept;
@@ -56,5 +43,4 @@ private:
     bool freeze = false;
     float timeScale = 1.0f;
 };
-
-} // namespace tf::dsp
+}

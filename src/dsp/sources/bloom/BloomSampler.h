@@ -11,24 +11,6 @@
 #include <vector>
 
 namespace tf::dsp {
-
-/** Bloom: a playable keyboard that turns ordinary one-shots into ambient material.
-
-    Every note starts a voice that runs the loaded one-shot through a transform:
-
-      Swell          the sample plays reversed up into its attack, then the attack is
-                     held as a slowly scanning granular pad
-      Smear          granular time-stretch, 10x to 100x, pitch held
-      Freeze         a moment of the sample (Position) held as dense, shimmering grains
-      Ghost          attack removed: only the body and tail, stretched and darkened
-      Constellation  the one-shot replayed as a scattered chord of scale tones, each
-                     arriving after its own delay and pan
-      Tape           varispeed playback with wow, flutter, saturation and a tape stop
-
-    `amount` is the depth of the transform (stretch, swell length, tap count, wobble);
-    `random` adds per-note variation so repeated notes never sound identical. A note
-    lasts at least `length` seconds (longer while held), then releases. Voices are a
-    fixed pool; when all are busy the quietest is stolen. */
 class BloomSampler
 {
 public:
@@ -48,13 +30,13 @@ public:
         float lengthSeconds = 8.0f;
         float attackSeconds = 0.05f;
         float releaseSeconds = 2.0f;
-        float rootNote = 60.0f;   // the pitch the sample was recorded at
-        float pitch = 0.0f;       // semitone offset for every note
-        float tone = 0.7f;        // 0 = dark, 1 = open
-        float spread = 0.6f;      // stereo scatter
-        float random = 0.3f;      // per-note variation
-        float position = 0.3f;    // Freeze point / Ghost start, 0..1
-        float gravity = 1.0f;     // pull note pitches into the key
+        float rootNote = 60.0f;
+        float pitch = 0.0f;
+        float tone = 0.7f;
+        float spread = 0.6f;
+        float random = 0.3f;
+        float position = 0.3f;
+        float gravity = 1.0f;
     };
 
     struct VoiceView
@@ -72,12 +54,8 @@ public:
 
     void noteOn(int note, float velocity) noexcept;
     void noteOff(int note) noexcept;
-    /** Sustain pedal: while down, note-offs are deferred until it is released. */
     void setSustain(bool down) noexcept;
-    /** Fast release of every voice (e.g. before swapping the sample). */
     void releaseAll(float seconds = 0.02f) noexcept;
-    /** Polyphony cap from CPU guardrails, 1..kMaxVoices. Voices above the cap release
-        over half a second; new notes steal within the cap. */
     void setVoiceLimit(int limit) noexcept;
 
     void process(float* left, float* right, int numSamples, float timeScale) noexcept;
@@ -93,7 +71,7 @@ private:
         double pos = 0.0, inc = 1.0;
         int delay = 0;
         float gainL = 0.0f, gainR = 0.0f;
-        int mip = -1; // band-limited level, chosen from |inc| on first read
+        int mip = -1;
     };
 
     struct Grain
@@ -111,7 +89,7 @@ private:
     {
         bool active = false;
         bool held = false;
-        bool sustained = false;    // note released while the pedal was down
+        bool sustained = false;
         int note = 60;
         float playedNote = 60.0f;
         float velocityGain = 1.0f;
@@ -120,18 +98,16 @@ private:
         float env = 0.0f, attackStep = 1.0f, releaseCoeff = 0.999f;
         int age = 0, minLength = 0;
         float pan = 0.0f;
-        double ratio = 1.0;       // playback rate for the played note
+        double ratio = 1.0;
         Random rng;
         std::array<Tap, kMaxTaps> taps {};
         std::array<Grain, kMaxGrains> grains {};
-        // Grain scheduling.
         bool grainsOn = false;
         double centre = 0.0, centreInc = 0.0;
         double grainLength = 0.0;
         double grainInterval = 0.0, nextGrain = 0.0;
         float grainJitter = 0.0f, pitchJitter = 0.0f;
         int grainsStartAt = 0;
-        // Tape.
         float wowPhase = 0.0f, flutterPhase = 0.0f, tapeSpeed = 1.0f;
         OnePole lpL, lpR;
         float level = 0.0f;
@@ -153,5 +129,4 @@ private:
     bool sustainPedal = false;
     int voiceLimit = kMaxVoices;
 };
-
-} // namespace tf::dsp
+}

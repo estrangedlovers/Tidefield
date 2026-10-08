@@ -6,7 +6,6 @@
 #include <cmath>
 
 namespace tf::engine {
-
 SeasonManager::SeasonManager(Engine& e) : engine(e) {}
 
 bool SeasonManager::valid(const Season& s) const
@@ -17,7 +16,6 @@ bool SeasonManager::valid(const Season& s) const
 }
 
 namespace {
-/** Keeps a season in range; a damaged file can hold anything (period 0 would divide by zero). */
 Season sanitised(Season s)
 {
     auto finiteOr = [](float v, float fallback) { return std::isfinite(v) ? v : fallback; };
@@ -28,7 +26,7 @@ Season sanitised(Season s)
         s.shape = Season::Shape::Sine;
     return s;
 }
-} // namespace
+}
 
 bool SeasonManager::set(int index, const Season& season)
 {
@@ -80,5 +78,4 @@ void SeasonManager::publish()
     set->version = ++version;
     dirty = ! engine.publishSeasons(std::move(set));
 }
-
-} // namespace tf::engine
+}

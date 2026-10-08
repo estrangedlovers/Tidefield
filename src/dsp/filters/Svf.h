@@ -7,9 +7,6 @@
 #include <cmath>
 
 namespace tf::dsp {
-
-/** Topology-preserving state-variable filter (Simper/Zavalishin). Stable under fast
-    modulation, which matters because every filter here is drifting all the time. */
 class Svf
 {
 public:
@@ -24,7 +21,6 @@ public:
 
     void reset() noexcept { ic1 = ic2 = 0.0f; }
 
-    /** cutoffHz is clamped below Nyquist; resonance in [0, 1) maps to Q 0.5..~25. */
     void setCutoff(float cutoffHz, float resonance01) noexcept
     {
         cutoff = std::clamp(cutoffHz, 10.0f, fs * 0.49f);
@@ -56,5 +52,4 @@ private:
     float g = 0.0f, k = 2.0f, a1 = 0.0f, a2 = 0.0f, a3 = 0.0f;
     float ic1 = 0.0f, ic2 = 0.0f;
 };
-
-} // namespace tf::dsp
+}

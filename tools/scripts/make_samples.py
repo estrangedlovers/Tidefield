@@ -1,10 +1,4 @@
 #!/usr/bin/env python3
-"""Synthesizes the small built-in sample set in resources/samples.
-
-These are original, generated sounds (no third-party audio), used as default cloud
-and Bloom material and by tests and render scores. Re-run to regenerate:
-    python3 tools/scripts/make_samples.py
-"""
 import math
 import random
 import struct
@@ -27,18 +21,16 @@ def write(name, samples):
 
 
 def glass(seconds=2.0, f0=880.0):
-    """Struck glass: inharmonic partials with independent decays."""
     partials = [(1.0, 1.0, 1.6), (2.32, 0.5, 0.9), (4.25, 0.3, 0.5), (6.63, 0.15, 0.3), (9.38, 0.08, 0.2)]
     out = []
     for i in range(int(seconds * SR)):
         t = i / SR
         s = sum(a * math.exp(-t / d) * math.sin(2 * math.pi * f0 * r * t) for r, a, d in partials)
-        out.append(s * min(1.0, t * 2000))  # 0.5 ms attack
+        out.append(s * min(1.0, t * 2000))
     return out
 
 
 def pluck(seconds=2.5, f0=146.83):
-    """Karplus-Strong string, D3."""
     rng = random.Random(7)
     period = int(SR / f0)
     buf = [rng.uniform(-1, 1) for _ in range(period)]
@@ -52,7 +44,6 @@ def pluck(seconds=2.5, f0=146.83):
 
 
 def breath(seconds=2.0):
-    """Shaped noise swell, like a breath across a bottle."""
     rng = random.Random(3)
     out, lp, bp1, bp2 = [], 0.0, 0.0, 0.0
     f = 2 * math.sin(math.pi * 590.0 / SR)
@@ -68,7 +59,6 @@ def breath(seconds=2.0):
 
 
 def chord(seconds=3.0):
-    """Soft organ-like D minor chord with slow attack, for pad-style clouds."""
     notes = [50, 53, 57, 62]
     out = []
     for i in range(int(seconds * SR)):
@@ -82,18 +72,11 @@ def chord(seconds=3.0):
     return out
 
 
-# ---------------------------------------------------------------------------------------
-# The factory library (resources/samples/library): longer, richer material for the
-# browser. numpy is needed for these; the four core sounds above stay pure Python and
-# bit-identical because tests and scores use them.
-# ---------------------------------------------------------------------------------------
-
 LIB = OUT / "library"
 
 
 def write_np(name, x, stereo=None):
     import numpy as np
-
     LIB.mkdir(parents=True, exist_ok=True)
     chans = [x] if stereo is None else [x, stereo]
     peak = max(1e-9, max(float(np.max(np.abs(c))) for c in chans))
@@ -137,7 +120,6 @@ def library():
         return x * env
 
     def partials(t, f0, spec, wobble=0.0, seed=0):
-        """Sum of (ratio, amp, decay, detune_hz) partials with optional slow pitch wander."""
         r = np.random.default_rng(seed)
         out = np.zeros_like(t)
         for ratio, amp, decay, beat in spec:
@@ -147,38 +129,36 @@ def library():
             out += amp * np.exp(-t / decay) * np.sin(2 * math.pi * np.cumsum(f) / SR + phase)
         return out
 
-    # Singing bowl: beating partial pairs, long ring (A3).
+
     t = t_axis(9.0)
     spec = [(1.0, 1.0, 6.0, 0.0), (1.0, 0.6, 6.0, 1.3), (2.71, 0.5, 4.0, 0.0), (2.71, 0.3, 4.0, 2.1), (5.12, 0.25, 2.2, 0.0), (8.3, 0.1, 1.2, 0.0)]
     bowl = partials(t, hz(57), spec, seed=1) * np.minimum(1, t / 0.01)
     write_np("bowl.wav", fade(bowl, 0.0, 0.3))
 
-    # Kalimba tine (C5): bright click into a sine with a quick 4th partial.
+
     t = t_axis(3.0)
     tine = partials(t, hz(72), [(1.0, 1.0, 1.4, 0), (5.4, 0.35, 0.08, 0), (9.1, 0.15, 0.03, 0)], seed=2)
     write_np("kalimba.wav", fade(tine * np.minimum(1, t / 0.0015), 0.0, 0.2))
 
-    # Felt piano (C4): stretched partials, soft hammer (few highs), damped.
     t = t_axis(5.0)
     B = 0.0004
     spec = [(n * math.sqrt(1 + B * n * n), 0.8 / n ** 1.6, 3.5 / n ** 0.6, 0.0) for n in range(1, 14)]
     piano = partials(t, hz(60), spec, seed=3)
-    piano += 0.004 * rng.standard_normal(len(t)) * np.exp(-t / 0.02)  # felt thump
+    piano += 0.004 * rng.standard_normal(len(t)) * np.exp(-t / 0.02)
     write_np("felt_piano.wav", fade(piano * np.minimum(1, t / 0.004), 0.0, 0.4))
 
-    # Marimba bar (C4): the bar's 1 : 4 : 10 modes.
+
     t = t_axis(2.5)
     marimba = partials(t, hz(60), [(1.0, 1.0, 0.7, 0), (3.93, 0.4, 0.15, 0), (9.2, 0.15, 0.05, 0)], seed=4)
     write_np("marimba.wav", fade(marimba * np.minimum(1, t / 0.002), 0.0, 0.2))
 
-    # FM bell (A4).
+
     t = t_axis(5.0)
     env = np.exp(-t / 1.6)
     mod = 2.6 * np.exp(-t / 0.9) * np.sin(2 * math.pi * hz(69) * 1.4 * t)
     bell = env * np.sin(2 * math.pi * hz(69) * t + mod) * np.minimum(1, t / 0.002)
     write_np("bell.wav", fade(bell, 0.0, 0.3))
 
-    # Wind chimes: a cluster of small tubes struck at random times, pentatonic on D.
     t = t_axis(7.0)
     chimes = np.zeros_like(t)
     notes = [74, 76, 78, 81, 83, 86, 88, 90]
@@ -190,7 +170,6 @@ def library():
         chimes[start:] += hit * rng.uniform(0.25, 1.0) * np.minimum(1, tt / 0.001)
     write_np("wind_chimes.wav", fade(chimes, 0.0, 0.5))
 
-    # Choir "aah" pad (D3 + A3): sawtooth ensemble through vowel formants.
     t = t_axis(7.0)
     voices = np.zeros_like(t)
     for k, n in enumerate([50, 50, 57, 57, 62]):
@@ -204,7 +183,7 @@ def library():
     env = np.minimum(1, t / 1.2) * np.minimum(1, (t[-1] - t) / 1.5)
     write_np("choir.wav", choir * env)
 
-    # Bowed strings pad (D2 fifth): filtered saw ensemble, slow bow.
+
     t = t_axis(8.0)
     saw = np.zeros_like(t)
     for k, n in enumerate([38, 45, 50, 57]):
@@ -216,7 +195,6 @@ def library():
     env = np.minimum(1, t / 2.0) * np.minimum(1, (t[-1] - t) / 2.0)
     write_np("bowed_strings.wav", strings * env)
 
-    # Reed organ / harmonium (C4 + G4).
     t = t_axis(6.0)
     reed = np.zeros_like(t)
     for n in (60, 67, 72):
@@ -225,13 +203,13 @@ def library():
     env = np.minimum(1, t / 0.25) * np.minimum(1, (t[-1] - t) / 0.8)
     write_np("harmonium.wav", onepole(reed, 3000.0) * env)
 
-    # Sub organ (D2): sine and octave, no attack, a floor under everything.
+
     t = t_axis(6.0)
     sub = np.sin(2 * math.pi * hz(38) * t) + 0.35 * np.sin(2 * math.pi * hz(50) * t) + 0.12 * np.sin(2 * math.pi * hz(57) * t)
     env = np.minimum(1, t / 1.0) * np.minimum(1, (t[-1] - t) / 1.0)
     write_np("sub_organ.wav", sub * env)
 
-    # Shimmer: drifting high harmonics of D, like light on water.
+
     t = t_axis(9.0)
     shim = np.zeros_like(t)
     for k, n in enumerate([74, 81, 86, 90, 93, 98]):
@@ -240,14 +218,14 @@ def library():
     env = np.minimum(1, t / 1.5) * np.minimum(1, (t[-1] - t) / 1.5)
     write_np("shimmer.wav", shim * env)
 
-    # Ocean wash: noise swelling and drawing back, darker as it recedes (stereo).
+
     t = t_axis(10.0)
     swell = (0.5 - 0.5 * np.cos(2 * math.pi * t / 10.0)) ** 1.5
     left = onepole(rng.standard_normal(len(t)), 900.0) + 0.25 * onepole(rng.standard_normal(len(t)), 4000.0) * swell
     right = onepole(rng.standard_normal(len(t)), 900.0) + 0.25 * onepole(rng.standard_normal(len(t)), 4000.0) * swell
     write_np("ocean.wav", left * swell, right * swell)
 
-    # Rain on leaves: thousands of tiny resonant drops (stereo).
+
     t = t_axis(8.0)
     rain = [np.zeros_like(t), np.zeros_like(t)]
     for k in range(2500):
@@ -262,7 +240,7 @@ def library():
     bed = 0.08 * onepole(rng.standard_normal(len(t)), 2500.0)
     write_np("rain_leaves.wav", fade(rain[0] + bed, 0.3, 0.3), fade(rain[1] + bed, 0.3, 0.3))
 
-    # Tape dust: hiss, crackle and the odd pop, for texture under everything (stereo).
+
     t = t_axis(6.0)
     hiss = 0.05 * onepole(rng.standard_normal(len(t)), 7000.0)
     crackle = np.zeros_like(t)

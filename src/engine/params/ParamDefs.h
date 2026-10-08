@@ -3,28 +3,20 @@
 #include "../control/ControlEvent.h"
 
 namespace tf::engine {
-
 enum class Taper : unsigned char { Linear, Log, Decibel };
 enum class Smoothing : unsigned char { Linear, Exponential, LogExponential };
 
-/** Flags describing how a parameter participates in the rest of the system. */
 namespace ParamFlag {
 inline constexpr unsigned kNone = 0;
-inline constexpr unsigned kTerrainBound = 1u << 0; // scenes and the terrain may set it
+inline constexpr unsigned kTerrainBound = 1u << 0;
 inline constexpr unsigned kMidiLearnable = 1u << 1;
-inline constexpr unsigned kTideScaled = 1u << 2;    // a rate that follows Tide
-inline constexpr unsigned kPerformance = 1u << 3;   // shown in the performance view
-inline constexpr unsigned kDiscrete = 1u << 4;      // integer choice; scenes pick, never blend
-} // namespace ParamFlag
-
-// clang-format off
-// X(enumName, "stable.id", "Display Name", min, max, default, Taper, Smoothing, smoothSeconds, "unit", flags)
-// IDs are persisted in session files: never rename one without adding a migration.
-// Display names inside a strip/slot are short ("Level"): the UI shows the group name.
+inline constexpr unsigned kTideScaled = 1u << 2;
+inline constexpr unsigned kPerformance = 1u << 3;
+inline constexpr unsigned kDiscrete = 1u << 4;
+}
 
 #define TF_TB_ML (kTerrainBound | kMidiLearnable)
 
-/** Mixer strip: level, pan, width, post-fader sends to bus A (reverb) and B (delay). */
 #define TF_STRIP(X, Name, id, level, sendA, sendB)                                                                          \
     X(Name##Level, id ".level", "Level",       -60.0f, 6.0f, level, Decibel, Linear, 0.05f, "dB", TF_TB_ML | kPerformance) \
     X(Name##Pan,   id ".pan",   "Pan",          -1.0f, 1.0f,  0.0f, Linear,  Linear, 0.05f, "",   TF_TB_ML)                 \
@@ -32,7 +24,6 @@ inline constexpr unsigned kDiscrete = 1u << 4;      // integer choice; scenes pi
     X(Name##SendA, id ".sendA", "Reverb Send", -60.0f, 0.0f, sendA, Decibel, Linear, 0.05f, "dB", TF_TB_ML)                 \
     X(Name##SendB, id ".sendB", "Delay Send",  -60.0f, 0.0f, sendB, Decibel, Linear, 0.05f, "dB", TF_TB_ML)
 
-/** FX slot: six generic controls (meaning set by the loaded processor) and mix. */
 #define TF_FX_SLOT(X, Name, id)                                                                               \
     X(Name##P1,  id ".p1",  "Control 1", 0.0f, 1.0f, 0.5f, Linear, Exponential, 0.08f, "", TF_TB_ML)          \
     X(Name##P2,  id ".p2",  "Control 2", 0.0f, 1.0f, 0.5f, Linear, Exponential, 0.08f, "", TF_TB_ML)          \
@@ -42,7 +33,6 @@ inline constexpr unsigned kDiscrete = 1u << 4;      // integer choice; scenes pi
     X(Name##P6,  id ".p6",  "Control 6", 0.0f, 1.0f, 0.5f, Linear, Exponential, 0.08f, "", TF_TB_ML)          \
     X(Name##Mix, id ".mix", "Mix",       0.0f, 1.0f, 1.0f, Linear, Linear,      0.05f, "", TF_TB_ML)
 
-/** Granular cloud slot. */
 #define TF_CLOUD(X, Name, id)                                                                                                      \
     X(Name##Density,     id ".density",     "Density",      0.5f, 200.0f, 12.0f, Log,    LogExponential, 0.3f, "/s", TF_TB_ML | kPerformance) \
     X(Name##GrainMs,     id ".grainMs",     "Grain Size",  10.0f, 2000.0f, 180.0f, Log,  LogExponential, 0.3f, "ms", TF_TB_ML)  \
@@ -195,7 +185,6 @@ inline constexpr unsigned kDiscrete = 1u << 4;      // integer choice; scenes pi
     TF_FX_SLOT(X, BusAFx1,   "busA.fx1")   TF_FX_SLOT(X, BusAFx2,   "busA.fx2")   \
     TF_FX_SLOT(X, BusBFx1,   "busB.fx1")   TF_FX_SLOT(X, BusBFx2,   "busB.fx2")   \
     TF_FX_SLOT(X, MasterFx1, "master.fx1") TF_FX_SLOT(X, MasterFx2, "master.fx2")
-// clang-format on
 
 enum class P : ParamIndex
 {
@@ -208,5 +197,4 @@ enum class P : ParamIndex
 inline constexpr ParamIndex kNumParams = static_cast<ParamIndex>(P::Count);
 
 constexpr ParamIndex idx(P p) noexcept { return static_cast<ParamIndex>(p); }
-
-} // namespace tf::engine
+}

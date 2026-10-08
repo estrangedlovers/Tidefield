@@ -15,7 +15,6 @@ using namespace tf::engine;
 using Catch::Approx;
 
 namespace {
-
 constexpr double kFs = 48000.0;
 constexpr int kBlock = 256;
 
@@ -27,13 +26,11 @@ float rms(const float* x, std::size_t n)
     return static_cast<float>(std::sqrt(sum / static_cast<double>(std::max<std::size_t>(1, n))));
 }
 
-/** Runs the engine block by block and drains its record tap after every block, the
-    way the disk writer would (only faster). */
 struct RecordRig
 {
     Engine engine;
     std::vector<float> outL, outR;
-    std::vector<std::vector<float>> recorded; // per channel
+    std::vector<std::vector<float>> recorded;
     std::vector<float> scratch;
 
     RecordRig()
@@ -72,18 +69,17 @@ struct RecordRig
                     recorded[c].push_back(scratch[static_cast<std::size_t>(i) * stride + c]);
     }
 };
-
-} // namespace
+}
 
 TEST_CASE("RecordTap moves through its states and keeps channels in step", "[record]")
 {
     RecordTap tap;
-    tap.prepare(1000.0, 0.1); // 100 frames of headroom at full width
+    tap.prepare(1000.0, 0.1);
     REQUIRE(tap.getState() == RecordTap::State::Idle);
-    REQUIRE(tap.beginBlock() == 0); // idle: nothing to push
+    REQUIRE(tap.beginBlock() == 0);
 
     REQUIRE(tap.begin(false));
-    REQUIRE_FALSE(tap.begin(false)); // already running
+    REQUIRE_FALSE(tap.begin(false));
     REQUIRE(tap.beginBlock() == 2);
 
     std::vector<float> a(10), b(10);
@@ -104,9 +100,9 @@ TEST_CASE("RecordTap moves through its states and keeps channels in step", "[rec
 
     tap.end();
     REQUIRE(tap.getState() == RecordTap::State::Stopping);
-    REQUIRE(tap.beginBlock() == 0); // producer acknowledges: nothing more is pushed
+    REQUIRE(tap.beginBlock() == 0);
     REQUIRE(tap.getState() == RecordTap::State::Stopped);
-    tap.push(ch, 10); // ignored
+    tap.push(ch, 10);
     REQUIRE(tap.read(out.data(), 64) == 6);
     CHECK(out[0] == 4.0f);
     REQUIRE(tap.read(out.data(), 64) == 0);
@@ -117,18 +113,18 @@ TEST_CASE("RecordTap moves through its states and keeps channels in step", "[rec
 TEST_CASE("RecordTap drops whole blocks when the writer falls behind", "[record]")
 {
     RecordTap tap;
-    tap.prepare(1000.0, 0.01); // 10 frames at full width = 110 frames at stride 2
+    tap.prepare(1000.0, 0.01);
     REQUIRE(tap.begin(false));
     std::vector<float> a(50, 1.0f);
     const float* ch[2] = { a.data(), a.data() };
     REQUIRE(tap.beginBlock() == 2);
     tap.push(ch, 50);
     tap.push(ch, 50);
-    tap.push(ch, 50); // does not fit
+    tap.push(ch, 50);
     CHECK(tap.getDroppedFrames() == 50);
     std::vector<float> out(400);
     CHECK(tap.read(out.data(), 200) == 100);
-    tap.push(ch, 50); // fits again
+    tap.push(ch, 50);
     CHECK(tap.read(out.data(), 200) == 50);
 }
 
@@ -146,7 +142,6 @@ TEST_CASE("Recording captures exactly what the engine outputs", "[record]")
 
     REQUIRE(rig.recorded.size() == 2);
     const auto frames = rig.recorded[0].size();
-    // Starts on the first block after begin(), ends on the first block after end().
     REQUIRE(frames == static_cast<std::size_t>(static_cast<int>(2.0 * kFs / kBlock) * kBlock));
     for (std::size_t i = 0; i < frames; ++i)
     {
@@ -171,10 +166,9 @@ TEST_CASE("Stems carry each strip and the bus returns", "[record]")
     const auto n = rig.recorded[0].size();
     auto stemRms = [&](int pair) { return rms(rig.recorded[static_cast<std::size_t>(2 + 2 * pair)].data(), n); };
     CHECK(stemRms(static_cast<int>(StripId::Drone)) > 1.0e-3f);
-    CHECK(stemRms(static_cast<int>(StripId::Input)) == 0.0f); // no input signal
-    CHECK(stemRms(kNumStrips) > 1.0e-5f);                       // reverb return
+    CHECK(stemRms(static_cast<int>(StripId::Input)) == 0.0f);
+    CHECK(stemRms(kNumStrips) > 1.0e-5f);
 
-    // The stems add up to the mix (before the master chain, so compare loosely).
     std::vector<float> sum(n, 0.0f);
     for (int pair = 0; pair < RecordTap::kStemPairs; ++pair)
         for (std::size_t i = 0; i < n; ++i)
@@ -221,32 +215,29 @@ TEST_CASE("DegradationPolicy steps down fast, back up slowly, with back-off", "[
     };
 
     feed(0.6f, 5.0f);
-    CHECK(policy.getLevel() == 0); // between the thresholds: hold
+    CHECK(policy.getLevel() == 0);
 
     feed(0.9f, 0.3f);
-    CHECK(policy.getLevel() == 0); // not yet sustained
+    CHECK(policy.getLevel() == 0);
     feed(0.9f, 0.2f);
     CHECK(policy.getLevel() == 1);
 
     feed(0.3f, 5.0f);
-    CHECK(policy.getLevel() == 1); // smoothed load needs ~0.7 s to fall, then a 6 s hold
+    CHECK(policy.getLevel() == 1);
     feed(0.3f, 2.0f);
     CHECK(policy.getLevel() == 0);
 
-    // Pumping: high again right after stepping up doubles the next hold.
     feed(0.9f, 0.5f);
     CHECK(policy.getLevel() == 1);
     feed(0.3f, 7.0f);
-    CHECK(policy.getLevel() == 1); // would have stepped at ~6.7 s without back-off
+    CHECK(policy.getLevel() == 1);
     feed(0.3f, 6.0f);
     CHECK(policy.getLevel() == 0);
 
-    // One block far over budget steps at once.
     feed(0.1f, 1.0f);
     REQUIRE(policy.update(1.6f, dt));
     CHECK(policy.getLevel() == 1);
 
-    // Never past the last level.
     feed(2.0f, 10.0f);
     CHECK(policy.getLevel() == kMaxGuardLevel);
     CHECK_FALSE(policy.update(std::nanf(""), dt));
@@ -271,7 +262,7 @@ TEST_CASE("Engine guardrails follow load and report it", "[guard]")
 
     run(0.5);
     CHECK(f.guardLevel == 0);
-    CHECK(f.dspLoad == 0.0f); // not measured while off
+    CHECK(f.dspLoad == 0.0f);
 
     engine.setGuardrailsEnabled(true);
     engine.forceLoadForTesting(1.2f);
@@ -283,7 +274,7 @@ TEST_CASE("Engine guardrails follow load and report it", "[guard]")
     run(8.0);
     CHECK(f.guardLevel == kMaxGuardLevel - 1);
 
-    engine.setGuardrailsEnabled(false); // off: straight back to full quality
+    engine.setGuardrailsEnabled(false);
     run(0.1);
     CHECK(f.guardLevel == 0);
 }
@@ -310,9 +301,9 @@ TEST_CASE("Lowering the resonator's mode count rings out instead of cutting", "[
     bank.setModeLimit(1);
     bank.process(ex.data(), l.data(), r.data(), kBlock, 1.0f);
     const float justAfter = rms(l.data(), 96);
-    CHECK(justAfter > 0.5f * before); // no sudden drop (a cut lost ~90 % of the modes here)
+    CHECK(justAfter > 0.5f * before);
 
-    for (int b = 0; b < 40; ++b) // ~0.2 s later the cut modes are gone
+    for (int b = 0; b < 40; ++b)
         bank.process(ex.data(), l.data(), r.data(), kBlock, 1.0f);
     CHECK(rms(l.data(), kBlock) < 0.5f * before);
 }

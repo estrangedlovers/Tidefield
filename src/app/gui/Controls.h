@@ -6,15 +6,6 @@
 #include <functional>
 
 namespace tf::app::gui {
-
-/** Base for controls bound to one parameter. Shared behaviour, the same everywhere:
-      drag            change (Shift: fine)
-      double-click    default
-      Alt/Opt-click   hand back to the terrain (when held in the live layer)
-      right-click     MIDI learn / forget, release, reset
-    Yellow means held in the live layer, pink means waiting for a MIDI controller, and
-    an arrow shows which way to turn a controller that has not picked up yet. Hovering
-    explains the control in the status bar. */
 class ParamComponent : public juce::Component, public Animated
 {
 public:
@@ -32,7 +23,6 @@ public:
     void mouseWheelMove(const juce::MouseEvent& e, const juce::MouseWheelDetails& w) override;
 
 protected:
-    /** Normalised 0..1 position of the current value (taper applied). */
     float norm() const { return model.toNorm(param, model.value(param)); }
     void setNorm(float n) { model.set(param, model.fromNorm(param, juce::jlimit(0.0f, 1.0f, n))); }
     juce::Colour valueColour() const;
@@ -50,7 +40,6 @@ private:
     int framesSincePaint = 0;
 };
 
-/** Rotary: a 270-degree arc with the value under it. */
 class Knob final : public ParamComponent
 {
 public:
@@ -58,15 +47,13 @@ public:
     void paint(juce::Graphics& g) override;
     void mouseDrag(const juce::MouseEvent& e) override;
 
-    /** Overrides the formatted value (FX slot controls format through their processor). */
     std::function<juce::String(float)> formatter;
     void tick() override;
 
 private:
-    juce::String lastText; // a formatter can change its text without the value moving (tempo sync)
+    juce::String lastText;
 };
 
-/** Tall vertical fader for the performance macros. */
 class Fader final : public ParamComponent
 {
 public:
@@ -76,7 +63,6 @@ public:
     void mouseDown(const juce::MouseEvent& e) override;
 };
 
-/** On/off switch for a discrete 0/1 parameter. */
 class Toggle final : public ParamComponent
 {
 public:
@@ -89,7 +75,6 @@ private:
     juce::Colour onColour;
 };
 
-/** A row (or grid) of choices for a discrete parameter. */
 class Choice final : public ParamComponent
 {
 public:
@@ -106,18 +91,17 @@ private:
     int columns;
 };
 
-/** A performance pad: a big square-ish button, lit by a level, optionally held. */
 class Pad final : public juce::Component, public Animated
 {
 public:
     Pad(Model& m, juce::String title, juce::String sub, juce::Colour colour, juce::String help);
     ~Pad() override;
 
-    std::function<void()> onPress, onRelease;   // press/release (hold gestures)
-    std::function<void()> onMenu;               // right-click
-    std::function<float()> level;               // 0..1 glow
-    std::function<bool()> lit;                  // latched on
-    std::function<juce::String()> subText;      // live sub-line
+    std::function<void()> onPress, onRelease;
+    std::function<void()> onMenu;
+    std::function<float()> level;
+    std::function<bool()> lit;
+    std::function<juce::String()> subText;
     juce::String keyCap;
 
     void paint(juce::Graphics& g) override;
@@ -135,7 +119,6 @@ private:
     juce::String shownSub;
 };
 
-/** A small flat text button. */
 class FlatButton final : public juce::Button
 {
 public:
@@ -149,5 +132,4 @@ private:
     Model* model = nullptr;
     juce::String help;
 };
-
-} // namespace tf::app::gui
+}

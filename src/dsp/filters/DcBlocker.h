@@ -6,8 +6,6 @@
 #include <cmath>
 
 namespace tf::dsp {
-
-/** First-order DC blocker: y[n] = x[n] - x[n-1] + R * y[n-1]. */
 class DcBlocker
 {
 public:
@@ -32,5 +30,4 @@ private:
     float x1 = 0.0f;
     float y1 = 0.0f;
 };
-
-} // namespace tf::dsp
+}

@@ -7,8 +7,6 @@
 #include <vector>
 
 namespace {
-
-/** A minimal JUCE plugin processor, standing in for the user's shimmer or fuzz. */
 class TestGainProcessor final : public juce::AudioProcessor
 {
 public:
@@ -40,8 +38,7 @@ public:
     juce::AudioParameterFloat* tone = nullptr;
     bool prepared = false;
 };
-
-} // namespace
+}
 
 TEST_CASE("A JUCE AudioProcessor registers as an FX type and processes in place", "[fxjuce]")
 {
@@ -51,7 +48,7 @@ TEST_CASE("A JUCE AudioProcessor registers as an FX type and processes in place"
     const auto* info = tf::dsp::ProcessorFactory::instance().find("test.gain");
     REQUIRE(info != nullptr);
     CHECK(std::string(info->name) == "Test Gain");
-    CHECK(std::string(info->controls[0].name) == "Tone"); // in the order asked for
+    CHECK(std::string(info->controls[0].name) == "Tone");
     CHECK(std::string(info->controls[1].name) == "Gain");
     CHECK(info->controls[1].defaultValue == Catch::Approx(0.5f));
     CHECK(info->controls[2].display.curve == tf::dsp::DisplayMap::Curve::Hidden);
@@ -64,10 +61,10 @@ TEST_CASE("A JUCE AudioProcessor registers as an FX type and processes in place"
     CHECK(hosted->getProcessor().prepared);
 
     p->setControls({ 0.2f, 0.25f, 0.0f, 0.0f, 0.0f, 0.0f }, {});
-    hosted->flushParameters(); // the message-thread timer's job
+    hosted->flushParameters();
     CHECK(hosted->getProcessor().gain->get() == Catch::Approx(0.25f));
 
-    std::vector<float> l(600, 1.0f), r(600, -1.0f); // more than one prepared block
+    std::vector<float> l(600, 1.0f), r(600, -1.0f);
     p->process(l.data(), r.data(), 600);
     CHECK(l[0] == Catch::Approx(0.25f));
     CHECK(l[599] == Catch::Approx(0.25f));

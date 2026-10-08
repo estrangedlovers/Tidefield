@@ -15,7 +15,6 @@ using namespace tf::engine;
 using Catch::Approx;
 
 namespace {
-
 constexpr double kFs = 48000.0;
 
 struct Rig
@@ -30,7 +29,6 @@ struct Rig
         engine.command(Command::FadeIn);
     }
 
-    /** Renders `seconds`, optionally feeding `input` as the live input. Returns left. */
     std::vector<float> run(double seconds, const std::vector<float>* input = nullptr, TelemetryFrame* last = nullptr, int block = 256)
     {
         const int total = static_cast<int>(seconds * kFs);
@@ -81,8 +79,7 @@ std::unique_ptr<tf::dsp::SampleBuffer> tone(float hz, float seconds)
         b->left[i] = 0.5f * std::sin(tf::dsp::kTwoPi * hz * static_cast<float>(i) / static_cast<float>(kFs));
     return b;
 }
-
-} // namespace
+}
 
 TEST_CASE("Default FX layout: reverb on bus A, delay on bus B")
 {
@@ -100,9 +97,9 @@ TEST_CASE("Reverb send keeps sounding after the source stops")
     Rig rig;
     rig.fx.loadDefaultLayout();
     rig.engine.setParam(P::ResLevel, -60.0f);
-    rig.engine.setParam(P::DroneSendA, 0.0f); // full send
+    rig.engine.setParam(P::DroneSendA, 0.0f);
     rig.run(4.0);
-    rig.engine.setParam(P::DroneLevel, -60.0f); // dry gone, sends are post-fader...
+    rig.engine.setParam(P::DroneLevel, -60.0f);
     auto withSend = rig.run(0.3);
 
     Rig dry;
@@ -112,8 +109,6 @@ TEST_CASE("Reverb send keeps sounding after the source stops")
     dry.engine.setParam(P::DroneLevel, -60.0f);
     auto withoutSend = dry.run(0.3);
 
-    // Post-fader sends: muting the strip also stops new input to the bus, but the
-    // reverb tail continues while the dry signal is gone.
     REQUIRE(rms(withSend, 9600, withSend.size()) > rms(withoutSend, 9600, withoutSend.size()) * 10.0f);
 }
 
@@ -126,7 +121,7 @@ TEST_CASE("Swapping FX types mid-signal crossfades without clicks or NaN")
     for (int round = 0; round < 6; ++round)
     {
         const char* types[] = { "tf.medium", "", "tf.delay", "tf.reverb", "tf.medium", "" };
-        rig.fx.setType(0, types[round]); // drone insert 1
+        rig.fx.setType(0, types[round]);
         rig.fx.setType(kMasterSlot, types[(round + 2) % 6]);
         const auto out = rig.run(0.25);
         for (float x : out)
@@ -174,14 +169,13 @@ TEST_CASE("Live input is silent until armed but always excites the resonator")
     rig.engine.setParam(P::ResRain, 0.0f);
     TelemetryFrame f;
     auto out = rig.run(1.0, &input, &f);
-    REQUIRE(rms(out, 24000, out.size()) < 1.0e-5f); // not armed
+    REQUIRE(rms(out, 24000, out.size()) < 1.0e-5f);
     REQUIRE(f.inputLevel > 0.2f);
 
     rig.engine.setParam(P::InputArmed, 1.0f);
     out = rig.run(1.0, &input);
     REQUIRE(rms(out, 24000, out.size()) > 0.05f);
 
-    // Resonator fed from the input, with the input itself disarmed.
     rig.engine.setParam(P::InputArmed, 0.0f);
     rig.engine.setParam(P::ResLevel, 0.0f);
     rig.engine.setParam(P::ResExciteInput, 1.0f);
@@ -195,8 +189,8 @@ TEST_CASE("Key changes migrate drone voices gradually into the new key")
     rig.engine.setParam(P::DroneDensity, 6.0f);
     rig.engine.setParam(P::DroneEvolve, 0.0f);
     rig.engine.setParam(P::HarmonyGravity, 1.0f);
-    rig.engine.setParam(P::HarmonyScale, 10.0f); // fifths only: root and 5th
-    rig.engine.setParam(P::HarmonyRoot, 2.0f);   // D
+    rig.engine.setParam(P::HarmonyScale, 10.0f);
+    rig.engine.setParam(P::HarmonyRoot, 2.0f);
     rig.engine.setParam(P::HarmonyMorph, 10.0f);
     TelemetryFrame f;
     rig.run(4.0, nullptr, &f);
@@ -207,7 +201,7 @@ TEST_CASE("Key changes migrate drone voices gradually into the new key")
     for (int v = 0; v < 6; ++v)
         REQUIRE(inKey(f.droneVoiceNote[static_cast<size_t>(v)], 2));
 
-    rig.engine.setParam(P::HarmonyRoot, 3.0f); // D#: every D-fifths note must move
+    rig.engine.setParam(P::HarmonyRoot, 3.0f);
     rig.run(5.0, nullptr, &f);
     REQUIRE(f.harmonyMorph > 0.3f);
     REQUIRE(f.harmonyMorph < 0.7f);
@@ -231,7 +225,7 @@ TEST_CASE("Tide speeds up and slows down autonomous motion")
         rig.engine.setParam(P::TideRate, tideRate);
         rig.engine.setParam(P::TerrainWander, 1.0f);
         rig.engine.setParam(P::TerrainWanderRate, 0.1f);
-        rig.run(2.0); // tide smoothing settles
+        rig.run(2.0);
         float distance = 0.0f;
         TelemetryFrame f, prev;
         rig.run(0.05, nullptr, &prev);
@@ -254,7 +248,7 @@ TEST_CASE("Medium on the master is heard even when every source is silent")
     auto out = rig.run(1.0);
     REQUIRE(rms(out, 24000, out.size()) < 1.0e-6f);
 
-    rig.engine.setParam(P::MediumType, 2.0f); // vinyl
+    rig.engine.setParam(P::MediumType, 2.0f);
     rig.engine.setParam(P::MediumNoise, 1.0f);
     rig.engine.setParam(P::MediumAge, 0.8f);
     out = rig.run(2.0);
@@ -276,7 +270,7 @@ TEST_CASE("Full engine with every source and slot active never allocates")
     rig.engine.setParam(P::MediumType, 1.0f);
     rig.engine.setParam(P::TerrainWander, 1.0f);
     std::vector<float> input(4800, 0.1f);
-    rig.run(1.0, &input, nullptr, 512); // let snapshots, processors and buffers land
+    rig.run(1.0, &input, nullptr, 512);
 
     std::vector<float> l(512), r(512), in(512, 0.2f);
     float* outs[2] = { l.data(), r.data() };

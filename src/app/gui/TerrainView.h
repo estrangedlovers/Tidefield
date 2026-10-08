@@ -7,26 +7,11 @@
 #include <vector>
 
 namespace tf::app::gui {
-
-/** Glide, rename, update, fold in, delete: the menu for one scene. */
 void showSceneMenu(Model& model, int scene, juce::Component* owner);
 
-/** The performance surface. Scenes are coloured places; each one's light grows with
-    how much of the sound it is shaping right now. The performer's cursor is the
-    crosshair; the sound itself (cursor plus wander) is the bright point, with a trail,
-    grains drifting off it, drone voices orbiting it, ripples when the resonator is
-    struck and blooms when Bloom plays.
-
-      drag empty space     move the sound there (it glides)
-      click a scene        glide to it      Shift-click: jump
-      drag a scene         move it
-      double-click         capture what you hear as a new scene, right there
-      right-click a scene  rename, update, delete
-      Draw (P)             draw a loop; the sound travels it on its own (Path wander) */
 class TerrainView final : public juce::Component, public Animated
 {
 public:
-    /** presentation: the projector's view, with no buttons, labels or hints. */
     explicit TerrainView(Model& model, bool presentation = false);
     ~TerrainView() override;
 
@@ -41,7 +26,6 @@ public:
     void mouseMove(const juce::MouseEvent& e) override;
     void mouseExit(const juce::MouseEvent& e) override;
 
-    /** Path drawing: while on, a drag records a loop instead of moving the cursor. */
     void setDrawMode(bool on);
     bool isDrawMode() const noexcept { return drawMode; }
 
@@ -68,8 +52,8 @@ private:
     void setCursorTo(juce::Point<float> s);
 
     Model& model;
-    juce::Image backdrop;  // grid and contours, redrawn on resize only
-    juce::Image glowLayer; // the glows, at a quarter resolution
+    juce::Image backdrop;
+    juce::Image glowLayer;
     double lastTime = 0.0;
     float energy = 0.0f, tidePhase = 0.0f, orbit = 0.0f;
     engine::Point2 shownPos { 0.5f, 0.5f }, shownCursor { 0.5f, 0.5f };
@@ -88,15 +72,13 @@ private:
     bool drawMode = false;
     const bool presentation;
 public:
-    /** Projector: a double-click toggles full screen instead of capturing. */
     std::function<void()> onDoubleClick;
 private:
     std::vector<engine::Point2> drawing;
-    std::vector<engine::Point2> shownPath; // the loop the engine follows, if any
+    std::vector<engine::Point2> shownPath;
     std::uint64_t shownPathVersion = 0;
     std::uint64_t shownSceneVersion = ~std::uint64_t { 0 };
-    bool needsRepaint = true; // something changed that the motion check cannot see
+    bool needsRepaint = true;
     FlatButton drawButton { "Draw path", display::tide() }, clearButton { "Clear path" };
 };
-
-} // namespace tf::app::gui
+}

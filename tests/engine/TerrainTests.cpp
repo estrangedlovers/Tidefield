@@ -17,9 +17,6 @@ using namespace tf::engine;
 using Catch::Approx;
 
 namespace {
-
-/** Runs the engine for `seconds`, draining queues like the UI would, and returns the
-    last telemetry frame. */
 TelemetryFrame run(Engine& engine, double seconds, SceneManager* scenes = nullptr, int block = 256)
 {
     std::vector<float> l(static_cast<size_t>(block)), r(static_cast<size_t>(block));
@@ -52,8 +49,7 @@ Scene makeScene(const ParamRegistry& reg, float x, float y, float cutoff, float 
 }
 
 float target(const TelemetryFrame& f, P p) { return f.paramTargets[idx(p)]; }
-
-} // namespace
+}
 
 TEST_CASE("SnapshotChannel hands over, retires and bounds in-flight snapshots")
 {
@@ -61,20 +57,20 @@ TEST_CASE("SnapshotChannel hands over, retires and bounds in-flight snapshots")
     REQUIRE(ch.current() == nullptr);
     REQUIRE(ch.publish(std::make_unique<int>(1)));
     REQUIRE(ch.publish(std::make_unique<int>(2)));
-    REQUIRE_FALSE(ch.publish(std::make_unique<int>(3))); // two in flight, capacity 2
+    REQUIRE_FALSE(ch.publish(std::make_unique<int>(3)));
 
     {
         const tf::test::ScopedAllocationCounter counter;
         REQUIRE(ch.acquire());
         REQUIRE(counter.count() == 0);
     }
-    REQUIRE(*ch.current() == 2); // newest wins, 1 retired
+    REQUIRE(*ch.current() == 2);
 
-    ch.collectGarbage();          // frees 1
+    ch.collectGarbage();
     REQUIRE(ch.publish(std::make_unique<int>(3)));
     REQUIRE(ch.acquire());
     REQUIRE(*ch.current() == 3);
-    REQUIRE_FALSE(ch.acquire());  // nothing new
+    REQUIRE_FALSE(ch.acquire());
 }
 
 TEST_CASE("IDW weights sum to one and favour the nearest scene")
@@ -95,7 +91,6 @@ TEST_CASE("IDW weights sum to one and favour the nearest scene")
     terrain::computeWeights(set, { 0.5f, 0.0f }, 2.5f, w.data());
     REQUIRE(w[0] == Approx(w[1]));
 
-    // Higher focus makes a scene's island larger.
     std::array<float, kMaxScenes> soft {}, sharp {};
     terrain::computeWeights(set, { 0.2f, 0.1f }, 1.0f, soft.data());
     terrain::computeWeights(set, { 0.2f, 0.1f }, 6.0f, sharp.data());
@@ -113,7 +108,7 @@ TEST_CASE("Log columns interpolate evenly in pitch; discrete columns never blend
 
     std::array<float, kMaxScenes> w {};
     terrain::computeWeights(set, { 0.5f, 0.5f }, 2.0f, w.data());
-    REQUIRE(terrain::blendColumn(set, 0, w.data()) == Approx(400.0f).epsilon(0.001)); // geometric mean
+    REQUIRE(terrain::blendColumn(set, 0, w.data()) == Approx(400.0f).epsilon(0.001));
     terrain::computeWeights(set, { 0.6f, 0.5f }, 2.0f, w.data());
     REQUIRE(terrain::blendColumn(set, 1, w.data()) == 2.0f);
 }
@@ -140,7 +135,7 @@ TEST_CASE("Moving the cursor morphs every terrain-bound parameter between scenes
 
     engine.setParam(P::TerrainX, 0.5f);
     f = run(engine, 1.0);
-    REQUIRE(target(f, P::DroneCutoff) == Approx(1264.9f).epsilon(0.01)); // sqrt(200 * 8000)
+    REQUIRE(target(f, P::DroneCutoff) == Approx(1264.9f).epsilon(0.01));
     REQUIRE(target(f, P::DroneDensity) == Approx(3.5f).epsilon(0.01));
 }
 
@@ -154,8 +149,8 @@ TEST_CASE("Glide makes the cursor travel, not jump")
     engine.setParam(P::TerrainGlide, 2.0f);
     engine.setParam(P::TerrainX, 1.0f);
     const auto f = run(engine, 0.5);
-    REQUIRE(f.cursor.x > 0.5f);   // moving toward 1 from the default 0.5
-    REQUIRE(f.cursor.x < 0.75f);  // but not there yet after a quarter of the glide time
+    REQUIRE(f.cursor.x > 0.5f);
+    REQUIRE(f.cursor.x < 0.75f);
 }
 
 TEST_CASE("Live layer overrides the terrain until released")
@@ -169,15 +164,15 @@ TEST_CASE("Live layer overrides the terrain until released")
     engine.setParam(P::TerrainX, 0.0f);
     run(engine, 0.5);
 
-    engine.setParam(P::DroneCutoff, 3000.0f); // performer grabs the knob
+    engine.setParam(P::DroneCutoff, 3000.0f);
     auto f = run(engine, 0.2);
     REQUIRE(f.live[idx(P::DroneCutoff)] == 1);
     REQUIRE(target(f, P::DroneCutoff) == Approx(3000.0f));
 
-    engine.setParam(P::TerrainX, 1.0f); // terrain moves; the held knob does not
+    engine.setParam(P::TerrainX, 1.0f);
     f = run(engine, 1.0);
     REQUIRE(target(f, P::DroneCutoff) == Approx(3000.0f));
-    REQUIRE(target(f, P::DroneDensity) == Approx(6.0f).epsilon(0.01)); // others still morph
+    REQUIRE(target(f, P::DroneDensity) == Approx(6.0f).epsilon(0.01));
 
     scenes.releaseLiveLayer();
     f = run(engine, 0.5);
@@ -215,16 +210,16 @@ TEST_CASE("A scene that does not mention a parameter has no opinion on it")
     a.values[idx(P::DroneDensity)] = 2.0f;
     Scene b;
     b.position = { 1.0f, 0.5f };
-    b.values[idx(P::DroneCutoff)] = 8000.0f; // says nothing about density
+    b.values[idx(P::DroneCutoff)] = 8000.0f;
     scenes.addScene(a);
     scenes.addScene(b);
-    engine.setParam(P::DroneShape, 0.9f); // no scene defines shape
+    engine.setParam(P::DroneShape, 0.9f);
     engine.setParam(P::TerrainGlide, 0.05f);
     engine.setParam(P::TerrainX, 0.9f);
     const auto f = run(engine, 1.0);
-    REQUIRE(target(f, P::DroneDensity) == Approx(2.0f).epsilon(0.001)); // only scene A has an opinion
-    REQUIRE(target(f, P::DroneShape) == Approx(0.9f));                  // untouched by the terrain
-    REQUIRE(f.live[idx(P::DroneShape)] == 1);                            // (set while scenes existed)
+    REQUIRE(target(f, P::DroneDensity) == Approx(2.0f).epsilon(0.001));
+    REQUIRE(target(f, P::DroneShape) == Approx(0.9f));
+    REQUIRE(f.live[idx(P::DroneShape)] == 1);
     REQUIRE(target(f, P::DroneCutoff) > 4000.0f);
 }
 
@@ -236,7 +231,7 @@ TEST_CASE("Pinned parameters ignore the terrain")
     scenes.setPinned(idx(P::DroneDensity), true);
     scenes.addScene(makeScene(engine.getRegistry(), 0.0f, 0.5f, 200.0f, 6.0f));
     const auto f = run(engine, 0.5);
-    REQUIRE(target(f, P::DroneDensity) == Approx(3.0f)); // default, untouched
+    REQUIRE(target(f, P::DroneDensity) == Approx(3.0f));
     REQUIRE(target(f, P::DroneCutoff) == Approx(200.0f).epsilon(0.01));
 }
 
@@ -262,7 +257,7 @@ TEST_CASE("Wander stays inside the terrain and returns to the cursor at zero amo
             travelled += std::hypot(p.x - last.x, p.y - last.y);
             last = p;
         }
-        REQUIRE(travelled > 1.0f); // it actually moves
+        REQUIRE(travelled > 1.0f);
 
         const auto still = w.update({ 0.3f, 0.7f }, 0.0f, 0.2f, style, &set, 0.01f);
         REQUIRE(still.x == Approx(0.3f));
@@ -302,12 +297,12 @@ TEST_CASE("Engine with a moving, wandering terrain never allocates")
         scenes.addScene(makeScene(engine.getRegistry(), static_cast<float>(i % 6) / 5.0f, static_cast<float>(i / 6) / 5.0f,
                                   100.0f + 300.0f * static_cast<float>(i), 1.0f + static_cast<float>(i % 6)));
     REQUIRE(scenes.isFull());
-    REQUIRE(scenes.hasPendingPublish()); // 32 rapid edits outran the snapshot queue
+    REQUIRE(scenes.hasPendingPublish());
     engine.setParam(P::TerrainWander, 1.0f);
     engine.setParam(P::TerrainWanderRate, 0.5f);
     engine.command(Command::FadeIn);
 
-    const auto settled = run(engine, 0.1, &scenes, 512); // message-thread ticks publish the rest
+    const auto settled = run(engine, 0.1, &scenes, 512);
     REQUIRE_FALSE(scenes.hasPendingPublish());
     REQUIRE(settled.numScenes == kMaxScenes);
 

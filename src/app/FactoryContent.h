@@ -9,31 +9,21 @@
 #include <vector>
 
 namespace tf::app {
-
-/** A sound compiled into the app. Tonal sounds carry the note they sound at, so
-    loading one into Bloom tunes it; textures have rootNote < 0. */
 struct FactorySound
 {
     const char* name;
-    const char* category; // "Tonal", "Pad", "Texture"
-    const char* resource; // BinaryData resource name
+    const char* category;
+    const char* resource;
     int rootNote;
 };
 
 const std::vector<FactorySound>& factorySounds();
 
-/** Decodes a factory sound (message thread or worker); null if it is missing. */
 std::shared_ptr<const dsp::SampleBuffer> loadFactorySound(const FactorySound& sound);
 
-/** What a new session starts as: the defaults, factory sounds in Cloud 1 and Bloom,
-    and a terrain of starter scenes so the surface plays from the first touch. */
 io::SessionData makeStarterSession(const engine::Engine& engine);
 
-/** The parameter-ID prefix a preset kind's keys belong under ("cloud" -> "cloud1.",
-    any cloud works); empty for unknown kinds. */
 std::string presetPrefix(const std::string& kind);
 
-/** Built-in presets for the sound sources, the recording medium and the loops. */
 void addFactoryPresets(io::PresetLibrary& library);
-
-} // namespace tf::app
+}

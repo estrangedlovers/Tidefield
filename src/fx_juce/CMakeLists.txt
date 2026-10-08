@@ -1,8 +1,4 @@
-# tidefield_fx_juce: JUCE-based effects (your shimmer and fuzz) hosted in FX slots.
-# An INTERFACE library like tidefield_io, compiled into each executable that uses it.
 set(USER_EFFECT_SOURCES
-    # user/ReverseShimmerProcessor.cpp
-    # user/FuzzProcessor.cpp
 )
 
 add_library(tidefield_fx_juce INTERFACE)

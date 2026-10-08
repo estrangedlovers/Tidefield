@@ -5,7 +5,6 @@
 #include "../Engine.h"
 
 namespace tf::engine {
-
 FxManager::FxManager(Engine& e) : engine(e) {}
 
 const dsp::ProcessorInfo* FxManager::getInfo(int slot) const noexcept
@@ -76,5 +75,4 @@ void FxManager::tick()
             pending[s] = ! trySend(i);
     }
 }
-
-} // namespace tf::engine
+}

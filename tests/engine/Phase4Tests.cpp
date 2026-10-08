@@ -16,7 +16,6 @@ using tf::dsp::BloomSampler;
 using Catch::Approx;
 
 namespace {
-
 constexpr double kFs = 48000.0;
 
 std::shared_ptr<tf::dsp::SampleBuffer> sine(float hz, float seconds, float decay = 0.0f)
@@ -81,8 +80,7 @@ float peakOf(const std::vector<float>& x)
         p = std::max(p, std::fabs(v));
     return p;
 }
-
-} // namespace
+}
 
 TEST_CASE("Catch captures the master into the first empty cloud, normalised and faded")
 {
@@ -103,7 +101,6 @@ TEST_CASE("Catch captures the master into the first empty cloud, normalised and 
     float peak = std::max(peakOf(caught->left), peakOf(caught->right));
     REQUIRE(peak == Approx(tf::dsp::dbToGain(CatchManager::kTargetPeakDb)).epsilon(0.01));
 
-    // Next catch goes to the next empty cloud; an explicit target is honoured.
     rig.engine.command(Command::Catch);
     rig.run(0.2);
     rig.engine.setParam(P::CatchTarget, 4.0f);
@@ -121,7 +118,7 @@ TEST_CASE("Catching silence is refused, and the live input can be caught")
     rig.engine.setParam(P::BusALevel, -60.0f);
     rig.engine.setParam(P::BusBLevel, -60.0f);
     rig.engine.setParam(P::ResRain, 0.0f);
-    rig.run(12.0); // drone tail and reverb fully gone
+    rig.run(12.0);
     rig.engine.setParam(P::CatchSeconds, 5.0f);
     rig.engine.command(Command::Catch);
     rig.run(0.2);
@@ -162,7 +159,7 @@ TEST_CASE("A catch handled too late is detected instead of reading torn audio")
     tf::dsp::SampleBuffer ok;
     REQUIRE(engine.copyCatch(notice, ok));
 
-    for (int i = 0; i < 48000 * 40 / 512; ++i) // the ring laps the region
+    for (int i = 0; i < 48000 * 40 / 512; ++i)
         engine.process(nullptr, 0, outs, 2, 512);
     tf::dsp::SampleBuffer late;
     REQUIRE_FALSE(engine.copyCatch(notice, late));
@@ -204,10 +201,10 @@ TEST_CASE("Every Bloom transform sounds, stays bounded, and ends")
             ++blocks;
         }
         INFO(BloomSampler::transformName(static_cast<BloomSampler::Transform>(t)));
-        REQUIRE(energy > 1.0);           // audible
-        REQUIRE(peak < 2.0f);            // bounded
-        REQUIRE(b.isSilent());           // and finished within 20 s
-        REQUIRE(blocks * 512 > 48000);   // but lasted more than a second
+        REQUIRE(energy > 1.0);
+        REQUIRE(peak < 2.0f);
+        REQUIRE(b.isSilent());
+        REQUIRE(blocks * 512 > 48000);
     }
 }
 
@@ -219,7 +216,7 @@ TEST_CASE("Bloom Tape plays an octave up at twice the speed")
     b.setBuffer(sample.get());
     BloomSampler::Params p;
     p.transform = BloomSampler::Transform::Tape;
-    p.amount = 0.0f; // no wobble
+    p.amount = 0.0f;
     p.rootNote = 57.0f;
     p.gravity = 0.0f;
     p.random = 0.0f;
@@ -231,7 +228,7 @@ TEST_CASE("Bloom Tape plays an octave up at twice the speed")
     int crossings = 0;
     for (size_t i = 4800; i < 24000; ++i)
         crossings += (l[i - 1] < 0.0f) != (l[i] < 0.0f);
-    REQUIRE(crossings / 2.0 / 0.4 == Approx(440.0).margin(5.0)); // 0.4 s window
+    REQUIRE(crossings / 2.0 / 0.4 == Approx(440.0).margin(5.0));
 }
 
 TEST_CASE("Bloom steals voices beyond eight and never allocates")

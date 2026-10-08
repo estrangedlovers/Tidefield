@@ -6,7 +6,6 @@
 #include <cmath>
 
 namespace tf::engine {
-
 SceneManager::SceneManager(Engine& e) : engine(e), registry(e.getRegistry())
 {
     pinned.assign(registry.size(), false);
@@ -58,7 +57,7 @@ void SceneManager::moveScene(int index, Point2 to)
 void SceneManager::renameScene(int index, const std::string& name)
 {
     if (index >= 0 && index < size())
-        scenes[static_cast<std::size_t>(index)].name = name; // names do not affect sound
+        scenes[static_cast<std::size_t>(index)].name = name;
 }
 
 void SceneManager::setSceneValue(int index, ParamIndex param, float value)
@@ -167,7 +166,7 @@ std::unique_ptr<SceneSet> SceneManager::build() const
         const auto param = static_cast<ParamIndex>(i);
         const bool anyScene = std::any_of(scenes.begin(), scenes.end(), [&](const Scene& sc) { return sc.values.count(param) > 0; });
         if (! anyScene)
-            continue; // no scene has an opinion: the terrain leaves it alone
+            continue;
         SceneSet::Column c;
         c.param = param;
         if ((spec.flags & ParamFlag::kDiscrete) != 0)
@@ -207,5 +206,4 @@ void SceneManager::tick()
     if (dirty)
         publish();
 }
-
-} // namespace tf::engine
+}

@@ -1,13 +1,8 @@
-// tidefield_icon <output dir> <wordmark font.ttf>
-// Writes icon_1024.png (the app and plugin icon) and logo.png (mark and wordmark,
-// for the README) from the paths in src/app/gui/Logo.h.
-
 #include "app/gui/Logo.h"
 
 #include <iostream>
 
 namespace {
-
 namespace logo = tf::app::gui::logo;
 
 bool writePng(const juce::Image& image, const juce::File& file)
@@ -18,8 +13,6 @@ bool writePng(const juce::Image& image, const juce::File& file)
     return out.openedOk() && png.writeImageToStream(image, out);
 }
 
-/** The macOS icon grid: an 824 px tile centred on a 1024 px canvas, with the soft
-    drop shadow the system icons carry. */
 juce::Image icon()
 {
     juce::Image image(juce::Image::ARGB, 1024, 1024, true);
@@ -30,7 +23,6 @@ juce::Image icon()
     return image;
 }
 
-/** Mark above the lowercase wordmark, on the paper colour, like the brand sheet. */
 juce::Image sheet(const juce::Typeface::Ptr& face)
 {
     juce::Image image(juce::Image::ARGB, 1200, 1200, true);
@@ -42,8 +34,7 @@ juce::Image sheet(const juce::Typeface::Ptr& face)
     g.drawText("tidefield", juce::Rectangle<float>(0.0f, 790.0f, 1200.0f, 230.0f), juce::Justification::centred);
     return image;
 }
-
-} // namespace
+}
 
 int main(int argc, char** argv)
 {

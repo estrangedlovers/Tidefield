@@ -3,17 +3,13 @@
 #include <cmath>
 
 namespace tf::app::gui {
-
 namespace {
 float meterNorm(float linear)
 {
-    // -60..+3 dB onto 0..1, with more room at the top where it matters.
     const float db = juce::Decibels::gainToDecibels(linear, -60.0f);
     return std::pow(juce::jlimit(0.0f, 1.0f, (db + 60.0f) / 63.0f), 1.6f);
 }
-} // namespace
-
-// --- Meter ----------------------------------------------------------------------------
+}
 
 Meter::Meter(Model& m, int s, bool h) : model(m), strip(s), horizontal(h) { model.add(this); }
 Meter::~Meter() { model.remove(this); }
@@ -24,13 +20,13 @@ void Meter::tick()
     const float l = strip < 0 ? f.peakL : f.stripPeakL[static_cast<std::size_t>(strip)];
     const float r = strip < 0 ? f.peakR : f.stripPeakR[static_cast<std::size_t>(strip)];
     auto follow = [](float& shown, float& hold, int& frames, float v) {
-        shown = v > shown ? v : shown * 0.86f + v * 0.14f; // fast up, smooth fall
+        shown = v > shown ? v : shown * 0.86f + v * 0.14f;
         if (shown < 1.0e-5f)
             shown = 0.0f;
         if (v > 0.0f && v >= hold)
         {
             hold = v;
-            frames = 50; // hold the peak line a moment, then let it fall
+            frames = 50;
         }
         else if (--frames < 0)
             hold = hold * 0.94f < 1.0e-5f ? 0.0f : hold * 0.94f;
@@ -39,7 +35,6 @@ void Meter::tick()
     follow(shownL, holdL, holdFramesL, l);
     follow(shownR, holdR, holdFramesR, r);
     const float after[] = { meterNorm(shownL), meterNorm(shownR), meterNorm(holdL), meterNorm(holdR) };
-    // Repaint only when a bar or a peak line moves visibly (silence costs nothing).
     for (int i = 0; i < 4; ++i)
         if (std::abs(after[i] - before[i]) > 0.002f)
         {
@@ -84,8 +79,6 @@ void Meter::paint(juce::Graphics& g)
     }
 }
 
-// --- Waveform -------------------------------------------------------------------------
-
 Waveform::Waveform(Model& m, int s, juce::Colour c) : model(m), slot(s), colour(c)
 {
     model.add(this);
@@ -105,7 +98,7 @@ void Waveform::rebuildPeaks()
     {
         const auto from = n * b / peaks.size();
         const auto to = std::max(from + 1, n * (b + 1) / peaks.size());
-        const auto step = std::max<std::size_t>(1, (to - from) / 256); // sparse read of long files
+        const auto step = std::max<std::size_t>(1, (to - from) / 256);
         float p = 0.0f;
         for (auto i = from; i < to; i += step)
             p = std::max({ p, std::fabs(shown->left[i]), shown->isStereo() ? std::fabs(shown->right[i]) : 0.0f });
@@ -128,7 +121,6 @@ void Waveform::tick()
         repaint();
         return;
     }
-    // Grains move only while they play; the read position marker moves with its knob.
     const int slotIndex = std::min(slot, engine::kNumClouds - 1);
     const int views = slot < engine::kNumClouds ? model.frame().cloudGrainViews[static_cast<std::size_t>(slotIndex)] : 0;
     const float pos = slot < engine::kNumClouds ? model.value(static_cast<engine::P>(engine::idx(engine::kCloudFirstParam[static_cast<std::size_t>(slotIndex)]) + 2))
@@ -174,7 +166,6 @@ void Waveform::paint(juce::Graphics& g)
             g.setColour(display::text().withAlpha(a));
             g.fillEllipse(x - 2.5f, y - 2.5f, 5.0f, 5.0f);
         }
-        // Where the cloud is reading from.
         const float pos = model.value(static_cast<engine::P>(engine::idx(engine::kCloudFirstParam[s]) + 2));
         g.setColour(display::accent());
         g.fillRect(r.getX() + pos * r.getWidth() - 0.75f, r.getY(), 1.5f, r.getHeight());
@@ -220,8 +211,6 @@ void Waveform::mouseEnter(const juce::MouseEvent&)
         model.onHover("Sample: click to load a sound (or drop one from the browser), right-click to clear. Dots are grains reading it.");
 }
 
-// --- ShapePad -------------------------------------------------------------------------
-
 ShapePad::ShapePad(Model& m) : model(m)
 {
     model.add(this);
@@ -246,7 +235,6 @@ void ShapePad::paint(juce::Graphics& g)
     auto r = getLocalBounds().toFloat();
     drawWell(g, r);
     r = r.reduced(1.0f);
-    // A soft gradient: dark to bright left to right, close to far bottom to top.
     g.setGradientFill(juce::ColourGradient(juce::Colour(0x332c4a8a), r.getX(), r.getCentreY(), juce::Colour(0x33ffcf7a), r.getRight(), r.getCentreY(), false));
     g.fillRoundedRectangle(r, metric::radius);
     g.setColour(display::wellLine());
@@ -313,8 +301,6 @@ void ShapePad::mouseEnter(const juce::MouseEvent&)
     if (model.onHover)
         model.onHover("Shape: left darkens everything, right brightens; up pushes it far into the reverb, down pulls it close and dry. Double-click recentres.");
 }
-
-// --- KeyboardStrip --------------------------------------------------------------------
 
 KeyboardStrip::KeyboardStrip(Model& m) : model(m) { model.add(this); }
 KeyboardStrip::~KeyboardStrip() { model.remove(this); }
@@ -401,7 +387,6 @@ void KeyboardStrip::mouseDown(const juce::MouseEvent& e)
     heldNote = noteAt(e.position);
     if (heldNote >= 0)
     {
-        // Lower on the key plays louder, the way a key is struck.
         const auto k = keyRect(heldNote);
         const float vel = juce::jlimit(0.25f, 1.0f, 0.35f + 0.65f * (e.position.y - k.getY()) / k.getHeight());
         model.engine.noteOn(heldNote, vel);
@@ -430,5 +415,4 @@ void KeyboardStrip::mouseUp(const juce::MouseEvent&)
     heldNote = -1;
     repaint();
 }
-
-} // namespace tf::app::gui
+}

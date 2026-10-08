@@ -21,7 +21,6 @@ using namespace tf::dsp;
 using Catch::Approx;
 
 namespace {
-
 constexpr double kFs = 48000.0;
 
 SampleBuffer makeTone(float hz, float seconds)
@@ -50,7 +49,6 @@ float peak(const std::vector<float>& x)
     return p;
 }
 
-/** Runs a processor over `seconds` of input produced by `gen(sampleIndex)`. */
 template <typename Gen>
 std::vector<float> runProcessor(Processor& p, float seconds, Gen gen, std::vector<float>* rightOut = nullptr)
 {
@@ -70,8 +68,7 @@ std::vector<float> runProcessor(Processor& p, float seconds, Gen gen, std::vecto
         *rightOut = outR;
     return outL;
 }
-
-} // namespace
+}
 
 TEST_CASE("DelayLine reads back an impulse at the requested delay")
 {
@@ -82,35 +79,33 @@ TEST_CASE("DelayLine reads back an impulse at the requested delay")
         d.push(0.0f);
     REQUIRE(d.at(99) == 1.0f);
     REQUIRE(d.read(99.0f) == Approx(1.0f));
-    REQUIRE(d.read(99.5f) == Approx(0.5625f).margin(0.1)); // between impulse and zero
+    REQUIRE(d.read(99.5f) == Approx(0.5625f).margin(0.1));
 }
 
 TEST_CASE("Scale snaps to the nearest scale tone and walks degrees")
 {
     Scale dMinor { kScaleTypes[1].mask, 2 };
-    REQUIRE(dMinor.nearest(61.0f) == 60.0f);  // C# -> C (D minor has C, not C#)
+    REQUIRE(dMinor.nearest(61.0f) == 60.0f);
     REQUIRE(dMinor.nearest(62.2f) == 62.0f);
-    REQUIRE(dMinor.degreeToNote(50, 0) == 50.0f); // D3
-    REQUIRE(dMinor.degreeToNote(50, 2) == 53.0f); // F3
-    REQUIRE(dMinor.degreeToNote(50, 7) == 62.0f); // D4
-    REQUIRE(dMinor.degreeToNote(50, -1) == 48.0f); // C3
+    REQUIRE(dMinor.degreeToNote(50, 0) == 50.0f);
+    REQUIRE(dMinor.degreeToNote(50, 2) == 53.0f);
+    REQUIRE(dMinor.degreeToNote(50, 7) == 62.0f);
+    REQUIRE(dMinor.degreeToNote(50, -1) == 48.0f);
 }
 
 TEST_CASE("Harmonic gravity migrates voices one by one over the morph time")
 {
     HarmonicGravity g;
-    g.snapTo({ kScaleTypes[0].mask, 0 });     // C major
+    g.snapTo({ kScaleTypes[0].mask, 0 });
     g.setMorphSeconds(10.0f);
-    g.setTarget({ kScaleTypes[0].mask, 1 });  // C# major
+    g.setTarget({ kScaleTypes[0].mask, 1 });
     g.advance(5.0f);
-    // Halfway: low-seed voices moved, high-seed voices have not.
-    // C#: not in C major (snaps down to C), in C# major (stays).
     REQUIRE(g.quantize(61.0f, 0.1f, 1.0f) == 61.0f);
     REQUIRE(g.quantize(61.0f, 0.9f, 1.0f) == 60.0f);
     g.advance(5.0f);
     REQUIRE(g.quantize(61.0f, 0.9f, 1.0f) == 61.0f);
     REQUIRE_FALSE(g.isMorphing());
-    REQUIRE(g.quantize(61.7f, 0.5f, 0.5f) == Approx(61.35f)); // halfway from 61.7 to C# (61)
+    REQUIRE(g.quantize(61.7f, 0.5f, 0.5f) == Approx(61.35f));
 }
 
 TEST_CASE("Granular cloud is silent without a buffer and alive with one")
@@ -144,7 +139,7 @@ TEST_CASE("Granular cloud respects its grain cap and never allocates")
     const auto buf = makeTone(330.0f, 1.0f);
     cloud.setBuffer(&buf);
     GranularCloud::Params p;
-    p.density = 2000.0f; // far more than the pool
+    p.density = 2000.0f;
     p.grainMs = 1000.0f;
     p.reverse = 0.5f;
     p.harmonize = 1.0f;
@@ -175,9 +170,9 @@ TEST_CASE("Resonator modes ring at their pitch, stay bounded and decay to zero")
     ResonatorBank bank;
     bank.prepare({ kFs, 512 }, 3);
     ResonatorBank::Params p;
-    p.rootNote = 69.0f; // A4
+    p.rootNote = 69.0f;
     p.modes = 1;
-    p.structure = 0.0f; // harmonic: mode 0 = root
+    p.structure = 0.0f;
     p.rain = 0.0f;
     p.decaySeconds = 2.0f;
     bank.setParams(p);
@@ -190,7 +185,6 @@ TEST_CASE("Resonator modes ring at their pitch, stay bounded and decay to zero")
         crossings += (l[i - 1] < 0.0f) != (l[i] < 0.0f);
     REQUIRE(crossings / 2 == Approx(440).margin(3));
 
-    // Max decay and continuous loud noise: must stay bounded (unity peak gain per mode).
     p.modes = 24;
     p.decaySeconds = 60.0f;
     p.structure = 1.0f;
@@ -208,7 +202,6 @@ TEST_CASE("Resonator modes ring at their pitch, stay bounded and decay to zero")
         REQUIRE(peak(l) < 30.0f);
     }
 
-    // Silence afterwards: decays to exact zero thanks to denormal flushing.
     p.rain = 0.0f;
     p.decaySeconds = 0.5f;
     bank.setParams(p);
@@ -232,26 +225,24 @@ TEST_CASE("Reverb tail decays to zero, and hold sustains without growing")
 
     rev.reset();
     rev.setControls({ 0.6f, 0.4f, 0.6f, 0.0f, 0.3f, 1.0f }, {});
-    // Feed a burst with hold off, then freeze.
     rev.setControls({ 0.6f, 0.4f, 0.6f, 0.0f, 0.3f, 0.0f }, {});
     runProcessor(rev, 0.3f, [](int i) { return (i % 13 == 0) ? 0.6f : -0.05f; });
     rev.setControls({ 0.6f, 0.4f, 0.6f, 0.0f, 0.3f, 1.0f }, {});
-    out = runProcessor(rev, 40.0f, [](int) { return 0.3f; }); // input is muted by hold
+    out = runProcessor(rev, 40.0f, [](int) { return 0.3f; });
     const float early = rms(out, 48000 * 2, 48000 * 4);
     const float late = rms(out, 48000 * 36, 48000 * 38);
     REQUIRE(early > 1.0e-3f);
-    REQUIRE(late > early * 0.5f);  // sustains (within 6 dB)
-    REQUIRE(late < early * 1.12f); // and does not grow
+    REQUIRE(late > early * 0.5f);
+    REQUIRE(late < early * 1.12f);
 }
 
 TEST_CASE("Tape delay echoes on time and self-oscillation stays bounded")
 {
     TapeDelay d;
     d.prepare({ kFs, 512 });
-    // 0.5 s: v = log(500/20)/log(100)
     const float v = std::log(25.0f) / std::log(100.0f);
     d.setControls({ v, 0.0f, 1.0f, 0.0f, 0.0f, 0.0f }, {});
-    runProcessor(d, 3.0f, [](int) { return 0.0f; }); // let the time glide settle
+    runProcessor(d, 3.0f, [](int) { return 0.0f; });
     auto out = runProcessor(d, 1.0f, [](int i) { return i == 0 ? 1.0f : 0.0f; });
     size_t peakAt = 0;
     for (size_t i = 0; i < out.size(); ++i)
@@ -259,10 +250,10 @@ TEST_CASE("Tape delay echoes on time and self-oscillation stays bounded")
             peakAt = i;
     REQUIRE(static_cast<double>(peakAt) == Approx(24000.0).margin(30.0));
 
-    d.setControls({ 0.3f, 1.0f, 1.0f, 1.0f, 1.0f, 1.0f }, {}); // 110% feedback, max wobble/age
+    d.setControls({ 0.3f, 1.0f, 1.0f, 1.0f, 1.0f, 1.0f }, {});
     Random rng(2);
     out = runProcessor(d, 20.0f, [&](int i) { return i < 48000 ? rng.nextBipolar() * 2.0f : 0.0f; });
-    REQUIRE(peak(out) < 1.5f); // saturator bounds the loop at 1.2; Hermite reads may overshoot slightly
+    REQUIRE(peak(out) < 1.5f);
     for (float x : out)
         REQUIRE(std::isfinite(x));
 }
@@ -327,7 +318,7 @@ TEST_CASE("Medium: tape hisses and vinyl crackles in silence; noise 0 is quiet")
         m.setParams(p);
         std::fill(l.begin(), l.end(), 0.0f);
         std::fill(r.begin(), r.end(), 0.0f);
-        m.process(l.data(), r.data(), 48000); // crossfade not involved: same type
+        m.process(l.data(), r.data(), 48000);
         REQUIRE(rms(l, 24000, 48000) < dbToGain(-100.0f));
     }
 }
@@ -367,7 +358,6 @@ TEST_CASE("Medium type changes crossfade without clicks")
             last = x;
         }
     }
-    // A 110 Hz sine at 0.4 moves at most ~0.0058 per sample; allow coloration, not steps.
     REQUIRE(worstJump < 0.05f);
 }
 
@@ -376,7 +366,7 @@ TEST_CASE("Declarative control display matches the processors' own mappings")
     char text[48];
     const auto& rev = FdnReverb::kInfo.controls;
     rev[1].display.format(0.4f, text, sizeof(text));
-    REQUIRE(std::string(text) == "2.5 s"); // decayFrom01(0.4) = 2.48
+    REQUIRE(std::string(text) == "2.5 s");
     REQUIRE(rev[1].display.value(0.4f) == Approx(FdnReverb::decayFrom01(0.4f)));
     REQUIRE(rev[2].display.value(0.7f) == Approx(FdnReverb::dampingFrom01(0.7f)));
     REQUIRE(rev[3].display.value(0.5f) == Approx(FdnReverb::predelayFrom01(0.5f)));

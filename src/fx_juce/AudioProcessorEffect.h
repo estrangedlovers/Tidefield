@@ -12,19 +12,6 @@
 #include <vector>
 
 namespace tf::fxjuce {
-
-/** Hosts a juce::AudioProcessor (the processor class of one of your own JUCE
-    plugins, compiled into the app) in any Tidefield FX slot.
-
-    Threading follows Tidefield's rules: the audio thread only copies the slot's six
-    controls into atomics and calls processBlock with the slot's buffers (wrapped,
-    not copied, so nothing is allocated). Parameter changes reach the plugin on the
-    message thread (a 60 Hz timer calling setValueNotifyingHost), because JUCE's
-    listener notification takes locks that must never be taken on the audio thread.
-    Knob moves therefore land up to ~16 ms late; the plugin's own smoothing hides it.
-
-    The six controls map to the parameters named at registration, or to the plugin's
-    first six parameters. */
 template <typename AudioProcessorType>
 class AudioProcessorEffect final : public dsp::Processor, private juce::Timer
 {
@@ -77,7 +64,7 @@ public:
         {
             const int n = std::min(maxBlock, numSamples - done);
             float* offset[2] = { channels[0] + done, channels[1] + done };
-            juce::AudioBuffer<float> buffer(offset, 2, n); // refers to the slot's data
+            juce::AudioBuffer<float> buffer(offset, 2, n);
             midi.clear();
             processor->processBlock(buffer, midi);
         }
@@ -86,8 +73,6 @@ public:
     int getLatencySamples() const noexcept override { return processor->getLatencySamples(); }
     float getTailSeconds() const noexcept override { return static_cast<float>(processor->getTailLengthSeconds()); }
 
-    /** Pushes pending control values to the plugin's parameters (the timer does this;
-        tests and offline renders without a message loop call it directly). */
     void flushParameters()
     {
         for (std::size_t k = 0; k < mapped.size() && k < values.size(); ++k)
@@ -111,21 +96,10 @@ private:
     int maxBlock = 512;
 };
 
-/** Registers an AudioProcessor class as an FX type. Call once at startup, on the
-    message thread, before sessions load (see registerUserEffects()).
-
-      typeId        stable id stored in sessions ("user.shimmer"); never rename it
-      name          shown in the FX menus
-      sendStyle     true for effects meant to sit fully wet on a send bus
-      parameterIds  which of the plugin's parameters the six slot controls drive (by
-                    parameter ID); empty = its first six parameters
-
-    Control names and defaults come from the plugin's own parameters. */
 template <typename AudioProcessorType>
 void registerAudioProcessorEffect(const char* typeId, const char* name, bool sendStyle,
                                   std::initializer_list<const char*> parameterIds = {})
 {
-    // One ProcessorInfo per registered class, living for the whole program.
     struct Registration
     {
         dsp::ProcessorInfo info;
@@ -137,9 +111,9 @@ void registerAudioProcessorEffect(const char* typeId, const char* name, bool sen
     reg.name = name;
     reg.ids.assign(parameterIds.begin(), parameterIds.end());
     reg.controlNames.clear();
-    reg.controlNames.reserve(6); // the info keeps pointers into these strings
+    reg.controlNames.reserve(6);
 
-    const auto probe = std::make_unique<AudioProcessorType>(); // only to read its parameters
+    const auto probe = std::make_unique<AudioProcessorType>();
     const auto& all = probe->getParameters();
     std::vector<juce::AudioProcessorParameter*> chosen;
     for (const auto& id : reg.ids)
@@ -174,7 +148,5 @@ void registerAudioProcessorEffect(const char* typeId, const char* name, bool sen
     });
 }
 
-/** Registers the user's own JUCE effects (UserEffects.cpp). */
 void registerUserEffects();
-
-} // namespace tf::fxjuce
+}

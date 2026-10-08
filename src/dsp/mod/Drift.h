@@ -6,10 +6,6 @@
 #include <algorithm>
 
 namespace tf::dsp {
-
-/** Slow wandering value in [-1, 1]. Moves between random targets with eased segments
-    whose lengths are jittered around 1 / rateHz, so it never sounds periodic.
-    Time advances by dt * timeScale, which is how Tide reaches every modulator. */
 class Drift
 {
 public:
@@ -22,7 +18,6 @@ public:
 
     void setRate(float hz) noexcept { rateHz = std::clamp(hz, 0.0005f, 20.0f); }
 
-    /** Advances by dtSeconds of (tide-scaled) time and returns the new value. */
     float advance(float dtSeconds) noexcept
     {
         phase += dtSeconds / segmentSeconds;
@@ -53,5 +48,4 @@ private:
     float to = 0.0f;
     float value = 0.0f;
 };
-
-} // namespace tf::dsp
+}

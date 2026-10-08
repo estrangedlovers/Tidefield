@@ -7,20 +7,15 @@
 #include <cmath>
 
 namespace tf::dsp {
-
 namespace {
-
-// A warm ambient balance, in dB relative to the 500 Hz-4 kHz band (pink noise sits
-// at about 0, -2.4 and -1.1 here). Slightly darker on top, a little less mud.
 constexpr float kTargetLow = 0.0f;
 constexpr float kTargetMud = -3.0f;
 constexpr float kTargetHigh = -3.5f;
-constexpr float kTargetSideRatio = 0.4f; // side/mid energy of a wide but solid mix
+constexpr float kTargetSideRatio = 0.4f;
 constexpr float kSilenceLufs = -55.0f;
 
 float toDb(double energy) noexcept { return 10.0f * static_cast<float>(std::log10(std::max(1.0e-12, energy))); }
-
-} // namespace
+}
 
 void AutoMaster::prepare(const ProcessSpec& s)
 {
@@ -33,7 +28,6 @@ void AutoMaster::prepare(const ProcessSpec& s)
         b->setHighShelf(1500.0f, 4.0f);
     for (auto* b : { &kInHpL, &kInHpR })
         b->setHighPass(38.0f, 0.5f);
-    // ITU-R BS.1770 K-weighting, approximated with RBJ shapes.
     kShelfL.setHighShelf(1500.0f, 4.0f);
     kShelfR.setHighShelf(1500.0f, 4.0f);
     kHpL.setHighPass(38.0f, 0.5f);
@@ -69,7 +63,6 @@ void AutoMaster::control() noexcept
 {
     const float n = static_cast<float>(std::max(1, accCount));
     const float dt = n / fs;
-    // ~3 s windows for balance and loudness.
     const float k = 1.0f - std::exp(-dt / 3.0f);
     auto follow = [&](float& e, double acc) { e = flushDenormal(e + k * (static_cast<float>(acc / n) - e)); };
     follow(eK, accK);
@@ -88,8 +81,6 @@ void AutoMaster::control() noexcept
     const bool audible = state.loudness > kSilenceLufs;
     const float amount = std::clamp(params.amount, 0.0f, 1.0f);
 
-    // Tonal balance: move each band toward the target relative to the mid band.
-    // Corrections ease over ~4 s and only while there is something to measure.
     if (audible)
     {
         const float mid = toDb(eMidBand);
@@ -101,19 +92,16 @@ void AutoMaster::control() noexcept
         state.mudDb += s * (correction(toDb(eMud), kTargetMud) - state.mudDb);
         state.highDb += s * (correction(toDb(eHigh), kTargetHigh) - state.highDb);
 
-        // Width toward a natural side/mid ratio.
         const float ratio = eSide / std::max(1.0e-9f, eMidSig);
         const float wanted = std::clamp(std::sqrt(kTargetSideRatio / std::max(1.0e-4f, ratio)), 0.7f, 1.4f);
         state.width += s * (1.0f + (wanted - 1.0f) * amount - state.width);
 
-        // Make-up toward the loudness target (measured before make-up).
         const float wantDb = std::clamp(params.targetLufs - state.loudness, -12.0f, 12.0f);
         const float g = 1.0f - std::exp(-dt / 3.0f);
         state.gainDb += g * (wantDb - state.gainDb);
     }
     gainTarget = dbToGain(state.gainDb);
 
-    // Re-derive EQ coefficients only when a gain moved audibly.
     if (std::fabs(state.lowDb - appliedLow) > 0.05f)
     {
         eqLowL.setLowShelf(150.0f, state.lowDb);
@@ -141,7 +129,7 @@ void AutoMaster::process(float* left, float* right, int n) noexcept
     if (mix == 0.0f && mixTarget == 0.0f)
     {
         state.mix = 0.0f;
-        return; // fully bypassed: no cost, and no state drifting while off
+        return;
     }
 
     const float attack = std::exp(-1.0f / (0.025f * fs));
@@ -159,11 +147,9 @@ void AutoMaster::process(float* left, float* right, int n) noexcept
         const float dryL = left[i];
         const float dryR = right[i];
 
-        // EQ.
         float l = eqHighL.process(eqMudL.process(eqLowL.process(dryL)));
         float r = eqHighR.process(eqMudR.process(eqLowR.process(dryR)));
 
-        // Analysis of the corrected signal (balance, stereo) and of the input bands.
         const float m = 0.5f * (dryL + dryR);
         const float lo = lowSplit.process(m);
         const float hi = highSplit.process(m);
@@ -177,30 +163,25 @@ void AutoMaster::process(float* left, float* right, int n) noexcept
         accSide += static_cast<double>(sd) * sd;
         accMidSig += static_cast<double>(m) * m;
 
-        // Width, with the lows kept mono.
         widthCur += 0.0005f * (state.width - widthCur);
         const float mm = 0.5f * (l + r);
         const float ss = sideLowCut.processHigh(0.5f * (l - r)) * widthCur;
         l = mm + ss;
         r = mm - ss;
 
-        // Loudness of the glue's own input (EQ'd, widened): its threshold reference.
-        // Measured here, before it, so compression cannot lower its own threshold.
         {
             const float kl = kInHpL.process(kInShelfL.process(l));
             const float kr = kInHpR.process(kInShelfR.process(r));
             accKIn += static_cast<double>(kl) * kl + static_cast<double>(kr) * kr;
         }
 
-        // Glue: RMS envelope, soft knee, threshold 8 dB over its input's loudness,
-        // at most 6 dB of reduction.
         const float e = 0.5f * (l * l + r * r);
         compEnv = flushDenormal(e > compEnv ? attack * compEnv + (1.0f - attack) * e : release * compEnv + (1.0f - release) * e);
         const float levelDb = 10.0f * std::log10(compEnv + 1.0e-12f);
         const float threshold = state.inputLoudness + 8.0f;
         const float over = levelDb - threshold;
         float grDb = 0.0f;
-        if (over > -3.0f) // 6 dB soft knee
+        if (over > -3.0f)
         {
             const float x = over < 3.0f ? (over + 3.0f) * (over + 3.0f) / 12.0f : over;
             grDb = std::min(6.0f, x * (1.0f - 1.0f / kRatio));
@@ -208,7 +189,6 @@ void AutoMaster::process(float* left, float* right, int n) noexcept
         compGain = dbToGain(-grDb);
         state.reductionDb = grDb;
 
-        // Make-up (glides) and loudness measurement of the pre-make-up signal.
         gainLin += gainGlide * (gainTarget - gainLin);
         l *= compGain;
         r *= compGain;
@@ -225,5 +205,4 @@ void AutoMaster::process(float* left, float* right, int n) noexcept
     }
     state.mix = mix;
 }
-
-} // namespace tf::dsp
+}

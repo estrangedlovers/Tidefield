@@ -12,14 +12,12 @@ using namespace tf::engine;
 using Catch::Approx;
 
 namespace {
-
 std::vector<Point2> circle(float cx, float cy, float r, int n, float wobble = 0.0f)
 {
     std::vector<Point2> pts;
     for (int i = 0; i < n; ++i)
     {
         const float a = 6.2831853f * static_cast<float>(i) / static_cast<float>(n);
-        // Uneven spacing (a hand speeding up and slowing down) and a little shake.
         const float warp = a + 0.4f * std::sin(a);
         pts.push_back({ cx + r * std::cos(warp) + wobble * std::sin(37.0f * a), cy + r * std::sin(warp) });
     }
@@ -36,14 +34,12 @@ float distanceToLoop(const TerrainPath& p, Point2 q)
     }
     return best;
 }
-
-} // namespace
+}
 
 TEST_CASE("A drawn path is resampled evenly, closed and kept on the terrain", "[path]")
 {
     const auto p = TerrainPath::build(circle(0.5f, 0.5f, 0.3f, 90, 0.004f), 1);
     REQUIRE(p.count == TerrainPath::kPoints);
-    // Even spacing: every step about the same length, however unevenly it was drawn.
     float minStep = 1.0e9f, maxStep = 0.0f;
     for (int i = 0; i < p.count; ++i)
     {
@@ -54,7 +50,6 @@ TEST_CASE("A drawn path is resampled evenly, closed and kept on the terrain", "[
         maxStep = std::max(maxStep, d);
     }
     CHECK(maxStep < minStep * 1.6f);
-    // at() wraps around.
     CHECK(p.at(1.25f).x == Approx(p.at(0.25f).x));
 
     const auto clamped = TerrainPath::build({ { -1.0f, 0.5f }, { 2.0f, 0.5f }, { 0.5f, 3.0f } }, 2);
@@ -71,35 +66,31 @@ TEST_CASE("Path wander travels the loop at a steady pace and starts where the so
     const auto path = TerrainPath::build(circle(0.5f, 0.5f, 0.3f, 64), 7);
     Wander w;
     w.setSeed(5);
-    const Point2 cursor { 0.8f, 0.5f }; // on the loop's right edge
-    const float rate = 0.1f;            // one lap in 10 s
+    const Point2 cursor { 0.8f, 0.5f };
+    const float rate = 0.1f;
     const float dt = 0.01f;
 
     auto first = w.update(cursor, 1.0f, rate, Wander::Style::Path, nullptr, dt, &path);
-    // No jump: it starts at the point of the loop nearest the sound.
     CHECK(std::hypot(first.x - cursor.x, first.y - cursor.y) < 0.03f);
 
     float maxOff = 0.0f;
     Point2 pos = first;
-    for (int i = 0; i < 1000; ++i) // 10 s: one lap
+    for (int i = 0; i < 1000; ++i)
     {
         pos = w.update(cursor, 1.0f, rate, Wander::Style::Path, nullptr, dt, &path);
         maxOff = std::max(maxOff, distanceToLoop(path, pos));
     }
     CHECK(maxOff < 0.01f);
-    CHECK(std::hypot(pos.x - first.x, pos.y - first.y) < 0.03f); // back where it began
+    CHECK(std::hypot(pos.x - first.x, pos.y - first.y) < 0.03f);
 
-    // Halfway around after half the time.
     for (int i = 0; i < 500; ++i)
         pos = w.update(cursor, 1.0f, rate, Wander::Style::Path, nullptr, dt, &path);
     CHECK(pos.x < 0.25f);
 
-    // Wander 0: the cursor alone.
     const auto still = w.update(cursor, 0.0f, rate, Wander::Style::Path, nullptr, dt, &path);
     CHECK(still.x == Approx(cursor.x));
     CHECK(still.y == Approx(cursor.y));
 
-    // No path: Path style drifts like Drift instead of sticking.
     Wander d;
     d.setSeed(5);
     Point2 last {};
@@ -129,7 +120,7 @@ TEST_CASE("The engine follows a published path in Path style", "[path]")
     {
         engine.process(nullptr, 0, outs, 2, 256);
         while (engine.popTelemetry(f)) {}
-        if (b > 48000 * 3 / 256) // after Wander and the cursor glide have settled
+        if (b > 48000 * 3 / 256)
         {
             minX = std::min(minX, f.position.x);
             maxX = std::max(maxX, f.position.x);
@@ -138,7 +129,7 @@ TEST_CASE("The engine follows a published path in Path style", "[path]")
         engine.collectGarbage();
     }
     CHECK(maxOff < 0.02f);
-    CHECK(maxX - minX > 0.6f); // went all the way round
+    CHECK(maxX - minX > 0.6f);
 
     paths.clear();
     engine.process(nullptr, 0, outs, 2, 256);

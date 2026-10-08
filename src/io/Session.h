@@ -20,13 +20,9 @@ class PathManager;
 class GestureManager;
 class SceneManager;
 class SeasonManager;
-} // namespace tf::engine
+}
 
 namespace tf::io {
-
-/** Everything a performance needs, independent of any engine instance. Parameter
-    and slot references are stored by their stable string IDs, so a session survives
-    parameters being added or reordered. */
 struct SessionData
 {
     static constexpr int kCurrentVersion = 1;
@@ -43,64 +39,45 @@ struct SessionData
     std::map<std::string, float> params;
     std::vector<SceneData> scenes;
     std::vector<std::string> pins;
-    std::map<std::string, std::string> fx;   // slot id -> processor type ("" = empty)
-    juce::var midi;                          // MIDI mappings (phase 5)
-    juce::var seasons;                       // slow macro curves (phase 8): array of objects
-    std::vector<engine::Point2> path;        // the loop the Path wander style travels, as drawn
-    juce::var gesture;                       // the recorded gesture take (see gestureToJson)
-    std::map<std::string, std::shared_ptr<const dsp::SampleBuffer>> samples; // "cloud1".."cloud4", "bloom"
+    std::map<std::string, std::string> fx;
+    juce::var midi;
+    juce::var seasons;
+    std::vector<engine::Point2> path;
+    juce::var gesture;
+    std::map<std::string, std::shared_ptr<const dsp::SampleBuffer>> samples;
 
-    /** Things recall could not apply (unknown IDs from a newer version, etc.). */
     std::vector<std::string> warnings;
 };
 
-/** Message thread: snapshot the running state. `latest` provides parameter targets. */
 SessionData captureSession(const engine::Engine& engine, const engine::TelemetryFrame& latest, const engine::SceneManager& scenes,
                            const engine::FxManager& fx, const engine::MidiManager* midi = nullptr,
                            const engine::SeasonManager* seasons = nullptr, const engine::PathManager* path = nullptr,
                            const engine::GestureManager* gestures = nullptr);
 
-/** Message thread: apply a session. With `snap` true, parameters jump (use while the
-    master is faded out); otherwise they glide through their smoothers. The live layer
-    is released. Returns warnings. */
 std::vector<std::string> applySession(const SessionData& session, engine::Engine& engine, engine::SceneManager& scenes,
                                       engine::FxManager& fx, bool snap, engine::MidiManager* midi = nullptr,
                                       engine::SeasonManager* seasons = nullptr, engine::PathManager* path = nullptr,
                                       engine::GestureManager* gestures = nullptr);
 
-/** MIDI mapping <-> JSON. A session without a "midi" object leaves the current mapping
-    alone (a controller setup usually belongs to the rig, not the piece). */
 juce::var midiToJson(const engine::MidiManager& midi, const engine::ParamRegistry& registry);
 std::vector<std::string> applyMidiJson(const juce::var& json, engine::MidiManager& midi, const engine::ParamRegistry& registry);
 
-/** Seasons <-> JSON ([{param, depth, period, shape, phase}]). Applying replaces every
-    season (an absent or empty list clears them). */
 juce::var seasonsToJson(const engine::SeasonManager& seasons, const engine::ParamRegistry& registry);
 std::vector<std::string> applySeasonsJson(const juce::var& json, engine::SeasonManager& seasons, const engine::ParamRegistry& registry);
 
-/** Gesture take <-> JSON: {seconds, loop, events: [[time s, kind, target, value]]},
-    kind "set" | "release" | "note" | "catch" | "loopRecord" | "loopClear", target a
-    parameter ID or a note number. Applying replaces the take (absent = no take). */
 juce::var gestureToJson(const engine::GestureTake& take, const engine::ParamRegistry& registry);
 std::vector<std::string> applyGestureJson(const juce::var& json, engine::GestureManager& gestures, const engine::ParamRegistry& registry);
 
-/** The default state: every parameter at its default, no scenes, default FX, no samples. */
 SessionData defaultSession(const engine::Engine& engine);
 
-/** Any thread: write / read a .tidefield file (a zip of session.json + FLAC audio).
-    Saving writes to a temporary file first and swaps it in, so a crash mid-save never
-    destroys the previous file. */
 bool saveSession(const SessionData& session, const juce::File& file, juce::String& error);
 std::optional<SessionData> loadSession(const juce::File& file, juce::String& error);
 
-/** The same format in memory (a plugin's state in a DAW project). */
 bool writeSession(const SessionData& session, juce::OutputStream& out, juce::String& error);
 std::optional<SessionData> readSession(const void* data, std::size_t size, juce::String& error);
 
-/** JSON form (no audio), exposed for tests and tooling. */
 juce::var sessionToJson(const SessionData& session);
 std::optional<SessionData> sessionFromJson(const juce::var& json, juce::String& error);
 
 inline constexpr const char* kSessionExtension = ".tidefield";
-
-} // namespace tf::io
+}

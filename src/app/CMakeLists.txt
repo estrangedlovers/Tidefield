@@ -9,13 +9,8 @@ juce_add_gui_app(Tidefield
     MICROPHONE_PERMISSION_TEXT "Tidefield uses audio input for the live input channel."
     HARDENED_RUNTIME_ENABLED TRUE
     HARDENED_RUNTIME_OPTIONS com.apple.security.device.audio-input
-    # Finder refuses to open the app on older macOS with a clear message instead of
-    # it failing at launch.
     PLIST_TO_MERGE "<plist><dict><key>LSMinimumSystemVersion</key><string>${CMAKE_OSX_DEPLOYMENT_TARGET}</string></dict></plist>")
 
-# Built-in sounds (synthesized by tools/scripts/make_samples.py), the Inter
-# typeface and Quicksand for the wordmark (both SIL Open Font License, licences in
-# resources/fonts), compiled in.
 file(GLOB _library_samples CONFIGURE_DEPENDS ${CMAKE_SOURCE_DIR}/resources/samples/library/*.wav)
 juce_add_binary_data(TidefieldBinaryData SOURCES
     ${CMAKE_SOURCE_DIR}/resources/samples/glass.wav
@@ -28,9 +23,6 @@ juce_add_binary_data(TidefieldBinaryData SOURCES
     ${CMAKE_SOURCE_DIR}/resources/fonts/Inter-SemiBold.ttf
     ${CMAKE_SOURCE_DIR}/resources/fonts/Quicksand-Medium.ttf)
 
-# Everything above the engine that the app and the plugin share: the app core, the
-# factory content and the native interface. An INTERFACE library like tidefield_io,
-# compiled into each target against its own JUCE modules.
 add_library(tidefield_app_core INTERFACE)
 target_sources(tidefield_app_core INTERFACE
     ${CMAKE_CURRENT_SOURCE_DIR}/AppCore.cpp
@@ -64,10 +56,6 @@ target_link_libraries(Tidefield PRIVATE
     juce::juce_recommended_config_flags
     juce::juce_recommended_lto_flags)
 
-# ---------------------------------------------------------------------------
-# The plugin: the same instrument and interface inside a DAW (AU and VST3 on
-# macOS, VST3 elsewhere). The DAW owns the audio device and MIDI.
-# ---------------------------------------------------------------------------
 option(TIDEFIELD_BUILD_PLUGIN "Build the AU/VST3 plugin" ON)
 if(TIDEFIELD_BUILD_PLUGIN)
     set(_tf_formats VST3)
@@ -110,5 +98,4 @@ if(TIDEFIELD_BUILD_PLUGIN)
     add_subdirectory(${CMAKE_SOURCE_DIR}/tools/plugincheck ${CMAKE_BINARY_DIR}/tools/plugincheck)
 endif()
 
-# Regenerates resources/icon from gui/Logo.h (not part of the build of the app).
 add_subdirectory(${CMAKE_SOURCE_DIR}/tools/icon ${CMAKE_BINARY_DIR}/tools/icon)

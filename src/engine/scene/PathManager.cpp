@@ -5,7 +5,6 @@
 #include <memory>
 
 namespace tf::engine {
-
 PathManager::PathManager(Engine& e) : engine(e) {}
 
 void PathManager::set(std::vector<Point2> s)
@@ -27,5 +26,4 @@ void PathManager::publish()
     auto path = std::make_unique<TerrainPath>(TerrainPath::build(stroke, ++version));
     dirty = ! engine.publishPath(std::move(path));
 }
-
-} // namespace tf::engine
+}

@@ -1,13 +1,10 @@
 #include "Recorder.h"
 
 namespace tf::io {
-
 namespace {
-
 constexpr int kChunkFrames = 4096;
-constexpr juce::uint32 kForceStopMs = 1000; // no audio callback completed the stop
-
-} // namespace
+constexpr juce::uint32 kForceStopMs = 1000;
+}
 
 Recorder::Recorder(engine::RecordTap& t) : juce::Thread("Tidefield recorder"), tap(t)
 {
@@ -22,7 +19,7 @@ Recorder::~Recorder()
     if (state.load() != State::Idle)
     {
         stop();
-        tap.forceStopped(); // the device may already be closed
+        tap.forceStopped();
         drainNow();
     }
 }
@@ -163,7 +160,6 @@ bool Recorder::drain()
 
     readAll();
 
-    // A full disk ends the recording rather than silently losing the rest.
     if (writeFailed && state.load() == State::Recording)
     {
         state.store(State::Finishing);
@@ -179,7 +175,7 @@ bool Recorder::drain()
     if (tap.getState() != engine::RecordTap::State::Stopped)
         return false;
 
-    readAll(); // whatever the last block pushed
+    readAll();
     tap.finish();
     closeFiles(! writeFailed);
     return true;
@@ -187,10 +183,9 @@ bool Recorder::drain()
 
 void Recorder::closeFiles(bool ok)
 {
-    writers.clear(); // flushes and finalises the headers
+    writers.clear();
     state.store(State::Idle);
     if (onFinished)
         onFinished(folder, ok);
 }
-
-} // namespace tf::io
+}

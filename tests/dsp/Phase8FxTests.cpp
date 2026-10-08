@@ -18,7 +18,6 @@
 using namespace tf::dsp;
 
 namespace {
-
 constexpr double kFs = 48000.0;
 constexpr int kBlock = 256;
 
@@ -31,8 +30,7 @@ double energy(const std::vector<float>& x, std::size_t from = 0, std::size_t to 
         s += static_cast<double>(x[i]) * x[i];
     return s;
 }
-
-} // namespace
+}
 
 TEST_CASE("Every registered processor survives extreme and random controls", "[fx][fuzz]")
 {
@@ -58,7 +56,6 @@ TEST_CASE("Every registered processor survives extreme and random controls", "[f
                 }
                 for (int i = 0; i < kBlock; ++i)
                 {
-                    // Loud noise bursts, then silence: worst cases for feedback and tails.
                     const bool loud = (b / 100) % 2 == 0;
                     l[static_cast<std::size_t>(i)] = loud ? rng.nextBipolar() : 0.0f;
                     r[static_cast<std::size_t>(i)] = loud ? rng.nextBipolar() : 0.0f;
@@ -74,7 +71,7 @@ TEST_CASE("Every registered processor survives extreme and random controls", "[f
             allocations = counter.count();
         }
         CHECK(allocations == 0);
-        CHECK(peak < 16.0f); // bounded (the master limiter handles the last few dB)
+        CHECK(peak < 16.0f);
     }
 }
 
@@ -94,7 +91,6 @@ TEST_CASE("Spectral blur at rest resynthesises its input", "[fx][blur]")
         std::copy_n(in.data() + pos, kBlock, outR.data() + pos);
         blur.process(outL.data() + pos, outR.data() + pos, kBlock);
     }
-    // Output is the input delayed by one window.
     const int latency = SpectralBlur::kSize;
     double err = 0.0, sig = 0.0;
     for (int i = latency + SpectralBlur::kSize; i < total; ++i)
@@ -129,7 +125,7 @@ TEST_CASE("Sympathetic strings tune to the key and ring for notes in it", "[fx][
             }
             s.process(l.data(), r.data(), kBlock);
             if (b >= 200)
-                wet.insert(wet.end(), l.begin(), l.end()); // input silent: only strings remain
+                wet.insert(wet.end(), l.begin(), l.end());
         }
         return energy(wet);
     };
@@ -140,8 +136,8 @@ TEST_CASE("Sympathetic strings tune to the key and ring for notes in it", "[fx][
     for (int i = 0; i < probe.getStringCount(); ++i)
         CHECK(dMinor.contains(static_cast<int>(std::lround(probe.getStringNote(i))) % 12));
 
-    const float inKey = probe.getStringNote(4);  // A
-    const float outKey = inKey - 0.5f;           // a quarter tone flat
+    const float inKey = probe.getStringNote(4);
+    const float outKey = inKey - 0.5f;
     CHECK(response(inKey) > 8.0 * response(outKey));
 }
 
@@ -149,16 +145,15 @@ TEST_CASE("Worn echo repeats at the set time and wears down", "[fx][echo]")
 {
     WornEcho echo;
     echo.prepare({ kFs, kBlock });
-    // Time 0.5 -> 20 * 100^0.5 = 200 ms; feedback 50 %; cassette.
     echo.setControls({ 0.5f, 0.5f / 1.05f, 0.0f, 0.3f, 0.0f, 0.0f }, {});
     std::vector<float> l(kBlock), r(kBlock), out;
-    for (int b = 0; b < static_cast<int>(1.5 * kFs / kBlock); ++b) // let the time glide settle
+    for (int b = 0; b < static_cast<int>(1.5 * kFs / kBlock); ++b)
     {
         std::fill(l.begin(), l.end(), 0.0f);
         std::fill(r.begin(), r.end(), 0.0f);
         echo.process(l.data(), r.data(), kBlock);
     }
-    const int burst = static_cast<int>(0.01 * kFs); // 10 ms of 600 Hz
+    const int burst = static_cast<int>(0.01 * kFs);
     for (int b = 0; b < static_cast<int>(1.0 * kFs / kBlock); ++b)
     {
         for (int i = 0; i < kBlock; ++i)
@@ -173,7 +168,7 @@ TEST_CASE("Worn echo repeats at the set time and wears down", "[fx][echo]")
     auto window = [&](double from, double to) {
         return energy(out, static_cast<std::size_t>(from * kFs), static_cast<std::size_t>(to * kFs));
     };
-    const double gap = window(0.08, 0.18);    // between dry and first repeat: hiss only
+    const double gap = window(0.08, 0.18);
     const double first = window(0.195, 0.22);
     const double second = window(0.395, 0.42);
     CHECK(first > 100.0 * gap);

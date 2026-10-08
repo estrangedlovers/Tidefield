@@ -9,22 +9,15 @@
 #include <juce_data_structures/juce_data_structures.h>
 
 namespace tf::app {
-
-/** Owns the audio device and the engine. The device callback forwards straight to
-    Engine::process; everything else (settings, persistence) happens on the message
-    thread. */
 class AudioHost final : public Host, private juce::AudioIODeviceCallback
 {
 public:
-    /** nullAudio: no device; a thread runs the engine at real-time pace into nothing
-        (`--null-audio`, for testing the interface on machines without sound). */
     AudioHost(juce::PropertiesFile& settings, bool nullAudio = false);
     ~AudioHost() override;
 
     engine::Engine& getEngine() noexcept override { return engine; }
     juce::AudioDeviceManager* getDeviceManager() noexcept override { return &deviceManager; }
 
-    /** 0..1 share of the callback's time budget, smoothed by JUCE. */
     double getCpuLoad() const override { return loadMeasurer.getLoadAsProportion(); }
     int getXrunCount() const { return loadMeasurer.getXRunCount(); }
     bool isRunning() const override { return deviceManager.getCurrentAudioDevice() != nullptr || nullThread != nullptr; }
@@ -45,5 +38,4 @@ private:
     engine::Engine engine;
     std::unique_ptr<juce::Thread> nullThread;
 };
-
-} // namespace tf::app
+}

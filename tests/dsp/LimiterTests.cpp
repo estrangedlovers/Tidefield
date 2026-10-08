@@ -37,7 +37,6 @@ TEST_CASE("Limiter never exceeds the ceiling on loud random bursts")
 
 TEST_CASE("Limiter gain reduction is smooth: no clipping on a single spike")
 {
-    // A lone spike must be absorbed by gain reduction, not by the hard clip.
     Limiter lim;
     lim.prepare({ 48000.0, 1024 });
     lim.setCeilingDb(0.0f);
@@ -65,8 +64,6 @@ TEST_CASE("Limiter passes quiet material unchanged apart from latency")
 
 TEST_CASE("Limiter holds the ceiling for the reconstructed signal (true peak)", "[limiter][truepeak]")
 {
-    // A tone at fs/4 sampled at 45 degrees: every sample is 0.707 of the waveform's
-    // real peak, the classic 3 dB intersample overshoot.
     tf::dsp::Limiter lim;
     lim.prepare({ 48000.0, 256 });
     lim.setCeilingDb(-1.0f);
@@ -76,7 +73,6 @@ TEST_CASE("Limiter holds the ceiling for the reconstructed signal (true peak)", 
         l[static_cast<std::size_t>(i)] = r[static_cast<std::size_t>(i)] = 1.2f * std::sin(3.14159265f * 0.5f * static_cast<float>(i) + 0.785398f);
     for (int pos = 0; pos < n; pos += 256)
         lim.process(l.data() + pos, r.data() + pos, 256);
-    // Reconstruct at 8x with a long windowed sinc and measure the true peak.
     float truePeak = 0.0f;
     for (int i = 4000; i < n - 64; ++i)
         for (int ph = 0; ph < 8; ++ph)
@@ -93,5 +89,5 @@ TEST_CASE("Limiter holds the ceiling for the reconstructed signal (true peak)", 
             truePeak = std::max(truePeak, static_cast<float>(std::fabs(acc)));
         }
     INFO("true peak " << 20.0f * std::log10(truePeak) << " dBTP");
-    CHECK(20.0f * std::log10(truePeak) <= -0.9f); // within 0.1 dB of the -1 dB ceiling
+    CHECK(20.0f * std::log10(truePeak) <= -0.9f);
 }

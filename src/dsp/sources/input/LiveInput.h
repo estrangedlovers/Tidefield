@@ -9,10 +9,6 @@
 #include <cmath>
 
 namespace tf::dsp {
-
-/** Conditioning for an instrument through the audio interface: channel choice, gain,
-    rumble high-pass, and a soft noise gate so a resting cello does not feed hiss into
-    the resonators and clouds. Output is mono; the strip pans it. */
 class LiveInput
 {
 public:
@@ -23,7 +19,7 @@ public:
         Channel channel = Channel::Left;
         float gainDb = 0.0f;
         float highPassHz = 40.0f;
-        float gateDb = -60.0f;   // -90 = gate off
+        float gateDb = -60.0f;
     };
 
     void prepare(const ProcessSpec& spec)
@@ -46,7 +42,6 @@ public:
 
     void setParams(const Params& p) noexcept { params = p; }
 
-    /** inputs may be null or have fewer than two channels; writes mono to `out`. */
     void process(const float* const* inputs, int numInputs, int offset, float* out, int n) noexcept
     {
         const float* l = numInputs > 0 && inputs != nullptr ? inputs[0] : nullptr;
@@ -95,5 +90,4 @@ private:
     float attack = 0.1f, release = 0.001f, followRelease = 0.01f;
     float envelope = 0.0f, gateGain = 0.0f, level = 0.0f;
 };
-
-} // namespace tf::dsp
+}

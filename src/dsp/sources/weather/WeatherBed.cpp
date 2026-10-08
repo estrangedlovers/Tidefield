@@ -7,7 +7,6 @@
 #include <cmath>
 
 namespace tf::dsp {
-
 void WeatherBed::prepare(const ProcessSpec& s, std::uint64_t seed)
 {
     spec = s;
@@ -46,7 +45,6 @@ void WeatherBed::control(float dt) noexcept
     const auto& p = params;
     const float tone = std::clamp(p.tone, 0.0f, 1.0f);
 
-    // Wind: gusts are a slow drift, sharpened so calm and strong moments both happen.
     gustDrift.setRate(0.04f + 0.25f * p.gust);
     centreDrift.setRate(0.03f + 0.1f * p.gust);
     const float g = gustDrift.advance(dt);
@@ -58,12 +56,10 @@ void WeatherBed::control(float dt) noexcept
     windGain = p.wind * gustEnv;
     whistleGain = p.wind * std::max(0.0f, gustEnv - 0.7f) * 1.2f;
 
-    // Rain: hiss brightness follows tone; drop rate rises steeply with rain.
     hissLpL.setCutoff(3500.0f + 7000.0f * tone);
     hissLpR.setCutoff(3500.0f + 7000.0f * tone);
     dropRate = p.rain > 0.0f ? (3.0f + 160.0f * std::pow(p.rain, 1.5f)) / static_cast<float>(spec.sampleRate) : 0.0f;
 
-    // Surf: one wave per cycle, quick crash then a long recession.
     wavePhase += dt / wavePeriod;
     if (wavePhase >= 1.0f)
     {
@@ -78,7 +74,6 @@ void WeatherBed::control(float dt) noexcept
     surfL.setCutoff(surfCut * (1.0f + 0.1f * wavePan));
     surfR.setCutoff(surfCut * (1.0f - 0.1f * wavePan));
 
-    // Distance: darker and narrower.
     const float far = std::clamp(p.distance, 0.0f, 1.0f);
     const float farCut = 18000.0f * std::pow(0.08f, far);
     farL.setCutoff(farCut);
@@ -171,5 +166,4 @@ void WeatherBed::process(float* left, float* right, int n, float timeScale) noex
         right[i] = flushDenormal(mid + width * (r - mid));
     }
 }
-
-} // namespace tf::dsp
+}

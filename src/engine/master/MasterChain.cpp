@@ -4,7 +4,6 @@
 #include <cmath>
 
 namespace tf::engine {
-
 void MasterChain::prepare(const dsp::ProcessSpec& spec)
 {
     fs = spec.sampleRate;
@@ -69,9 +68,6 @@ MasterChain::Events MasterChain::process(float* left, float* right, int n, float
 {
     Events events;
 
-    // 1. Guard. One non-finite sample poisons every recursive state downstream, so
-    //    the whole block is dropped, state is cleared, and the output recovers with
-    //    a short fade.
     bool finite = true;
     for (int i = 0; i < n && finite; ++i)
         finite = std::isfinite(left[i]) && std::isfinite(right[i]);
@@ -89,7 +85,6 @@ MasterChain::Events MasterChain::process(float* left, float* right, int n, float
         }
     }
 
-    // 2-3. Level and fade.
     const float levelStep = n > 0 ? (levelEnd - levelStart) / static_cast<float>(n) : 0.0f;
     for (int i = 0; i < n; ++i)
     {
@@ -110,15 +105,12 @@ MasterChain::Events MasterChain::process(float* left, float* right, int n, float
             }
         }
         const float g = (levelStart + levelStep * static_cast<float>(i + 1)) * fadeCurve(fadePosition);
-        // 4. DC blocker.
         left[i] = dcL.process(left[i] * g);
         right[i] = dcR.process(right[i] * g);
     }
 
-    // 5. Limiter.
     limiter.process(left, right, n);
 
-    // 6. Panic.
     if (panicActive)
     {
         for (int i = 0; i < n; ++i)
@@ -139,5 +131,4 @@ MasterChain::Events MasterChain::process(float* left, float* right, int n, float
 
     return events;
 }
-
-} // namespace tf::engine
+}

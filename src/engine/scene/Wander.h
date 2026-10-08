@@ -13,22 +13,6 @@
 #include <cmath>
 
 namespace tf::engine {
-
-/** Autonomous movement of the terrain cursor. Produces an offset that is added to the
-    performer's cursor, scaled by `amount`, so the performer always stays in charge.
-
-    Styles:
-      Drift     - Ornstein-Uhlenbeck walk: random, but always pulled back toward the
-                  performer's cursor, so it wanders without escaping.
-      Orbit     - slow ellipse around the cursor with drifting radius and speed.
-      TidePool  - drift that is attracted toward the nearest scene, so the sound tends
-                  to settle into scenes, linger, then get washed out again.
-      Journey   - travels from scene to scene on its own (nearer scenes are likelier
-                  next stops), easing in and out of each and dwelling there; Wander
-                  sets how far it pulls away from the performer's cursor (1 = fully).
-      Path      - travels a loop the performer drew, at a steady speed (one lap takes
-                  1 / rate seconds of Tide-scaled time); Wander sets how far it
-                  follows the path rather than the cursor. No path: drift. */
 class Wander
 {
 public:
@@ -51,7 +35,6 @@ public:
         journeyTo = -1;
     }
 
-    /** Advances by dt seconds of (tide-scaled) time and returns the effective position. */
     Point2 update(Point2 cursor, float amount, float rateHz, Style style, const SceneSet* scenes, float dt,
                   const TerrainPath* path = nullptr) noexcept
     {
@@ -62,8 +45,6 @@ public:
         {
             if (path->version != pathVersion)
             {
-                // A new path: start at the point nearest to where the sound is, so
-                // drawing never makes it jump.
                 pathVersion = path->version;
                 const Point2 here { cursor.x + offset.x * reach, cursor.y + offset.y * reach };
                 float best = 1.0e9f;
@@ -87,7 +68,7 @@ public:
                 offset = { std::clamp((pos.x - cursor.x) / reach, -1.5f, 1.5f), std::clamp((pos.y - cursor.y) / reach, -1.5f, 1.5f) };
             return { std::clamp(pos.x, 0.0f, 1.0f), std::clamp(pos.y, 0.0f, 1.0f) };
         }
-        if (style == Style::Path) // no path drawn yet: drift
+        if (style == Style::Path)
             style = Style::Drift;
 
         if (style == Style::Journey && scenes != nullptr && scenes->numScenes >= 2)
@@ -96,18 +77,17 @@ public:
             const Point2 at = stepJourney(here, rateHz, scenes, dt);
             const float a = std::clamp(amount, 0.0f, 1.0f);
             const Point2 pos { cursor.x + (at.x - cursor.x) * a, cursor.y + (at.y - cursor.y) * a };
-            // Keep the offset in step, so switching to another style continues from here.
             if (reach > 0.0f)
                 offset = { std::clamp((pos.x - cursor.x) / reach, -1.5f, 1.5f), std::clamp((pos.y - cursor.y) / reach, -1.5f, 1.5f) };
             return { std::clamp(pos.x, 0.0f, 1.0f), std::clamp(pos.y, 0.0f, 1.0f) };
         }
-        journeyTo = -1; // any other style: the next journey starts afresh
+        journeyTo = -1;
 
         switch (style)
         {
             case Style::Drift: stepOu(rateHz, dt, Point2 { 0.0f, 0.0f }, 0.0f); break;
             case Style::Orbit: stepOrbit(rateHz, dt); break;
-            case Style::Journey: // fewer than two scenes: nowhere to travel, so drift
+            case Style::Journey:
             case Style::Path:
                 stepOu(rateHz, dt, Point2 { 0.0f, 0.0f }, 0.0f);
                 break;
@@ -120,7 +100,6 @@ public:
                     const Point2 here { cursor.x + offset.x * reach, cursor.y + offset.y * reach };
                     const int n = terrain::nearestScene(*scenes, here);
                     const auto target = scenes->positions[static_cast<std::size_t>(n)];
-                    // Target offset (in unit-offset space) that would put us on the scene.
                     pull = { (target.x - cursor.x) / reach, (target.y - cursor.y) / reach };
                     strength = 1.5f;
                 }
@@ -137,16 +116,14 @@ public:
 private:
     float gaussian() noexcept
     {
-        // Irwin-Hall approximation: sum of 4 uniforms, unit variance.
         const float s = rng.nextFloat() + rng.nextFloat() + rng.nextFloat() + rng.nextFloat();
         return (s - 2.0f) * 1.7320508f;
     }
 
-    /** OU process on a unit-scale offset, optionally attracted to `pull`. */
     void stepOu(float rateHz, float dt, Point2 pull, float pullStrength) noexcept
     {
-        const float theta = dsp::kTwoPi * rateHz;           // mean reversion
-        const float sigma = std::sqrt(2.0f * theta) * 0.6f; // stationary std ~0.6
+        const float theta = dsp::kTwoPi * rateHz;
+        const float sigma = std::sqrt(2.0f * theta) * 0.6f;
         const float sq = std::sqrt(std::max(dt, 0.0f));
         offset.x += theta * dt * (-offset.x + pullStrength * (pull.x - offset.x)) + sigma * sq * gaussian();
         offset.y += theta * dt * (-offset.y + pullStrength * (pull.y - offset.y)) + sigma * sq * gaussian();
@@ -154,8 +131,6 @@ private:
         offset.y = std::clamp(offset.y, -1.5f, 1.5f);
     }
 
-    /** One leg takes 0.5 / rate (Tide-scaled) seconds of travel plus as long again
-        dwelling at the scene. */
     Point2 stepJourney(Point2 here, float rateHz, const SceneSet* scenes, float dt) noexcept
     {
         const int n = scenes->numScenes;
@@ -170,12 +145,11 @@ private:
         if (journeyDwell > 0.0f)
         {
             journeyDwell -= dt * rateHz * 2.0f;
-            return journeyFrom; // resting at the scene just reached (journeyTo is already the next stop)
+            return journeyFrom;
         }
         journeyPhase += dt * rateHz * 2.0f;
         if (journeyPhase >= 1.0f)
         {
-            // Arrived: linger, then choose the next stop (nearer ones likelier).
             const int at = journeyTo;
             journeyFrom = pos(at);
             float total = 0.0f;
@@ -220,7 +194,6 @@ private:
         angle += dsp::kTwoPi * rateHz * speed * dt;
         if (angle > dsp::kTwoPi)
             angle -= dsp::kTwoPi;
-        // Ease toward the orbit point so switching style never jumps.
         const float k = std::min(1.0f, dt * 2.0f);
         offset.x += k * (radius * std::cos(angle) - offset.x);
         offset.y += k * (0.7f * radius * std::sin(angle) - offset.y);
@@ -236,5 +209,4 @@ private:
     float pathPhase = 0.0f;
     std::uint64_t pathVersion = 0;
 };
-
-} // namespace tf::engine
+}

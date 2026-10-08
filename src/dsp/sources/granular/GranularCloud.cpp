@@ -7,7 +7,6 @@
 #include <cmath>
 
 namespace tf::dsp {
-
 void GranularCloud::prepare(const ProcessSpec& newSpec, std::uint64_t seed)
 {
     spec = newSpec;
@@ -22,11 +21,9 @@ void GranularCloud::prepare(const ProcessSpec& newSpec, std::uint64_t seed)
     {
         const float t = static_cast<float>(i) / kWindowSize;
         hann[static_cast<size_t>(i)] = 0.5f - 0.5f * std::cos(kTwoPi * t);
-        // Percussive: 5% raised-cosine attack, exponential-ish decay to zero.
         const float attack = 0.05f;
         perc[static_cast<size_t>(i)] = t < attack ? 0.5f - 0.5f * std::cos(kPi * t / attack)
                                                   : std::pow(1.0f - (t - attack) / (1.0f - attack), 2.5f);
-        // Tukey (25% tapers), for smooth, sustained textures.
         const float taper = 0.25f;
         float w = 1.0f;
         if (t < taper * 0.5f)
@@ -50,8 +47,6 @@ void GranularCloud::setBuffer(const SampleBuffer* newBuffer) noexcept
 {
     if (newBuffer == buffer)
         return;
-    // Grains index into the old buffer, so they must stop. The engine crossfades the
-    // strip when it swaps buffers, so the cut is not heard.
     reset();
     buffer = newBuffer;
 }
@@ -87,12 +82,10 @@ void GranularCloud::spawnGrain() noexcept
     const double bufferSize = static_cast<double>(buffer->size());
     const double rateRatio = buffer->sampleRate / spec.sampleRate;
 
-    // Pitch: base + random detune, optionally a scale interval, optionally pulled to
-    // the scale by gravity (relative to the root the sample is assumed to sit on).
     float semis = p.pitch + p.pitchSpread * rng.nextBipolar();
     if (harmony != nullptr && p.harmonize > 0.0f && rng.chance(p.harmonize))
     {
-        const int degree = rng.nextInt(9) - 2; // a little below to well above
+        const int degree = rng.nextInt(9) - 2;
         const auto& scale = harmony->scaleFor(rng.nextFloat());
         const int rootPc = scale.root;
         const int base = static_cast<int>(std::lround(p.rootNote));
@@ -104,10 +97,10 @@ void GranularCloud::spawnGrain() noexcept
 
     const double ratio = std::exp2(static_cast<double>(semis) / 12.0) * rateRatio;
     const int length = std::max(16, static_cast<int>(p.grainMs * 0.001f * static_cast<float>(spec.sampleRate)));
-    const double span = ratio * length; // buffer samples the grain will cover
+    const double span = ratio * length;
 
     float pos = p.position + scanPosition + p.spray * 0.5f * rng.nextBipolar() + 0.02f * positionDrift.getValue();
-    pos -= std::floor(pos); // wrap
+    pos -= std::floor(pos);
     double start = static_cast<double>(pos) * bufferSize;
     const bool reversed = rng.chance(p.reverse);
     if (! reversed)
@@ -143,21 +136,17 @@ void GranularCloud::process(float* left, float* right, int n, float timeScale) n
     scanPosition += params.scan * dt / 60.0f;
     scanPosition -= std::floor(scanPosition);
 
-    // Overlap normalisation: expected simultaneous grains = density * length.
     const float overlap = std::max(1.0f, params.density * params.grainMs * 0.001f);
     const float norm = 1.0f / std::sqrt(overlap);
 
     const bool stereoSource = buffer->isStereo();
     const double meanInterval = spec.sampleRate / std::max(0.05, static_cast<double>(params.density));
 
-    // Onsets are resolved per block (the engine calls with <= 32 samples, < 1 ms).
     samplesToNextGrain -= static_cast<double>(n);
     {
         while (samplesToNextGrain <= 0.0)
         {
             spawnGrain();
-            // Half regular, half Poisson: even enough to feel continuous at high
-            // density, irregular enough to never sound like a pulse.
             const double u = std::max(1.0e-6, static_cast<double>(rng.nextFloat()));
             samplesToNextGrain += meanInterval * (0.5 + 0.5 * -std::log(u));
         }
@@ -167,17 +156,12 @@ void GranularCloud::process(float* left, float* right, int n, float timeScale) n
     {
         if (! g.active)
             continue;
-        // Read the band-limited level chosen for this grain's speed (positions stay in
-        // level-0 samples; a level-k sample covers 2^k of them).
         const float* srcL = buffer->mipChannel(0, g.mip);
         const float* srcR = buffer->mipChannel(1, g.mip);
         const auto size = buffer->mipSize(g.mip);
         const bool stereo = stereoSource;
         const double scale = 1.0 / static_cast<double>(1 << g.mip);
         const float invLength = 1.0f / static_cast<float>(g.length);
-        // The window changes slowly against a chunk (<= 32 samples; grains are >= 10 ms),
-        // so it is evaluated at the chunk's ends and interpolated: two table blends per
-        // chunk instead of one per sample (error below -50 dB).
         const int run = std::min(n, g.length - g.age);
         const float w0 = windowAt(static_cast<float>(g.age) * invLength, g.windowMix) * norm;
         const float w1 = windowAt(static_cast<float>(g.age + run) * invLength, g.windowMix) * norm;
@@ -187,8 +171,6 @@ void GranularCloud::process(float* left, float* right, int n, float timeScale) n
         double pos = g.readPos * scale;
         const double inc = g.increment * scale;
 
-        // Most chunks lie wholly inside the sample: check both ends once, then run a
-        // loop with no bounds checks and no per-sample channel test.
         const double endPos = pos + inc * static_cast<double>(std::max(0, run - 1));
         if (run > 0 && std::min(pos, endPos) >= 1.0 && static_cast<std::size_t>(std::max(pos, endPos)) + 2 < size)
         {
@@ -221,7 +203,6 @@ void GranularCloud::process(float* left, float* right, int n, float timeScale) n
             const auto k = static_cast<std::size_t>(pos);
             if (pos >= 1.0 && k + 2 < size)
             {
-                // Interior: one index for both channels, no bounds checks.
                 const float t = static_cast<float>(pos - static_cast<double>(k));
                 sl = hermite(srcL[k - 1], srcL[k], srcL[k + 1], srcL[k + 2], t);
                 sr = stereo ? hermite(srcR[k - 1], srcR[k], srcR[k + 1], srcR[k + 2], t) : sl;
@@ -231,7 +212,6 @@ void GranularCloud::process(float* left, float* right, int n, float timeScale) n
                 sl = readHermite(srcL, size, pos);
                 sr = stereo ? readHermite(srcR, size, pos) : sl;
             }
-            // Pan a mono read in full; for stereo sources the pan narrows to a balance.
             left[i] += sl * w * gl;
             right[i] += sr * w * gr;
             pos += inc;
@@ -262,5 +242,4 @@ int GranularCloud::getGrainViews(GrainView* out) const noexcept
     }
     return count;
 }
-
-} // namespace tf::dsp
+}

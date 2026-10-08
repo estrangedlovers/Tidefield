@@ -15,11 +15,6 @@
 #include <memory>
 
 namespace tf::app {
-
-/** New / Open / Save for the app. File work happens on a background thread; applying
-    happens on the message thread. Opening while sound is playing fades the master
-    out, swaps everything with no smoothing (so nothing audibly sweeps), then fades
-    back in. */
 class SessionController
 {
 public:
@@ -34,22 +29,17 @@ public:
     void save();
     void saveAs();
 
-    /** Feed every engine notice and the latest telemetry (message thread). */
     void handleNotice(const engine::EngineNotice& notice);
     void setLatest(const engine::TelemetryFrame& frame) { latest = frame; }
 
     juce::String getName() const { return current == juce::File() ? juce::String("Untitled") : current.getFileNameWithoutExtension(); }
     bool isBusy() const noexcept { return busy; }
 
-    /** UI feedback: short status messages and warnings. */
     std::function<void(const juce::String&)> onStatus;
     std::function<void()> onSessionChanged;
-    /** What New starts from (the app's starter session); the plain defaults if unset. */
     std::function<io::SessionData()> makeNewSession;
-    /** After a session is applied (message thread), with what was applied. */
     std::function<void(const io::SessionData&)> onApplied;
 
-    /** Where file work runs (the app core's pool, which waits for it on shutdown). */
     void setWorkers(juce::ThreadPool* pool) { workers = pool; }
 
 private:
@@ -74,5 +64,4 @@ private:
     void runInBackground(std::function<void()> job);
     std::shared_ptr<bool> alive = std::make_shared<bool>(true);
 };
-
-} // namespace tf::app
+}

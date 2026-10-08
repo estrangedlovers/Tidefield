@@ -11,13 +11,9 @@ class Engine;
 class FxManager;
 class SceneManager;
 class SeasonManager;
-} // namespace tf::engine
+}
 
 namespace tf::io {
-
-/** JSON messages between the engine side and the web UI. The schema describes every
-    parameter, strip, slot and processor, so the front end has no hard-coded tables;
-    telemetry carries only what changed since the last frame for parameters. */
 juce::var buildSchema(const engine::Engine& engine);
 
 juce::var describeScenes(const engine::SceneManager& scenes);
@@ -28,7 +24,6 @@ juce::var describeSeasons(const engine::SeasonManager& seasons);
 class TelemetryEncoder
 {
 public:
-    /** Next frame includes every parameter (call when the page (re)loads). */
     void reset() noexcept { primed = false; }
 
     juce::var encode(const engine::TelemetryFrame& frame);
@@ -39,5 +34,4 @@ private:
     std::vector<std::uint8_t> lastLive;
     std::vector<std::int8_t> lastPickup;
 };
-
-} // namespace tf::io
+}

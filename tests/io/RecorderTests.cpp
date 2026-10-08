@@ -9,7 +9,6 @@
 using namespace tf;
 
 namespace {
-
 constexpr double kFs = 48000.0;
 constexpr int kBlock = 512;
 
@@ -18,8 +17,7 @@ struct TempDir
     juce::File dir = juce::File::getSpecialLocation(juce::File::tempDirectory).getNonexistentChildFile("tidefield_rec", "");
     ~TempDir() { dir.deleteRecursively(); }
 };
-
-} // namespace
+}
 
 TEST_CASE("Recorder writes the master and stems as float WAVs matching the output", "[record]")
 {
@@ -50,18 +48,18 @@ TEST_CASE("Recorder writes the master and stems as float WAVs matching the outpu
     REQUIRE(folder.getFileName().endsWith("test take"));
     REQUIRE(rec.start(folder, kFs, true).wasOk());
     REQUIRE(rec.getStatus().state == io::Recorder::State::Recording);
-    REQUIRE(rec.start(folder, kFs, true).failed()); // one at a time
+    REQUIRE(rec.start(folder, kFs, true).failed());
 
     const int blocks = static_cast<int>(1.5 * kFs / kBlock);
     for (int b = 0; b < blocks; ++b)
     {
         block(true);
         if (b % 8 == 0)
-            rec.drainNow(); // the background thread drains too; both are fine
+            rec.drainNow();
     }
     rec.stop();
     REQUIRE(rec.getStatus().state == io::Recorder::State::Finishing);
-    block(false); // the engine acknowledges the stop at its next block
+    block(false);
     rec.drainNow();
     REQUIRE(rec.getStatus().state == io::Recorder::State::Idle);
     REQUIRE(finished);
@@ -73,7 +71,7 @@ TEST_CASE("Recorder writes the master and stems as float WAVs matching the outpu
     REQUIRE(master != nullptr);
     REQUIRE(master->size() == outL.size());
     for (std::size_t i = 0; i < outL.size(); ++i)
-        REQUIRE(master->left[i] == outL[i]); // 32-bit float: bit-exact
+        REQUIRE(master->left[i] == outL[i]);
 
     for (const auto& name : io::Recorder::stemNames())
     {
@@ -82,7 +80,6 @@ TEST_CASE("Recorder writes the master and stems as float WAVs matching the outpu
         CHECK(stem->size() == outL.size());
     }
 
-    // The next take can start straight away.
     const auto second = io::Recorder::makeFolder(tmp.dir, "second");
     REQUIRE(rec.start(second, kFs, false).wasOk());
     block(false);

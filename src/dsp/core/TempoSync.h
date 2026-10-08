@@ -4,8 +4,6 @@
 #include <cmath>
 
 namespace tf::dsp {
-
-/** Musical divisions a synced time can snap to, in beats (quarter notes). */
 struct BeatDivision
 {
     float beats;
@@ -17,8 +15,6 @@ inline constexpr std::array<BeatDivision, 10> kBeatDivisions { {
     { 1.5f, "1/4 dotted" }, { 2.0f, "1/2" }, { 3.0f, "1/2 dotted" }, { 4.0f, "1 bar" }, { 8.0f, "2 bars" },
 } };
 
-/** The division nearest (in ratio, so 1/8 vs 1/4 is judged like 1/2 vs 1 bar) to a
-    free time, among those no longer than maxSeconds. -1 if none fits. */
 inline int nearestDivision(float seconds, float beatSeconds, float maxSeconds) noexcept
 {
     int best = -1;
@@ -38,7 +34,6 @@ inline int nearestDivision(float seconds, float beatSeconds, float maxSeconds) n
     return best;
 }
 
-/** A free time locked to the beat when beatSeconds > 0 (otherwise unchanged). */
 inline float syncedSeconds(float seconds, float beatSeconds, float maxSeconds) noexcept
 {
     if (beatSeconds <= 0.0f)
@@ -46,5 +41,4 @@ inline float syncedSeconds(float seconds, float beatSeconds, float maxSeconds) n
     const int i = nearestDivision(seconds, beatSeconds, maxSeconds);
     return i < 0 ? seconds : kBeatDivisions[static_cast<std::size_t>(i)].beats * beatSeconds;
 }
-
-} // namespace tf::dsp
+}

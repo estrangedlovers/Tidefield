@@ -6,9 +6,7 @@
 #include <stdexcept>
 
 namespace tf::tools {
-
 namespace {
-
 engine::Command parseCommand(const juce::String& name)
 {
     using engine::Command;
@@ -23,8 +21,7 @@ engine::Command parseCommand(const juce::String& name)
     if (name == "loopClear") return Command::LoopClear;
     throw std::runtime_error("Unknown command: " + name.toStdString());
 }
-
-} // namespace
+}
 
 Score Score::load(const juce::File& file, const engine::ParamRegistry& registry)
 {
@@ -146,5 +143,4 @@ Score Score::load(const juce::File& file, const engine::ParamRegistry& registry)
                      [](const TimedEvent& a, const TimedEvent& b) { return a.sample < b.sample; });
     return s;
 }
-
-} // namespace tf::tools
+}

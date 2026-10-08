@@ -7,8 +7,6 @@
 #include <cmath>
 
 namespace tf::dsp {
-
-/** TPT one-pole lowpass with a matching highpass output. */
 class OnePole
 {
 public:
@@ -44,5 +42,4 @@ private:
     float G = 0.0f;
     float s = 0.0f;
 };
-
-} // namespace tf::dsp
+}

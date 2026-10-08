@@ -6,9 +6,8 @@
 #include <dsp/sources/bloom/BloomSampler.h>
 
 namespace tf::app::gui {
-
 namespace {
-constexpr int kHoldFrames = 12; // ~200 ms: long enough for the engine to echo the value back
+constexpr int kHoldFrames = 12;
 }
 
 Model::Model(AppCore& c) : core(c), engine(c.engine), registry(c.engine.getRegistry())
@@ -28,10 +27,8 @@ void Model::tick()
     for (auto& h : holdFrames)
         if (h > 0)
             --h;
-    // A copy (a component may unregister itself while ticking), into a buffer that
-    // keeps its capacity, so a frame allocates nothing.
     ticking.assign(animated.begin(), animated.end());
-    for (std::size_t i = 0; i < ticking.size(); ++i) // by index: remove() may null entries as we go
+    for (std::size_t i = 0; i < ticking.size(); ++i)
         if (auto* a = ticking[i])
             a->tick();
     ticking.clear();
@@ -47,7 +44,7 @@ void Model::jumpTerrain(engine::Point2 to)
     set(P::TerrainX, to.x);
     set(P::TerrainY, to.y);
     juce::Timer::callAfterDelay(150, [this, weak = std::weak_ptr<bool>(alive), token] {
-        if (weak.expired() || token != jumpToken) // gone, or a later jump owns the restore
+        if (weak.expired() || token != jumpToken)
             return;
         set(P::TerrainGlide, savedGlide);
         jumpPending = false;
@@ -57,7 +54,6 @@ void Model::jumpTerrain(engine::Point2 to)
 float Model::value(P p) const noexcept
 {
     const auto i = engine::idx(p);
-    // Without telemetry (no audio running) a value set here is the best guess.
     if (touching[i] != 0 || holdFrames[i] > 0 || (frame().sampleTime == 0 && setHere[i] != 0))
         return local[i];
     return frame().paramTargets[i];
@@ -201,5 +197,4 @@ void Model::showParamMenu(P p, juce::Component* owner)
             resetToDefault(p);
     });
 }
-
-} // namespace tf::app::gui
+}

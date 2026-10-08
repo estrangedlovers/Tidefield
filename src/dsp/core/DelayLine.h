@@ -7,8 +7,6 @@
 #include <vector>
 
 namespace tf::dsp {
-
-/** Power-of-two circular delay with Hermite fractional reads. Allocated in prepare. */
 class DelayLine
 {
 public:
@@ -34,10 +32,6 @@ public:
         writePos = (writePos + 1) & mask;
     }
 
-    /** Value `delay` samples behind the most recent push: read(0) is the newest
-        sample, read(1) the one before. Fractional delays use Hermite interpolation and
-        are clamped to [1, capacity]. In a feedback loop, read before pushing: the loop
-        delay is then delay + 1 samples. */
     float read(float delay) const noexcept
     {
         const float d = std::clamp(delay, 1.0f, static_cast<float>(capacity()));
@@ -46,7 +40,6 @@ public:
         return hermite(at(whole - 1), at(whole), at(whole + 1), at(whole + 2), frac);
     }
 
-    /** Integer read: k samples behind the newest (0 = newest). */
     float at(std::size_t k) const noexcept { return buffer[(writePos + mask - k) & mask]; }
 
     std::size_t capacity() const noexcept { return mask - 3; }
@@ -56,5 +49,4 @@ private:
     std::size_t mask = 0;
     std::size_t writePos = 0;
 };
-
-} // namespace tf::dsp
+}

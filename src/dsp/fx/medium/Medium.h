@@ -14,22 +14,6 @@
 #include <vector>
 
 namespace tf::dsp {
-
-/** The "recording type": makes everything sound printed to a medium.
-
-      Digital        clean
-      Cassette       hiss, wow and flutter, head bump, HF loss with age, asymmetric
-                     tape saturation, crosstalk, dropouts when worn
-      Vinyl          crackle and pops, surface noise, rumble, 33 rpm wow, mono lows,
-                     inner-groove HF loss
-      Noisy sampler  sample-rate reduction, 8 to 14-bit quantisation, input clipping,
-                     noise floor, warm reconstruction filter
-
-    Every model runs behind the same fixed base delay (kBaseDelayMs), so dry/wet mix
-    and type crossfades are phase-coherent. Changing type crossfades over 300 ms.
-
-    Controls are in 0..1. Noise is the medium's own noise (hiss, crackle, floor); it
-    is independent of the input, so a cassette hisses even in silence, as it should. */
 class Medium
 {
 public:
@@ -41,11 +25,11 @@ public:
     struct Params
     {
         Type type = Type::Digital;
-        float age = 0.3f;     // how worn: HF loss, dropouts, bit depth, crackle rate
-        float noise = 0.4f;   // level of the medium's own noise
-        float wobble = 0.3f;  // wow/flutter (tape, vinyl), clock jitter (sampler)
-        float drive = 0.3f;   // saturation / clipping
-        float mix = 1.0f;     // dry/wet
+        float age = 0.3f;
+        float noise = 0.4f;
+        float wobble = 0.3f;
+        float drive = 0.3f;
+        float mix = 1.0f;
     };
 
     static const char* typeName(Type t) noexcept;
@@ -69,7 +53,7 @@ private:
         Svf hfL, hfR;
         OnePole hissHp, hissLp;
         Random rng;
-        TanhAdaa satL, satR; // anti-aliased tape saturation
+        TanhAdaa satL, satR;
         float dropoutGain = 1.0f, dropoutTarget = 1.0f;
         int dropoutRemaining = 0;
     };
@@ -106,7 +90,7 @@ private:
     int baseDelay = 144;
     Params params;
     Type previousType = Type::Digital;
-    float fade = 1.0f;       // 0 -> 1 while crossfading previous -> current
+    float fade = 1.0f;
     float fadeStep = 0.0f;
     float timeScale = 1.0f;
 
@@ -117,8 +101,6 @@ private:
     std::vector<float> inL, inR, curL, curR, prevL, prevR;
 };
 
-/** Medium as an FX-slot processor (inserts, delay feedback experiments). p1 selects
-    the type in four bands; p2..p5 are age, noise, wobble, drive; p6 is unused. */
 class MediumProcessor final : public Processor
 {
 public:
@@ -136,5 +118,4 @@ public:
 private:
     Medium medium;
 };
-
-} // namespace tf::dsp
+}

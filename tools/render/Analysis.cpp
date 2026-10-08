@@ -4,10 +4,9 @@
 #include <cmath>
 
 namespace tf::tools {
-
 namespace {
 float toDb(double linear) { return linear <= 1.0e-6 ? -120.0f : static_cast<float>(20.0 * std::log10(linear)); }
-} // namespace
+}
 
 Analysis Analysis::run(const std::vector<std::vector<float>>& channels, double sampleRate, float ceilingDb)
 {
@@ -88,5 +87,4 @@ juce::var Analysis::toJson() const
     obj->setProperty("rmsPerSecondDb", env);
     return juce::var(obj);
 }
-
-} // namespace tf::tools
+}

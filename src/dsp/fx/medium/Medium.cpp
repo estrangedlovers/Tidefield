@@ -8,14 +8,11 @@
 #include <cstdio>
 
 namespace tf::dsp {
-
 namespace {
-
 inline float softClip(float x) noexcept { return std::tanh(x); }
 
 constexpr const char* kTypeNames[] = { "Digital", "Cassette", "Vinyl", "Sampler" };
-
-} // namespace
+}
 
 const char* Medium::typeName(Type t) noexcept
 {
@@ -95,7 +92,6 @@ void Medium::setParams(const Params& p) noexcept
     params = p;
 
     const float age = std::clamp(p.age, 0.0f, 1.0f);
-    // Control-rate coefficient updates for every model (cheap; called per tick).
     cassette.bumpL.setPeak(75.0f, 0.9f, 1.5f + 2.0f * age);
     cassette.bumpR.setPeak(75.0f, 0.9f, 1.5f + 2.0f * age);
     const float tapeHf = 16000.0f * std::pow(0.33f, age);
@@ -136,7 +132,7 @@ void Medium::runCassette(const float* iL, const float* iR, float* oL, float* oR,
     const float hiss = params.noise * dbToGain(-54.0f + 12.0f * age);
     const float dt = static_cast<float>(1.0 / fs);
     const float fsf = static_cast<float>(fs);
-    const float dropoutRate = std::max(0.0f, age - 0.4f) * 0.6f; // events per second
+    const float dropoutRate = std::max(0.0f, age - 0.4f) * 0.6f;
 
     for (int i = 0; i < n; ++i)
     {
@@ -153,19 +149,15 @@ void Medium::runCassette(const float* iL, const float* iR, float* oL, float* oR,
         float l = c.dl.read(d);
         float r = c.dr.read(d);
 
-        // Crosstalk between tracks.
         const float lx = l + 0.03f * r;
         const float rx = r + 0.03f * l;
 
-        // Asymmetric tape saturation (bias shifts the curve; the offset is removed),
-        // anti-aliased: up to 18 dB of drive would otherwise fold harmonics back down.
         l = (c.satL.process(lx * driveGain + bias) - biasOffset) * makeup;
         r = (c.satR.process(rx * driveGain + bias) - biasOffset) * makeup;
 
         l = c.hfL.processLow(c.bumpL.process(l));
         r = c.hfR.processLow(c.bumpR.process(r));
 
-        // Dropouts: brief, smooth dips when the tape is worn.
         if (c.dropoutRemaining > 0)
         {
             if (--c.dropoutRemaining == 0)
@@ -178,7 +170,6 @@ void Medium::runCassette(const float* iL, const float* iR, float* oL, float* oR,
         }
         c.dropoutGain += 0.003f * (c.dropoutTarget - c.dropoutGain);
 
-        // Hiss: band-shaped noise, slightly different per channel.
         const float h = c.hissLp.processLow(c.hissHp.processHigh(c.rng.nextBipolar())) * hiss;
         const float h2 = c.rng.nextBipolar() * hiss * 0.3f;
 
@@ -197,7 +188,7 @@ void Medium::runVinyl(const float* iL, const float* iR, float* oL, float* oR, in
     const float makeup = 1.0f / std::sqrt(driveGain);
     const float dt = static_cast<float>(1.0 / fs);
     const float fsf = static_cast<float>(fs);
-    const float crackleRate = noise * (4.0f + 50.0f * age);   // clicks per second
+    const float crackleRate = noise * (4.0f + 50.0f * age);
     const float popRate = noise * (0.05f + 0.6f * age);
     const float clickDecay = std::exp(-1.0f / (0.00025f * fsf));
     const float popDecay = std::exp(-1.0f / (0.004f * fsf));
@@ -209,7 +200,6 @@ void Medium::runVinyl(const float* iL, const float* iR, float* oL, float* oR, in
         v.dl.push(iL[i]);
         v.dr.push(iR[i]);
 
-        // 33 1/3 rpm = 0.555 Hz eccentricity wow, plus a little drift.
         v.wowPhase += 0.555f * timeScale * dt;
         if (v.wowPhase >= 1.0f)
             v.wowPhase -= 1.0f;
@@ -218,13 +208,11 @@ void Medium::runVinyl(const float* iL, const float* iR, float* oL, float* oR, in
         float l = v.dl.read(d);
         float r = v.dr.read(d);
 
-        // Mono below ~150 Hz (cutting lathes sum the lows), then groove HF loss.
         const float mid = 0.5f * (l + r);
         const float side = v.sideHp.processHigh(0.5f * (l - r));
         l = v.hfL.processLow(softClip((mid + side) * driveGain) * makeup);
         r = v.hfR.processLow(softClip((mid - side) * driveGain) * makeup);
 
-        // Crackle: sparse, very short clicks with random level and polarity.
         if (v.rng.chance(crackleRate * dt))
         {
             const float a = v.rng.nextFloat();
@@ -266,12 +254,10 @@ void Medium::runSampler(const float* iL, const float* iR, float* oL, float* oR, 
         const float l = s.preL.processLow(s.dl.at(static_cast<std::size_t>(baseDelay)));
         const float r = s.preR.processLow(s.dr.at(static_cast<std::size_t>(baseDelay)));
 
-        // Sample and hold at the reduced rate, with clock jitter.
         s.phase += step * (1.0f + jitter * s.rng.nextBipolar());
         if (s.phase >= 1.0f)
         {
             s.phase -= std::floor(s.phase);
-            // Input stage clips hard (converters had no headroom), then quantises.
             const float cl = std::clamp(l * driveGain, -1.0f, 1.0f);
             const float cr = std::clamp(r * driveGain, -1.0f, 1.0f);
             s.holdL = std::round(cl * levels) / levels / std::sqrt(driveGain);
@@ -320,7 +306,6 @@ void Medium::process(float* left, float* right, int numSamples) noexcept
             if (fading)
             {
                 fade = std::min(1.0f, fade + fadeStep);
-                // Equal-power crossfade between models (they are decorrelated noise-wise).
                 const float a = std::sin(fade * 0.5f * kPi);
                 const float b = std::cos(fade * 0.5f * kPi);
                 wl = wl * a + prevL[static_cast<size_t>(i)] * b;
@@ -363,9 +348,8 @@ void MediumProcessor::setControls(const std::array<float, 6>& c, const ModContex
     p.noise = c[2];
     p.wobble = c[3];
     p.drive = c[4];
-    p.mix = 1.0f; // the slot applies mix
+    p.mix = 1.0f;
     medium.setParams(p);
     medium.setTimeScale(ctx.timeScale);
 }
-
-} // namespace tf::dsp
+}

@@ -5,12 +5,9 @@
 #include <memory>
 
 namespace tf::app::gui {
-
-/** Stereo peak meter with a held peak line; reads the master or one strip. */
 class Meter final : public juce::Component, public Animated
 {
 public:
-    /** strip < 0: master. */
     Meter(Model& m, int strip = -1, bool horizontal = true);
     ~Meter() override;
     void tick() override;
@@ -24,12 +21,9 @@ private:
     int holdFramesL = 0, holdFramesR = 0;
 };
 
-/** A sample's outline with the grains (or Bloom voices) currently reading it. Click
-    to load a sound, right-click to clear it. */
 class Waveform final : public juce::Component, public Animated
 {
 public:
-    /** slot 0..3 = clouds, kNumClouds = Bloom. */
     Waveform(Model& m, int slot, juce::Colour colour);
     ~Waveform() override;
     void tick() override;
@@ -51,8 +45,6 @@ private:
     float shownPos = -1.0f;
 };
 
-/** Colour and space on one surface: left dark / right bright, down close and dry /
-    up far and wet. Double-click recentres. */
 class ShapePad final : public juce::Component, public Animated
 {
 public:
@@ -72,8 +64,6 @@ private:
     float shownC = 0.0f, shownS = 0.0f;
 };
 
-/** A playable keyboard for Bloom: click or drag across keys, or play the computer
-    keyboard in note mode. Lights the notes Bloom is sounding and the notes in key. */
 class KeyboardStrip final : public juce::Component, public Animated
 {
 public:
@@ -95,5 +85,4 @@ private:
     int heldNote = -1;
     std::array<float, 128> lit {};
 };
-
-} // namespace tf::app::gui
+}

@@ -11,9 +11,7 @@
 #include <engine/scene/SceneManager.h>
 
 namespace tf::io {
-
 namespace {
-
 constexpr const char* kFormatTag = "tidefield-session";
 constexpr const char* kJsonEntry = "session.json";
 
@@ -26,15 +24,12 @@ std::vector<std::string> sampleSlotNames()
     return names;
 }
 
-/** Upgrades older JSON in place, one version step at a time. Add a case for every
-    schema change; never edit an existing step. */
 bool migrate(juce::DynamicObject& root, int from, juce::String& error)
 {
     for (int v = from; v < SessionData::kCurrentVersion; ++v)
     {
         switch (v)
         {
-            // case 1: (1 -> 2) e.g. rename a parameter id inside "params" and "scenes".
             default:
                 error = "No migration from session version " + juce::String(v);
                 return false;
@@ -57,12 +52,11 @@ std::map<std::string, float> varToMap(const juce::var& v)
     std::map<std::string, float> m;
     if (const auto* obj = v.getDynamicObject())
         for (const auto& prop : obj->getProperties())
-            if (const double v = prop.value; std::isfinite(v)) // a damaged value is skipped (the default applies)
+            if (const double v = prop.value; std::isfinite(v))
                 m[prop.name.toString().toStdString()] = static_cast<float>(v);
     return m;
 }
-
-} // namespace
+}
 
 juce::var midiToJson(const engine::MidiManager& midi, const engine::ParamRegistry& registry)
 {
@@ -228,7 +222,6 @@ std::vector<std::string> applyGestureJson(const juce::var& json, engine::Gesture
         return warnings;
     }
     take.sampleRate = 48000.0;
-    // Times in seconds, kept finite and within a day (a damaged file can hold anything).
     auto seconds = [](const juce::var& v) {
         const double s = v;
         return std::isfinite(s) ? std::clamp(s, 0.0, 86400.0) : 0.0;
@@ -339,9 +332,6 @@ std::vector<std::string> applySession(const SessionData& session, engine::Engine
     const auto& reg = engine.getRegistry();
     std::vector<std::string> warnings = session.warnings;
 
-    // FX types first: loading a processor posts its defaults, which the stored
-    // values below then override. Slots the session does not mention (it predates
-    // them) are emptied, so nothing carries over from the previous piece.
     for (int slot = 0; slot < engine::kNumFxSlots; ++slot)
         if (session.fx.find(engine::kFxSlots[static_cast<std::size_t>(slot)].id) == session.fx.end())
             fx.setType(slot, "", false);
@@ -353,14 +343,13 @@ std::vector<std::string> applySession(const SessionData& session, engine::Engine
         else if (! type.empty() && dsp::ProcessorFactory::instance().find(type) == nullptr)
         {
             warnings.push_back("Unknown processor '" + type + "' in " + slotId + " (left empty)");
-            fx.setType(slot, "", false); // nothing from the previous piece stays in the slot
+            fx.setType(slot, "", false);
         }
         else
             fx.setType(slot, type, false);
     }
 
     engine.command(engine::Command::ReleaseLiveLayer);
-    // Parameters added after the session was saved go to their defaults.
     for (const auto& spec : reg.all())
         if (session.params.find(spec.id) == session.params.end())
         {
@@ -401,7 +390,6 @@ std::vector<std::string> applySession(const SessionData& session, engine::Engine
             pins.push_back(*index);
     scenes.replaceAll(std::move(newScenes), pins);
 
-    // Samples: every slot is set, so a session without a cloud sample clears it.
     for (int k = 0; k < engine::kNumClouds; ++k)
     {
         const auto it = session.samples.find("cloud" + std::to_string(k + 1));
@@ -461,7 +449,7 @@ juce::var sessionToJson(const SessionData& s)
         root->setProperty("seasons", s.seasons);
     if (! s.path.empty())
     {
-        juce::Array<juce::var> pts; // flat: x0, y0, x1, y1, ...
+        juce::Array<juce::var> pts;
         for (const auto& p : s.path)
         {
             pts.add(std::round(p.x * 10000.0f) / 10000.0f);
@@ -547,7 +535,6 @@ bool writeSession(const SessionData& s, juce::OutputStream& out, juce::String& e
         juce::MemoryBlock flac;
         if (! encodeFlac(*buffer, flac, error))
             return false;
-        // FLAC is already compressed: store it.
         zip.addEntry(std::make_unique<juce::MemoryInputStream>(std::move(flac)), 0, "audio/" + juce::String(slot) + ".flac", now);
     }
     if (! zip.writeToStream(out, nullptr))
@@ -571,7 +558,7 @@ bool saveSession(const SessionData& s, const juce::File& file, juce::String& err
         out.setPosition(0);
         out.truncate();
         bool ok = writeSession(s, out, error);
-        out.flush(); // the last bytes: a full disk shows up here
+        out.flush();
         if (ok && out.getStatus().failed())
         {
             error = "Writing " + file.getFileName() + " failed: " + out.getStatus().getErrorMessage();
@@ -579,12 +566,10 @@ bool saveSession(const SessionData& s, const juce::File& file, juce::String& err
         }
         if (! ok)
         {
-            temp.deleteFile(); // the previous file is untouched
+            temp.deleteFile();
             return false;
         }
     }
-    // Swap in atomically. If that fails, the complete new copy is kept beside the old
-    // one rather than deleted.
     if (! temp.replaceFileIn(file))
     {
         error = "Could not replace " + file.getFullPathName() + "; the new version was saved as " + temp.getFileName();
@@ -594,7 +579,6 @@ bool saveSession(const SessionData& s, const juce::File& file, juce::String& err
 }
 
 namespace {
-
 std::optional<SessionData> loadFromZip(juce::ZipFile& zip, const juce::String& what, juce::String& error)
 {
     const auto* entry = zip.getEntry(kJsonEntry);
@@ -645,8 +629,7 @@ std::optional<SessionData> loadFromZip(juce::ZipFile& zip, const juce::String& w
     }
     return session;
 }
-
-} // namespace
+}
 
 std::optional<SessionData> loadSession(const juce::File& file, juce::String& error)
 {
@@ -660,5 +643,4 @@ std::optional<SessionData> readSession(const void* data, std::size_t size, juce:
     juce::ZipFile zip(stream);
     return loadFromZip(zip, "The saved state", error);
 }
-
-} // namespace tf::io
+}

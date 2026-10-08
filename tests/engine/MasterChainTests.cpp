@@ -9,17 +9,15 @@
 using namespace tf::engine;
 
 namespace {
-
 constexpr double kFs = 48000.0;
-constexpr int kBlock = 480; // 10 ms
+constexpr int kBlock = 480;
 
 void fill(std::vector<float>& l, std::vector<float>& r, float value)
 {
     std::fill(l.begin(), l.end(), value);
     std::fill(r.begin(), r.end(), value);
 }
-
-} // namespace
+}
 
 TEST_CASE("Master starts silent and fades in over the configured time")
 {
@@ -39,7 +37,7 @@ TEST_CASE("Master starts silent and fades in over the configured time")
         ++blocks;
     }
     REQUIRE(completed);
-    REQUIRE(blocks == 100); // 1 s of 10 ms blocks
+    REQUIRE(blocks == 100);
     REQUIRE(m.getFadeState() == FadeState::Open);
 }
 
@@ -58,7 +56,7 @@ TEST_CASE("Panic reaches silence within 60 ms and stays silent until resumed")
 
     m.panic();
     bool silentReported = false;
-    for (int i = 0; i < 6; ++i) // 60 ms
+    for (int i = 0; i < 6; ++i)
     {
         fill(l, r, 0.5f);
         silentReported = m.process(l.data(), r.data(), kBlock, 1.0f, 1.0f).panicReachedSilence || silentReported;

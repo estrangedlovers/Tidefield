@@ -163,7 +163,7 @@ medium. One `Medium` processor with a type selector and shared controls:
 | **Digital** | clean bypass |
 | **Cassette** | hiss (shaped noise that rides slightly with level), wow and flutter (two modulated fractional delays, slow + fast, tide-independent), head-bump low boost, high-frequency roll-off that drops with *age*, soft asymmetric tape saturation, slight L/R crosstalk, occasional dropouts at high age |
 | **Vinyl** | crackle and pops (random impulse generator, filtered), surface noise and rumble, slow 0.55 Hz wow (33 rpm), low-end mono summing, inner-groove HF loss, gentle tilt EQ |
-| **Noisy sampler** | 12-bit style quantisation, sample-rate reduction with selectable anti-alias filter (clean / gritty), input drive into clipping, noise floor, warm output filter (SP-1200 / S950 territory) |
+| **Sampler** | 12-bit style quantisation, sample-rate reduction with selectable anti-alias filter (clean / gritty), input drive into clipping, noise floor, warm output filter (SP-1200 / S950 territory) |
 
 Shared controls: `medium.type`, `medium.age` (0..1, how worn), `medium.noise`,
 `medium.wobble`, `medium.drive`, `medium.mix`. Switching type crossfades the old and
@@ -201,9 +201,9 @@ Each item is either a `Source`, a `Processor` or a control-layer feature, so any
 them can be added without changing the core.
 
 **Sources and generators**
-- **Disintegration looper**: records a phrase; every repeat passes through a Medium so
+- **Tape looper**: records a phrase; every repeat passes through a Medium so
   it slowly decays (the William Basinski technique).
-- **Incommensurate loops**: several sparse note loops of different prime lengths
+- **Cycles** (incommensurate loops): several sparse note loops of different prime lengths
   (Eno's *Music for Airports* system), pitched by gravity, played through Bloom or the
   resonators.
 - **Weather bed**: procedural wind, rain and surf from shaped noise with drifting

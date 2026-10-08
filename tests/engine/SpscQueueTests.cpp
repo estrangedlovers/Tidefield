@@ -14,7 +14,7 @@ TEST_CASE("SpscQueue preserves order and reports full/empty")
     REQUIRE(q.push(1));
     REQUIRE(q.push(2));
     REQUIRE(q.push(3));
-    REQUIRE_FALSE(q.push(4)); // capacity 3
+    REQUIRE_FALSE(q.push(4));
     REQUIRE(q.pop(out));
     REQUIRE(out == 1);
     REQUIRE(q.push(4));

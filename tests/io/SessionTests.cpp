@@ -18,7 +18,6 @@ using namespace tf;
 using Catch::Approx;
 
 namespace {
-
 constexpr double kFs = 48000.0;
 
 std::shared_ptr<dsp::SampleBuffer> noise(float seconds, bool stereo, std::uint64_t seed)
@@ -71,8 +70,7 @@ juce::File tempFile(const juce::String& name)
 {
     return juce::File::getSpecialLocation(juce::File::tempDirectory).getChildFile("tidefield-tests").getChildFile(name);
 }
-
-} // namespace
+}
 
 TEST_CASE("A session round-trips through a .tidefield file with its audio")
 {
@@ -126,7 +124,6 @@ TEST_CASE("A session round-trips through a .tidefield file with its audio")
     }
     REQUIRE_FALSE(loaded->samples.at("bloom")->isStereo());
 
-    // Recall into a fresh engine.
     Rig b;
     const auto warnings = io::applySession(*loaded, b.engine, b.scenes, b.fx, true);
     REQUIRE(warnings.empty());
@@ -177,7 +174,6 @@ TEST_CASE("MIDI mappings round-trip through a session; sessions without MIDI kee
     REQUIRE(midi2.getNotesToDrone());
     REQUIRE(midi2.getNoteChannel() == 2);
 
-    // A session saved without MIDI leaves the current mapping untouched.
     io::SessionData bare;
     io::applySession(bare, e2, scenes2, fx2, true, &midi2);
     REQUIRE(midi2.getBindings().size() == 9);
@@ -274,11 +270,9 @@ TEST_CASE("A session from before a parameter or slot existed resets it to defaul
     e.prepare(kFs, 256);
     engine::SceneManager scenes(e);
     engine::FxManager fx(e);
-    // The previous piece: wind blowing and an insert on the weather strip.
     e.setParam(engine::P::WeatherWind, 0.8f);
     fx.setType(engine::FxManager::findSlot("weather.fx1"), "tf.ensemble", false);
 
-    // An old session that knows nothing about weather.
     auto old = io::defaultSession(e);
     for (auto it = old.params.begin(); it != old.params.end();)
         it = it->first.rfind("weather.", 0) == 0 ? old.params.erase(it) : std::next(it);
@@ -385,15 +379,15 @@ TEST_CASE("Presets save, list after the factory ones, and delete", "[presets]")
 
     const auto clouds = lib.list("cloud");
     REQUIRE(clouds.size() == 3);
-    CHECK(clouds[0].name == "Alpha"); // factory first, by name
+    CHECK(clouds[0].name == "Alpha");
     CHECK(clouds[1].name == "Zeta");
     CHECK_FALSE(clouds[2].factory);
-    CHECK(clouds[2].name == "My: dusty/cloud"); // the name survives an unsafe file name
+    CHECK(clouds[2].name == "My: dusty/cloud");
     CHECK(clouds[2].values.at("pitch") == Approx(-12.0f));
     REQUIRE(lib.list("fx:tf.reverb").size() == 1);
     CHECK(lib.list("fx:tf.reverb")[0].values.at("mix") == Approx(0.4f));
 
-    CHECK_FALSE(lib.remove(clouds[0])); // factory presets cannot be deleted
+    CHECK_FALSE(lib.remove(clouds[0]));
     CHECK(lib.remove(clouds[2]));
     CHECK(lib.list("cloud").size() == 2);
     dir.deleteRecursively();
@@ -407,14 +401,12 @@ TEST_CASE("Damaged or hostile sessions are refused or made safe", "[session][rob
     engine::FxManager fx(e);
     engine::SeasonManager seasons(e);
 
-    // A season with period 0 (would divide by zero) and absurd depth.
     auto data = io::defaultSession(e);
     auto* season = new juce::DynamicObject();
     season->setProperty("param", "drone.cutoff");
     season->setProperty("period", 0.0);
     season->setProperty("depth", 50.0);
     data.seasons = juce::Array<juce::var> { juce::var(season) };
-    // An effect type this build does not have, over a slot that holds one now.
     fx.setType(engine::kBusASlot, "tf.reverb", false);
     data.fx[engine::kFxSlots[static_cast<std::size_t>(engine::kBusASlot)].id] = "someone.elses.shimmer";
     io::applySession(data, e, scenes, fx, true, nullptr, &seasons);
@@ -423,7 +415,6 @@ TEST_CASE("Damaged or hostile sessions are refused or made safe", "[session][rob
     CHECK(seasons.getSeasons()[0].depth <= 1.0f);
     CHECK(fx.getType(engine::kBusASlot).empty());
 
-    // Running it stays finite.
     std::vector<float> l(256), r(256);
     float* outs[2] = { l.data(), r.data() };
     bool finite = true;
@@ -435,10 +426,8 @@ TEST_CASE("Damaged or hostile sessions are refused or made safe", "[session][rob
     }
     CHECK(finite);
 
-    // NaN never reaches a parameter.
     CHECK(e.getRegistry().spec(engine::P::DroneCutoff).clamp(std::numeric_limits<float>::quiet_NaN()) == Approx(900.0f));
 
-    // A truncated or garbage state blob is refused, not a crash.
     juce::MemoryOutputStream out;
     juce::String error;
     REQUIRE(io::writeSession(io::defaultSession(e), out, error));
@@ -457,10 +446,9 @@ TEST_CASE("Preset names that share a file name do not overwrite each other", "[p
     juce::String error;
     REQUIRE(lib.save({ "Pad?", "drone", { { "root", 40.0f } }, false }, error));
     REQUIRE(lib.save({ "Pad", "drone", { { "root", 50.0f } }, false }, error));
-    REQUIRE(lib.save({ "Pad", "drone", { { "root", 55.0f } }, false }, error)); // same name: replaced
+    REQUIRE(lib.save({ "Pad", "drone", { { "root", 55.0f } }, false }, error));
     auto list = lib.list("drone");
     REQUIRE(list.size() == 2);
-    // Deleting one leaves the other.
     for (const auto& p : list)
         if (p.name == "Pad?")
             CHECK(lib.remove(p));

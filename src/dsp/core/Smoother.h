@@ -6,8 +6,6 @@
 #include <cmath>
 
 namespace tf::dsp {
-
-/** Linear ramp to the target over a fixed time. No overshoot; good for gains. */
 class LinearSmoother
 {
 public:
@@ -44,7 +42,6 @@ public:
         return current;
     }
 
-    /** Advances n samples at once and returns the value afterwards. */
     float skip(int n) noexcept
     {
         if (remaining <= 0)
@@ -74,8 +71,6 @@ private:
     int rampSamples = 1;
 };
 
-/** Exponential (one-pole) smoother. Optionally runs in the log domain so frequency
-    sweeps move evenly in pitch. Snaps to the target once within a small epsilon. */
 class OnePoleSmoother
 {
 public:
@@ -93,7 +88,6 @@ public:
         state = targetState = toState(value);
     }
 
-    /** Changes the time constant without disturbing the current value. */
     void setTimeConstant(float seconds) noexcept
     {
         if (seconds == tau)
@@ -116,7 +110,6 @@ public:
     {
         if (state == targetState)
             return fromState(state);
-        // Closed form of n iterations: state moves by 1 - (1 - c)^n of the gap.
         const float before = state;
         const float k = 1.0f - std::pow(1.0f - coefficient, static_cast<float>(n));
         state += k * (targetState - state);
@@ -132,8 +125,6 @@ private:
     float toState(float v) const noexcept { return useLog ? std::log(std::max(v, 1.0e-6f)) : v; }
     float fromState(float s) const noexcept { return useLog ? std::exp(s) : s; }
 
-    /** Snaps when close enough, or when float precision means the step no longer
-        moves the state (long time constants stall a few ulps short otherwise). */
     void snap(float before) noexcept
     {
         const float epsilon = useLog ? 1.0e-5f : 1.0e-6f * std::max(1.0f, std::fabs(targetState));
@@ -148,5 +139,4 @@ private:
     float targetState = 0.0f;
     bool useLog = false;
 };
-
-} // namespace tf::dsp
+}

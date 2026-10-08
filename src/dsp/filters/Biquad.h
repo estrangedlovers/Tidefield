@@ -7,9 +7,6 @@
 #include <cmath>
 
 namespace tf::dsp {
-
-/** RBJ-cookbook biquad, transposed direct form II. Coefficients are recomputed only
-    when set*() is called, so keep those calls at control rate. */
 class Biquad
 {
 public:
@@ -92,5 +89,4 @@ private:
     float b0 = 1.0f, b1 = 0.0f, b2 = 0.0f, a1 = 0.0f, a2 = 0.0f;
     float z1 = 0.0f, z2 = 0.0f;
 };
-
-} // namespace tf::dsp
+}

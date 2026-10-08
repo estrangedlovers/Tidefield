@@ -1,6 +1,5 @@
 cmake_minimum_required(VERSION 3.24)
 
-# Must precede project(): it sets the compiler's minimum-version flag.
 set(CMAKE_OSX_DEPLOYMENT_TARGET "12.0" CACHE STRING "Minimum macOS version")
 
 project(Tidefield VERSION 1.2.0 LANGUAGES C CXX)
@@ -9,7 +8,6 @@ set(CMAKE_CXX_STANDARD 20)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
 set(CMAKE_CXX_EXTENSIONS OFF)
 set(CMAKE_EXPORT_COMPILE_COMMANDS ON)
-# The DSP and engine libraries are linked into the plugin (a shared module) too.
 set(CMAKE_POSITION_INDEPENDENT_CODE ON)
 
 if(APPLE)
@@ -25,9 +23,6 @@ option(TIDEFIELD_BUILD_RENDER "Build the offline render harness"   ON)
 include(cmake/CompilerWarnings.cmake)
 include(cmake/Dependencies.cmake)
 
-# ---------------------------------------------------------------------------
-# tidefield_dsp: pure C++20 DSP. No JUCE, no engine, no UI.
-# ---------------------------------------------------------------------------
 add_library(tidefield_dsp STATIC
     src/dsp/fx/Limiter.cpp
     src/dsp/fx/ProcessorFactory.cpp
@@ -50,9 +45,6 @@ add_library(tidefield_dsp STATIC
 target_include_directories(tidefield_dsp PUBLIC src)
 tf_set_warnings(tidefield_dsp)
 
-# ---------------------------------------------------------------------------
-# tidefield_engine: parameters, control flow, mixer, master chain. No JUCE.
-# ---------------------------------------------------------------------------
 add_library(tidefield_engine STATIC
     src/engine/Engine.cpp
     src/engine/params/ParamRegistry.cpp
@@ -68,11 +60,6 @@ add_library(tidefield_engine STATIC
 target_link_libraries(tidefield_engine PUBLIC tidefield_dsp)
 tf_set_warnings(tidefield_engine)
 
-# ---------------------------------------------------------------------------
-# tidefield_io: JUCE-based file and session code. An INTERFACE library: each
-# executable compiles these sources against its own JUCE modules, so JUCE module
-# code is never linked twice.
-# ---------------------------------------------------------------------------
 add_library(tidefield_io INTERFACE)
 target_sources(tidefield_io INTERFACE
     ${CMAKE_CURRENT_SOURCE_DIR}/src/io/AudioFileIO.cpp

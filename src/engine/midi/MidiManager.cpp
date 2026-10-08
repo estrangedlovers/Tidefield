@@ -6,7 +6,6 @@
 #include <cctype>
 
 namespace tf::engine {
-
 MidiManager::MidiManager(Engine& e) : engine(e), registry(e.getRegistry()) {}
 
 const char* MidiManager::actionName(MidiAction action) noexcept
@@ -34,7 +33,6 @@ std::string MidiManager::describe(const MidiBinding& b) const
                           + (b.channel < 0 ? " (any ch)" : " (ch " + std::to_string(b.channel + 1) + ")");
     if (b.action != MidiAction::None)
         return control + " -> " + actionName(b.action);
-    // Display name, with its group when the name alone is ambiguous ("Level").
     const auto& spec = registry.spec(b.param);
     std::string target = spec.name;
     const auto dot = spec.id.find('.');
@@ -81,8 +79,6 @@ void MidiManager::setBindings(std::vector<MidiBinding> newBindings)
 
 void MidiManager::addBinding(const MidiBinding& b)
 {
-    // One control drives one target when learned: drop older bindings of the same
-    // control so moving a knob never surprises you with a forgotten mapping.
     bindings.erase(std::remove_if(bindings.begin(), bindings.end(),
                                   [&](const MidiBinding& o) { return o.source == b.source && o.cc == b.cc && o.channel == b.channel; }),
                    bindings.end());
@@ -164,12 +160,12 @@ bool MidiManager::handleMonitor(const RawMidi& m)
     if (m.isCc())
     {
         if (m.data1 == 64)
-            return false; // the sustain pedal is reserved for Bloom
+            return false;
         b.source = MidiBinding::Source::Cc;
     }
     else if (m.isNoteOn() && learnTargetAction != MidiAction::None)
     {
-        b.source = MidiBinding::Source::Note; // pads can trigger actions
+        b.source = MidiBinding::Source::Note;
     }
     else
     {
@@ -199,9 +195,7 @@ void MidiManager::loadDefaultLayout()
         b.param = idx(targets[i]);
         layout.push_back(b);
     }
-    // Keep master level out of the danger zone at the top of the knob.
     layout[7].high = registry.spec(P::MasterLevel).toNormalised(0.0f);
     setBindings(std::move(layout));
 }
-
-} // namespace tf::engine
+}

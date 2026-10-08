@@ -3,7 +3,6 @@
 #include <cmath>
 
 namespace tf::app::gui {
-
 namespace {
 constexpr float kSceneHit = 16.0f;
 constexpr float kInset = 26.0f;
@@ -11,8 +10,6 @@ const std::array<juce::Colour, 4> kCloudTints { juce::Colour(0xff7fe6ff), juce::
 
 float ease(float dt, float tau) { return 1.0f - std::exp(-dt / tau); }
 
-/** A soft radial falloff (alpha only), drawn tinted and scaled for every glow: far
-    cheaper than computing a radial gradient over a large area every frame. */
 const juce::Image& glowImage()
 {
     static const juce::Image image = [] {
@@ -24,7 +21,7 @@ const juce::Image& glowImage()
             {
                 const float dx = (static_cast<float>(x) + 0.5f) / (size * 0.5f) - 1.0f;
                 const float dy = (static_cast<float>(y) + 0.5f) / (size * 0.5f) - 1.0f;
-                const float a = std::max(0.0f, 1.0f - std::sqrt(dx * dx + dy * dy)); // linear, like the gradient it replaces
+                const float a = std::max(0.0f, 1.0f - std::sqrt(dx * dx + dy * dy));
                 *data.getPixelPointer(x, y) = static_cast<juce::uint8>(juce::roundToInt(a * 255.0f));
             }
         return img;
@@ -37,7 +34,7 @@ void drawGlow(juce::Graphics& g, juce::Point<float> centre, float radius, juce::
     g.setColour(c);
     g.drawImage(glowImage(), juce::Rectangle<float>(radius * 2.0f, radius * 2.0f).withCentre(centre), juce::RectanglePlacement::stretchToFit, true);
 }
-} // namespace
+}
 
 void showSceneMenu(Model& model, int scene, juce::Component* owner)
 {
@@ -74,7 +71,6 @@ void showSceneMenu(Model& model, int scene, juce::Component* owner)
         }
         else if (r == 3)
         {
-            // In place, so the scene keeps its index and colour.
             const auto& f = model.frame();
             for (engine::ParamIndex i = 0; i < engine::kNumParams; ++i)
                 if ((model.registry.spec(i).flags & engine::ParamFlag::kTerrainBound) != 0)
@@ -144,7 +140,6 @@ int TerrainView::sceneAt(juce::Point<float> s) const
 
 juce::Colour TerrainView::soundColour() const
 {
-    // The blend of the scenes shaping the sound, so the light takes their colour.
     float r = 0.0f, g = 0.0f, b = 0.0f, total = 0.0f;
     for (std::size_t k = 0; k < shownWeights.size(); ++k)
     {
@@ -186,11 +181,9 @@ void TerrainView::renderBackdrop()
     juce::Graphics g(backdrop);
     g.addTransform(juce::AffineTransform::scale(scale));
     const auto f = field();
-    // Deep water: lighter at the top, like looking down into a pool.
     g.setGradientFill(juce::ColourGradient(juce::Colour(0xff26383e), f.getX(), f.getY(), juce::Colour(0xff141c1f), f.getX(), f.getBottom(), false));
     g.fillRoundedRectangle(f, metric::radius + 2.0f);
 
-    // A dot grid, like a pad surface.
     const auto inner = f.reduced(kInset);
     g.setColour(display::wellLine());
     for (int i = 0; i <= 16; ++i)
@@ -201,7 +194,6 @@ void TerrainView::renderBackdrop()
             const float s = (i % 4 == 0 && j % 5 == 0) ? 2.6f : 1.6f;
             g.fillEllipse(x - s * 0.5f, y - s * 0.5f, s, s);
         }
-    // Gentle contour lines.
     g.setColour(display::wellLine().withAlpha(0.6f));
     for (int k = 0; k < 9; ++k)
     {
@@ -228,8 +220,6 @@ void TerrainView::tick()
     const float tide = f.tide;
 
     const float audible = f.panicActive ? 0.0f : std::pow(f.fadeGain, 1.5f);
-    // Anything still moving? When nothing is (no sound, nothing gliding), skip the
-    // repaint: an idle terrain costs nothing.
     bool moving = std::abs(audible - energy) > 1.0e-3f || std::abs(f.position.x - shownPos.x) > 1.0e-4f || std::abs(f.position.y - shownPos.y) > 1.0e-4f
                   || std::abs(f.cursor.x - shownCursor.x) > 1.0e-4f || std::abs(f.cursor.y - shownCursor.y) > 1.0e-4f || energy > 0.01f
                   || ! particles.empty() || ! ripples.empty() || drag != Drag::None || model.core.scenes.getVersion() != shownSceneVersion;
@@ -267,7 +257,6 @@ void TerrainView::tick()
             trail.pop_front();
     }
 
-    // Grains: particles emitted in proportion to each cloud's active grains.
     auto& rng = juce::Random::getSystemRandom();
     for (int c = 0; c < engine::kNumClouds; ++c)
     {
@@ -296,11 +285,10 @@ void TerrainView::tick()
     }
     particles.erase(std::remove_if(particles.begin(), particles.end(), [](const Particle& p) { return p.age >= p.life; }), particles.end());
 
-    // Ripples: resonator strikes (a mode jumping up) and new Bloom notes.
     for (std::size_t m = 0; m < lastModes.size(); ++m)
     {
         const float lv = f.modeLevel[m];
-        if (lv > lastModes[m] * 1.6f + 0.02f && ripples.size() < 40 && energy > 0.05f) // only strikes you can hear
+        if (lv > lastModes[m] * 1.6f + 0.02f && ripples.size() < 40 && energy > 0.05f)
             ripples.push_back({ at + juce::Point<float>(rng.nextFloat() * 40.0f - 20.0f, rng.nextFloat() * 40.0f - 20.0f), 0.0f,
                                 juce::jlimit(0.2f, 1.0f, lv * 4.0f) * std::min(1.0f, energy * 1.5f), display::live() });
         lastModes[m] = lv;
@@ -327,8 +315,6 @@ void TerrainView::paint(juce::Graphics& g)
     const auto f = field();
     if (backdrop.isValid())
         g.drawImage(backdrop, f, juce::RectanglePlacement::stretchToFit);
-    // A rectangular clip: cheap to draw against (a rounded one makes every fill
-    // an edge-table intersection); the corners are a few pixels of the backdrop.
     juce::Graphics::ScopedSaveState clip(g);
     g.reduceClipRegion(f.reduced(1.0f).toNearestInt());
     const auto& scenes = model.core.scenes.getScenes();
@@ -337,9 +323,6 @@ void TerrainView::paint(juce::Graphics& g)
     const auto tint = soundColour();
     const float big = std::max(f.getWidth(), f.getHeight());
 
-    // The light: each scene glows by its share of the sound, and the sound itself.
-    // Glows are soft, so they are drawn into a quarter-resolution layer that is
-    // scaled up once: one large image draw per frame instead of one per glow.
     {
         constexpr float kLayerScale = 0.25f;
         const int lw = std::max(1, juce::roundToInt(f.getWidth() * kLayerScale));
@@ -362,7 +345,6 @@ void TerrainView::paint(juce::Graphics& g)
         g.drawImage(glowLayer, f, juce::RectanglePlacement::stretchToFit);
     }
 
-    // Drawn path the sound follows.
     auto drawPath = [&](const std::vector<engine::Point2>& pts, juce::Colour c, float alpha, bool closed) {
         if (pts.size() < 2)
             return;
@@ -376,7 +358,6 @@ void TerrainView::paint(juce::Graphics& g)
         const juce::PathStrokeType stroke(2.0f, juce::PathStrokeType::curved, juce::PathStrokeType::rounded);
         if (closed)
         {
-            // The loop being followed: dashed. (The stroke being drawn is solid.)
             const float dashes[] = { 6.0f, 5.0f };
             juce::Path dashed;
             stroke.createDashedStroke(dashed, p, dashes, 2);
@@ -389,7 +370,6 @@ void TerrainView::paint(juce::Graphics& g)
     drawPath(shownPath, display::tide(), following ? 0.7f : 0.3f, true);
     drawPath(drawing, display::accent(), 0.9f, false);
 
-    // Trail of where the sound has been.
     for (std::size_t i = 1; i < trail.size(); ++i)
     {
         const float a = static_cast<float>(i) / static_cast<float>(trail.size());
@@ -397,7 +377,6 @@ void TerrainView::paint(juce::Graphics& g)
         g.drawLine(juce::Line<float>(trail[i - 1], trail[i]), 1.0f + 2.0f * a);
     }
 
-    // Ripples.
     for (const auto& r : ripples)
     {
         const float t = r.age / 2.6f;
@@ -406,7 +385,6 @@ void TerrainView::paint(juce::Graphics& g)
         g.drawEllipse(juce::Rectangle<float>(rad * 2.0f, rad * 2.0f).withCentre(r.p), 1.4f);
     }
 
-    // Grains.
     for (const auto& p : particles)
     {
         const float t = p.age / p.life;
@@ -415,7 +393,6 @@ void TerrainView::paint(juce::Graphics& g)
         g.fillEllipse(juce::Rectangle<float>(p.size, p.size).withCentre(p.p));
     }
 
-    // Drone voices: lights orbiting the sound.
     for (int v = 0; v < 6; ++v)
     {
         const float level = fr.droneVoiceLevel[static_cast<std::size_t>(v)] * energy;
@@ -429,7 +406,6 @@ void TerrainView::paint(juce::Graphics& g)
         g.fillEllipse(juce::Rectangle<float>(s, s).withCentre(p));
     }
 
-    // Performer's cursor: crosshair and ring (on the projector, only a faint ring).
     const auto cur = toScreen(shownCursor);
     if (! presentation)
     {
@@ -440,13 +416,11 @@ void TerrainView::paint(juce::Graphics& g)
     g.setColour(display::tide().withAlpha(presentation ? 0.35f : 1.0f));
     g.drawEllipse(juce::Rectangle<float>(18.0f, 18.0f).withCentre(cur), 2.0f);
 
-    // The sound.
     g.setColour(tint.withAlpha(0.5f));
     g.fillEllipse(juce::Rectangle<float>(16.0f, 16.0f).withCentre(at));
     g.setColour(display::text());
     g.fillEllipse(juce::Rectangle<float>(8.0f, 8.0f).withCentre(at));
 
-    // Scenes: coloured markers with a weight ring and a name pill.
     for (std::size_t k = 0; k < scenes.size(); ++k)
     {
         const auto c = display::forScene(static_cast<int>(k));
@@ -469,7 +443,6 @@ void TerrainView::paint(juce::Graphics& g)
         const auto name = juce::String(scenes[k].name);
         if (presentation)
         {
-            // The audience sees places, not buttons: a faint name under the dot.
             g.setFont(font(13.0f, 500));
             g.setColour(c.withAlpha(0.35f + 0.5f * w));
             g.drawText(name, juce::Rectangle<float>(200.0f, 18.0f).withCentre(s.translated(0.0f, 24.0f)), juce::Justification::centred, false);
@@ -478,7 +451,7 @@ void TerrainView::paint(juce::Graphics& g)
         g.setFont(font(11.0f, 600));
         const float tw = juce::GlyphArrangement::getStringWidth(g.getCurrentFont(), name) + 14.0f;
         auto pill = juce::Rectangle<float>(tw, 18.0f).withCentre(s.translated(0.0f, 24.0f));
-        if (pill.getBottom() > f.getBottom() - 2.0f) // no room below: label above the dot
+        if (pill.getBottom() > f.getBottom() - 2.0f)
             pill = pill.withCentre(s.translated(0.0f, -24.0f));
         pill = pill.withX(juce::jlimit(f.getX() + 2.0f, std::max(f.getX() + 2.0f, f.getRight() - pill.getWidth() - 2.0f), pill.getX()));
         g.setColour(c.withAlpha(hover ? 1.0f : 0.85f));
@@ -487,7 +460,6 @@ void TerrainView::paint(juce::Graphics& g)
         g.drawText(name, pill, juce::Justification::centred, false);
     }
 
-    // Guidance.
     if (presentation)
         return;
     g.setFont(font(12.0f, 500));
@@ -567,7 +539,6 @@ void TerrainView::mouseUp(const juce::MouseEvent& e)
     }
     else if (drag == Drag::Scene && ! sceneMoved && dragScene >= 0 && dragScene < model.core.scenes.size())
     {
-        // A click on a scene glides there (Shift: arrive at once).
         const auto p = model.core.scenes.getScenes()[static_cast<std::size_t>(dragScene)].position;
         if (e.mods.isShiftDown())
         {
@@ -584,7 +555,6 @@ void TerrainView::mouseUp(const juce::MouseEvent& e)
         if (drawing.size() >= 3)
         {
             model.core.paths.set(drawing);
-            // Follow it: Path style, and enough Wander to hear it.
             model.set(engine::P::TerrainWanderStyle, 4.0f);
             if (model.value(engine::P::TerrainWander) < 0.6f)
                 model.set(engine::P::TerrainWander, 1.0f);
@@ -626,5 +596,4 @@ void TerrainView::mouseExit(const juce::MouseEvent&)
     hoverScene = -1;
     needsRepaint = true;
 }
-
-} // namespace tf::app::gui
+}

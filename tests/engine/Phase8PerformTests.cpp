@@ -13,7 +13,6 @@ using namespace tf::engine;
 using Catch::Approx;
 
 namespace {
-
 constexpr double kFs = 48000.0;
 constexpr int kBlock = 256;
 
@@ -39,8 +38,7 @@ struct Rig
         }
     }
 };
-
-} // namespace
+}
 
 TEST_CASE("ParamState modulation offsets the value, not the target, and clears", "[mod]")
 {
@@ -57,10 +55,10 @@ TEST_CASE("ParamState modulation offsets the value, not the target, and clears",
     ps.clearModulation();
     ps.advance(32);
     CHECK(ps.current(cutoff) == Approx(base));
-    ps.addModulation(idx(P::MediumType), 0.5f); // discrete: ignored
+    ps.addModulation(idx(P::MediumType), 0.5f);
     ps.advance(32);
     CHECK(ps.current(idx(P::MediumType)) == Approx(0.0f));
-    ps.addModulation(cutoff, 5.0f); // clamps at the top of the range
+    ps.addModulation(cutoff, 5.0f);
     ps.advance(32);
     CHECK(ps.current(cutoff) == Approx(spec.maxValue));
 }
@@ -79,7 +77,7 @@ TEST_CASE("Swell rises while held, ebbs after, and leaves targets alone", "[swel
     CHECK(early > 0.1f);
     CHECK(early < 0.9f);
     CHECK(rig.f.swell > 0.95f);
-    CHECK(rig.f.paramTargets[idx(P::DroneSendA)] == Approx(sendTarget)); // the knob does not move
+    CHECK(rig.f.paramTargets[idx(P::DroneSendA)] == Approx(sendTarget));
     rig.engine.setParam(P::SwellHold, 0.0f);
     rig.run(3.0);
     CHECK(rig.f.swell < 0.05f);
@@ -97,16 +95,16 @@ TEST_CASE("Seasons sweep their parameter on their period and persist through the
     REQUIRE(seasons.set(0, s));
     Season bad;
     bad.param = idx(P::MediumType);
-    CHECK_FALSE(seasons.set(1, bad)); // discrete parameters cannot be swept
-    rig.run(5.0); // a quarter cycle: sin peaks
+    CHECK_FALSE(seasons.set(1, bad));
+    rig.run(5.0);
     CHECK(rig.f.seasonValue[0] == Approx(1.0f).margin(0.02));
-    rig.run(10.0); // three quarters: trough
+    rig.run(10.0);
     CHECK(rig.f.seasonValue[0] == Approx(-1.0f).margin(0.02));
 
-    rig.engine.setParam(P::TideRate, 2.0f); // Tide speeds seasons up
+    rig.engine.setParam(P::TideRate, 2.0f);
     rig.run(4.0);
     const float v1 = rig.f.seasonValue[0];
-    rig.run(2.5); // a quarter cycle at double speed
+    rig.run(2.5);
     CHECK(std::fabs(rig.f.seasonValue[0] - v1) > 0.3f);
 
     seasons.remove(0);
@@ -125,7 +123,7 @@ TEST_CASE("Incommensurate loops fire notes into Bloom on their own periods", "[l
     rig.engine.setParam(P::BloomLength, 30.0f);
     rig.engine.setParam(P::LoopsOn, 1.0f);
     rig.engine.setParam(P::LoopsDensity, 1.0f);
-    rig.engine.setParam(P::LoopsRate, 4.0f); // periods of ~4-10 s
+    rig.engine.setParam(P::LoopsRate, 4.0f);
     int fires = 0;
     float lastFlash = 0.0f;
     for (int step = 0; step < 300; ++step)
@@ -138,10 +136,9 @@ TEST_CASE("Incommensurate loops fire notes into Bloom on their own periods", "[l
             ++fires;
         lastFlash = flash;
         for (int k = 5; k < 8; ++k)
-            REQUIRE(rig.f.loopFlash[static_cast<std::size_t>(k)] == 0.0f); // count is 5
+            REQUIRE(rig.f.loopFlash[static_cast<std::size_t>(k)] == 0.0f);
     }
-    CHECK(fires >= 5); // 30 s at 4x: each of 5 loops fires at least once
-    // Notes sit in the key (D minor by default: D E F G A Bb C).
+    CHECK(fires >= 5);
     for (int k = 0; k < 5; ++k)
     {
         const int pc = static_cast<int>(std::lround(rig.f.loopNote[static_cast<std::size_t>(k)])) % 12;
@@ -162,12 +159,12 @@ TEST_CASE("Journey travels between scenes and dwells at them", "[wander][journey
     set.positions[2] = { 0.5f, 0.9f };
     Wander w;
     w.setSeed(4);
-    const float rate = 0.1f; // a leg: 5 s travel + 5 s dwell
+    const float rate = 0.1f;
     int visits[3] = { 0, 0, 0 };
     int lastAt = -1;
     Point2 prev = w.update({ 0.5f, 0.5f }, 1.0f, rate, Wander::Style::Journey, &set, 0.0f);
     float maxStep = 0.0f;
-    for (int step = 0; step < 6000; ++step) // 120 s at 20 ms
+    for (int step = 0; step < 6000; ++step)
     {
         const auto p = w.update({ 0.5f, 0.5f }, 1.0f, rate, Wander::Style::Journey, &set, 0.02f);
         const float stepLen = std::hypot(p.x - prev.x, p.y - prev.y);
@@ -181,11 +178,10 @@ TEST_CASE("Journey travels between scenes and dwells at them", "[wander][journey
             }
     }
     for (int s = 0; s < 3; ++s)
-        CHECK(visits[s] >= 1); // every scene visited
-    CHECK(visits[0] + visits[1] + visits[2] >= 8); // ~12 legs in 120 s
-    CHECK(maxStep < 0.02f);                         // eased, no jumps
+        CHECK(visits[s] >= 1);
+    CHECK(visits[0] + visits[1] + visits[2] >= 8);
+    CHECK(maxStep < 0.02f);
 
-    // Wander 0 keeps the performer's cursor.
     const auto still = w.update({ 0.3f, 0.6f }, 0.0f, rate, Wander::Style::Journey, &set, 0.02f);
     CHECK(still.x == Approx(0.3f));
     CHECK(still.y == Approx(0.6f));
@@ -199,8 +195,8 @@ TEST_CASE("Hush sinks the sources and slow time eases Tide down and back", "[hus
     rig.engine.setParam(P::SlowHold, 1.0f);
     rig.run(4.0);
     CHECK(rig.f.hush > 0.95f);
-    CHECK(rig.f.tide == Approx(0.25f).epsilon(0.05)); // a quarter of Tide 1
-    CHECK(rig.f.paramTargets[idx(P::TideRate)] == Approx(1.0f)); // the setting itself is untouched
+    CHECK(rig.f.tide == Approx(0.25f).epsilon(0.05));
+    CHECK(rig.f.paramTargets[idx(P::TideRate)] == Approx(1.0f));
     rig.engine.setParam(P::HushHold, 0.0f);
     rig.engine.setParam(P::SlowHold, 0.0f);
     rig.run(8.0);

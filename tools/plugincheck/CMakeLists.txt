@@ -1,4 +1,3 @@
-# tidefield_plugincheck: hosts the built plugin like a DAW would and checks it.
 juce_add_console_app(tidefield_plugincheck PRODUCT_NAME "tidefield_plugincheck")
 target_sources(tidefield_plugincheck PRIVATE Main.cpp)
 target_compile_definitions(tidefield_plugincheck PRIVATE

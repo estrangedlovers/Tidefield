@@ -7,12 +7,11 @@
 #include <cmath>
 
 namespace tf::dsp {
-
 namespace {
 const char* const kVoiceChoices[] = { "Two", "Three", "Four", "Six" };
 constexpr int kVoiceCounts[] = { 2, 3, 4, 6 };
 constexpr float kBaseMs = 9.0f;
-} // namespace
+}
 
 using Curve = DisplayMap::Curve;
 
@@ -63,7 +62,7 @@ void Ensemble::process(float* left, float* right, int n) noexcept
 {
     const float msToSamples = static_cast<float>(fs) * 0.001f;
     const float slowInc = rateHz * timeScale / static_cast<float>(fs);
-    const float fastInc = 6.2f / static_cast<float>(fs); // vibrato stays put: Tide would make it seasick
+    const float fastInc = 6.2f / static_cast<float>(fs);
     const float invVoices = 1.0f / static_cast<float>(voices);
     const float norm = 1.0f / std::sqrt(static_cast<float>(voices));
     const float slowMs = 4.0f * depth;
@@ -77,7 +76,6 @@ void Ensemble::process(float* left, float* right, int n) noexcept
         for (int v = 0; v < voices; ++v)
         {
             const float off = static_cast<float>(v) * invVoices;
-            // Right taps run a quarter cycle apart from the left ones at full spread.
             const float offR = off + 0.25f * spread;
             const float dl = kBaseMs + slowMs * sinAt(slowPhase + off) + fastMs * sinAt(fastPhase + off);
             const float dr = kBaseMs + slowMs * sinAt(slowPhase + offR) + fastMs * sinAt(fastPhase + offR);
@@ -92,5 +90,4 @@ void Ensemble::process(float* left, float* right, int n) noexcept
         fastPhase -= std::floor(fastPhase);
     }
 }
-
-} // namespace tf::dsp
+}

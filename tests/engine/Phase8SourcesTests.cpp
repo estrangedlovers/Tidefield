@@ -16,7 +16,6 @@
 using namespace tf;
 
 namespace {
-
 constexpr double kFs = 48000.0;
 constexpr int kBlock = 256;
 
@@ -39,8 +38,7 @@ bool allFinite(const std::vector<float>& x)
             return false;
     return true;
 }
-
-} // namespace
+}
 
 TEST_CASE("FFT round-trips and finds a sinusoid's bin", "[fft]")
 {
@@ -81,10 +79,9 @@ TEST_CASE("Spectral freeze holds a note at about its level, after the note stops
     }
     const auto held = rms(l, static_cast<std::size_t>(2.0 * kFs), static_cast<std::size_t>(3.4 * kFs));
     const float noteRms = 0.3f / std::sqrt(2.0f);
-    CHECK(std::fabs(db(held) - db(noteRms)) < 6.0f); // within 6 dB of the note
-    CHECK(rms(l, static_cast<std::size_t>(5.7 * kFs)) < 1.0e-4f); // released over 2 s
+    CHECK(std::fabs(db(held) - db(noteRms)) < 6.0f);
+    CHECK(rms(l, static_cast<std::size_t>(5.7 * kFs)) < 1.0e-4f);
     CHECK(allFinite(l));
-    // Left and right drift independently: a wide pad, not mono.
     double corr = 0.0, el = 0.0, er = 0.0;
     for (auto i = static_cast<std::size_t>(2.0 * kFs); i < static_cast<std::size_t>(3.4 * kFs); ++i)
     {
@@ -122,7 +119,7 @@ TEST_CASE("Disintegrator: pedal states, loop length, erosion wears it down", "[l
     loop.record();
     REQUIRE(loop.getState() == dsp::Disintegrator::State::Recording);
     auto during = run(2.0, true);
-    CHECK(rms(during) == 0.0f); // the take is not played while recording
+    CHECK(rms(during) == 0.0f);
     loop.record();
     REQUIRE(loop.getState() == dsp::Disintegrator::State::Playing);
     CHECK(loop.getLengthSeconds() == Catch::Approx(2.0f).epsilon(0.01));
@@ -133,8 +130,8 @@ TEST_CASE("Disintegrator: pedal states, loop length, erosion wears it down", "[l
     const float early = rms(firstPass);
     const float late = rms(later, later.size() - static_cast<std::size_t>(2.0 * kFs));
     CHECK(early > 0.1f);
-    CHECK(late < early * 0.6f);  // worn down
-    CHECK(late > early * 0.02f); // but still there
+    CHECK(late < early * 0.6f);
+    CHECK(late > early * 0.02f);
     CHECK(allFinite(later));
 
     loop.clear();
@@ -158,7 +155,7 @@ TEST_CASE("Disintegrator without erosion repeats the loop exactly", "[looper]")
             x = 0.2f * noise.nextBipolar();
         loop.process(in.data(), in.data(), l.data(), r.data(), kBlock);
     }
-    loop.record(); // closes at 40 blocks
+    loop.record();
     std::fill(in.begin(), in.end(), 0.0f);
     for (int pass = 0; pass < 3; ++pass)
         for (int b = 0; b < 40; ++b)
@@ -197,7 +194,6 @@ TEST_CASE("Weather bed: each element sounds, stays bounded and finite", "[weathe
     const float rain = level(0.0f, 1.0f, 0.0f);
     const float surf = level(0.0f, 0.0f, 1.0f);
     INFO("wind " << wind << " rain " << rain << " surf " << surf);
-    // Each element at full sits in a usable bed range.
     for (float v : { wind, rain, surf })
     {
         CHECK(v > -36.0f);
@@ -228,13 +224,12 @@ TEST_CASE("Engine: freeze all holds the mix, ducks it, and releases", "[freeze][
     run(4.0);
     const auto before = run(2.0);
     eng.setParam(engine::P::FreezeOn, 1.0f);
-    eng.setParam(engine::P::FreezeDuck, 1.0f); // only the frozen hold remains
+    eng.setParam(engine::P::FreezeDuck, 1.0f);
     eng.setParam(engine::P::DroneLevel, -60.0f);
     run(1.5);
     CHECK(f.freezeGain == 1.0f);
     const auto held = run(3.0);
     INFO("mix " << db(rms(before)) << " dB, hold " << db(rms(held)) << " dB");
-    // The hold sounds with the source gone and ducked, at about the level it caught.
     CHECK(std::fabs(db(rms(held)) - db(rms(before))) < 6.0f);
     CHECK(allFinite(held));
     eng.setParam(engine::P::FreezeOn, 0.0f);
@@ -273,7 +268,6 @@ TEST_CASE("Engine: the looper records the mix and the input pad sounds unarmed",
     CHECK(f.loopSeconds == Catch::Approx(2.0f).margin(0.02f));
     CHECK(f.loopPasses >= 2);
 
-    // Input monitor off (default), a tone in, freeze it: the pad comes through anyway.
     run(1.0, true);
     eng.setParam(engine::P::InputFreeze, 1.0f);
     run(1.0, true);

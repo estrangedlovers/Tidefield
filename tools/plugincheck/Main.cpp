@@ -1,9 +1,3 @@
-// tidefield_plugincheck <plugin>: loads the built plugin the way a DAW does and
-// checks that it behaves: it instantiates, plays a note, stays finite and under
-// its ceiling at odd block sizes and several sample rates, reports its latency,
-// and its saved state restores into a fresh instance. CI runs it on the VST3 (and
-// the AU on macOS, alongside auval).
-
 #include <juce_audio_processors/juce_audio_processors.h>
 #include <juce_events/juce_events.h>
 
@@ -14,7 +8,6 @@
 #include <map>
 
 namespace {
-
 int failures = 0;
 
 void check(bool ok, const juce::String& what)
@@ -30,7 +23,6 @@ struct Result
     double rmsDb = -200.0;
 };
 
-/** Renders `seconds` in blocks cycling through `blockSizes`, with a held note. */
 Result render(juce::AudioPluginInstance& p, double rate, std::initializer_list<int> blockSizes, double seconds)
 {
     const int maxBlock = *std::max_element(blockSizes.begin(), blockSizes.end());
@@ -67,15 +59,12 @@ Result render(juce::AudioPluginInstance& p, double rate, std::initializer_list<i
                 energy += static_cast<double>(v) * v;
             }
         done += n;
-        // Let the plugin's message-thread work (telemetry, FX loading) run as in a DAW.
         juce::MessageManager::getInstance()->runDispatchLoopUntil(0);
     }
     r.rmsDb = 10.0 * std::log10(energy / (2.0 * static_cast<double>(total)) + 1.0e-20);
     return r;
 }
 
-/** The session inside a saved state: the plugin's zip, unwrapped from the VST3
-    host's XML container when there is one. Returns entry name -> size, and the JSON. */
 std::map<juce::String, juce::int64> sessionEntries(const juce::MemoryBlock& state, juce::var& json)
 {
     juce::MemoryBlock zipData;
@@ -83,8 +72,6 @@ std::map<juce::String, juce::int64> sessionEntries(const juce::MemoryBlock& stat
     const auto size = state.getSize();
     if (size > 8 && juce::String(juce::CharPointer_UTF8(bytes), 4) == "VC2!")
     {
-        // JUCE's VST3 host: "VC2!", a 4-byte size, then XML with the component state
-        // in JUCE's base64 form.
         const auto text = juce::String::fromUTF8(bytes + 8, static_cast<int>(size - 8));
         const auto start = text.indexOf("<IComponent>");
         if (start >= 0)
@@ -92,8 +79,6 @@ std::map<juce::String, juce::int64> sessionEntries(const juce::MemoryBlock& stat
     }
     else
     {
-        // An Audio Unit's ClassInfo: the plugin's bytes as data under jucePluginState,
-        // either raw (binary plist) or standard base64 (XML plist).
         const juce::MemoryBlock pk("PK\x03\x04", 4);
         for (size_t i = 0; i + 4 <= size && zipData.isEmpty(); ++i)
             if (std::memcmp(bytes + i, pk.getData(), 4) == 0)
@@ -122,8 +107,7 @@ std::map<juce::String, juce::int64> sessionEntries(const juce::MemoryBlock& stat
         json = juce::JSON::parse(std::unique_ptr<juce::InputStream>(zip.createStreamForEntry(*e))->readEntireStreamAsString());
     return entries;
 }
-
-} // namespace
+}
 
 int main(int argc, char** argv)
 {
@@ -136,8 +120,6 @@ int main(int argc, char** argv)
     juce::AudioPluginFormatManager formats;
     juce::addDefaultFormatsToManager(formats);
 
-    // A file (VST3), or an installed Audio Unit's identifier such as
-    // "AudioUnit:Synths/aumu,Tdfl,Tdfd" (AUs are found by registration, not path).
     const juce::String arg(argv[1]);
     const juce::String path = arg.startsWith("AudioUnit:") ? arg : juce::File::getCurrentWorkingDirectory().getChildFile(arg).getFullPathName();
     juce::OwnedArray<juce::PluginDescription> found;
@@ -157,7 +139,7 @@ int main(int argc, char** argv)
     check(plugin->acceptsMidi(), "accepts MIDI");
     check(plugin->getTotalNumOutputChannels() == 2, "stereo out");
 
-    const float ceiling = std::pow(10.0f, -1.0f / 20.0f) + 1.0e-4f; // the safety limiter's default -1 dBTP
+    const float ceiling = std::pow(10.0f, -1.0f / 20.0f) + 1.0e-4f;
     for (double rate : { 44100.0, 48000.0, 96000.0 })
     {
         const auto r = render(*plugin, rate, { 512, 37, 1024, 128, 1 }, 10.0);
@@ -186,10 +168,9 @@ int main(int argc, char** argv)
             juce::File(dump + "/a.zip").replaceWithData(state.getData(), state.getSize());
             juce::File(dump + "/b.zip").replaceWithData(again.getData(), again.getSize());
         }
-        // Same sounds, scenes, effects and parameters come back out.
         juce::var a, b;
         const auto ea = sessionEntries(state, a), eb = sessionEntries(again, b);
-        if (ea.empty()) // unknown wrapper: show how it starts, for the next fix
+        if (ea.empty())
             std::cout << "      state begins: " << juce::String::toHexString(state.getData(), static_cast<int>(std::min<size_t>(64, state.getSize())))
                       << "\n      as text: " << juce::String::fromUTF8(static_cast<const char*>(state.getData()), static_cast<int>(std::min<size_t>(300, state.getSize()))).replaceCharacters("\r\n", "  ") << std::endl;
         auto names = [](const std::map<juce::String, juce::int64>& m) {
@@ -199,8 +180,6 @@ int main(int argc, char** argv)
             return n;
         };
         auto same = [&](const char* key) { return juce::JSON::toString(a.getProperty(key, {})) == juce::JSON::toString(b.getProperty(key, {})); };
-        // Names, lengths and slots (the FLAC bytes themselves differ at the 24-bit
-        // noise floor from one save generation to the next).
         check(! ea.empty() && names(ea) == names(eb) && same("samples"), "restored state carries the same sounds (" + names(ea).joinIntoString(", ") + ")");
         check(same("scenes") && same("fx") && same("path"), "restored state carries the same scenes and effects");
         int params = 0, matching = 0;
@@ -219,10 +198,6 @@ int main(int argc, char** argv)
 
     if (argc > 2 && juce::String(argv[2]) == "--ui-load")
     {
-        // The interface while it plays: the editor open, audio fed in real time (blocks
-        // paced by the clock, the message loop running in between), CPU measured for
-        // the whole process. Run once with and once without the editor to separate the
-        // interface's share from the audio's.
         const bool withEditor = argc > 3 && juce::String(argv[3]) == "on";
         std::unique_ptr<juce::AudioProcessorEditor> editor(withEditor ? plugin->createEditorAndMakeActive() : nullptr);
         if (editor != nullptr)

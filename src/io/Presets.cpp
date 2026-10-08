@@ -3,17 +3,13 @@
 #include <algorithm>
 
 namespace tf::io {
-
 namespace {
-
-/** A file-system-safe name: keeps letters, digits, spaces and a few marks. */
 juce::String safeName(const std::string& name)
 {
     auto s = juce::File::createLegalFileName(juce::String(name)).trim();
     return s.isEmpty() ? juce::String("Preset") : s;
 }
-
-} // namespace
+}
 
 PresetLibrary::PresetLibrary(juce::File f) : folder(std::move(f)) {}
 
@@ -61,8 +57,6 @@ bool PresetLibrary::save(const Preset& p, juce::String& error)
         error = "Could not create " + dir.getFullPathName();
         return false;
     }
-    // Same name: replace it. A different name that maps to the same file name ("Pad?"
-    // and "Pad") gets its own file instead of overwriting the other preset.
     auto file = dir.getChildFile(safeName(p.name) + ".json");
     for (int n = 2; file.existsAsFile(); ++n)
     {
@@ -83,7 +77,6 @@ bool PresetLibrary::remove(const Preset& p)
 {
     if (p.factory)
         return false;
-    // The file it was listed from (two names can share a sanitised file name).
     const auto file = p.file != juce::File() ? p.file : folderFor(p.kind).getChildFile(safeName(p.name) + ".json");
     return file.isAChildOf(folder) && file.deleteFile();
 }
@@ -115,5 +108,4 @@ std::optional<Preset> PresetLibrary::fromJson(const juce::var& json)
             p.values[prop.name.toString().toStdString()] = static_cast<float>(static_cast<double>(prop.value));
     return p;
 }
-
-} // namespace tf::io
+}

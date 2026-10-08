@@ -12,12 +12,9 @@ using namespace tf;
 using Catch::Approx;
 
 namespace {
-
 constexpr double kFs = 48000.0;
 constexpr int kBlock = 256;
 
-/** Runs the engine and returns the beat positions (from the host's song position)
-    at which any loop fired. */
 std::vector<double> loopFires(engine::Engine& e, double fromPpq, double toPpq, double bpm, bool host)
 {
     std::vector<float> l(kBlock), r(kBlock);
@@ -34,8 +31,6 @@ std::vector<double> loopFires(engine::Engine& e, double fromPpq, double toPpq, d
         while (e.popTelemetry(f))
             for (std::size_t k = 0; k < 8; ++k)
             {
-                // A flash jumps to 1 when a loop fires and decays with a 0.4 s time
-                // constant, so its level tells how long ago that was.
                 if (f.loopFlash[k] > lastFlash[k] + 0.05f)
                 {
                     const double ago = std::log(1.0 / std::max(1.0e-3f, f.loopFlash[k])) * 0.4;
@@ -55,30 +50,28 @@ void syncedLoops(engine::Engine& e)
     e.setParam(engine::P::LoopsOn, 1.0f);
     e.setParam(engine::P::LoopsCount, 8.0f);
     e.setParam(engine::P::LoopsDensity, 1.0f);
-    e.setParam(engine::P::LoopsRate, 4.0f); // periods / 4: more fires to check
+    e.setParam(engine::P::LoopsRate, 4.0f);
 }
-
-} // namespace
+}
 
 TEST_CASE("Beat divisions snap a free time to the nearest musical length", "[tempo]")
 {
-    const float beat = 0.5f; // 120 BPM
-    CHECK(dsp::syncedSeconds(0.47f, beat, 2.0f) == Approx(0.5f));   // a quarter
-    CHECK(dsp::syncedSeconds(0.26f, beat, 2.0f) == Approx(0.25f));  // an eighth
-    CHECK(dsp::syncedSeconds(1.9f, beat, 2.0f) == Approx(2.0f));    // a bar
-    CHECK(dsp::syncedSeconds(5.0f, beat, 2.0f) == Approx(2.0f));    // longest that fits
-    CHECK(dsp::syncedSeconds(0.47f, 0.0f, 2.0f) == Approx(0.47f));  // not synced
+    const float beat = 0.5f;
+    CHECK(dsp::syncedSeconds(0.47f, beat, 2.0f) == Approx(0.5f));
+    CHECK(dsp::syncedSeconds(0.26f, beat, 2.0f) == Approx(0.25f));
+    CHECK(dsp::syncedSeconds(1.9f, beat, 2.0f) == Approx(2.0f));
+    CHECK(dsp::syncedSeconds(5.0f, beat, 2.0f) == Approx(2.0f));
+    CHECK(dsp::syncedSeconds(0.47f, 0.0f, 2.0f) == Approx(0.47f));
 }
 
 TEST_CASE("A synced tape delay repeats on the beat", "[tempo]")
 {
     dsp::TapeDelay d;
     d.prepare({ kFs, 512 });
-    // Wobble off; the free time (0.47 s) snaps to a quarter at 120 BPM (0.5 s).
     dsp::ModContext ctx;
     ctx.beatSeconds = 0.5f;
     const float time01 = std::log(470.0f / 20.0f) / std::log(100.0f);
-    for (int i = 0; i < 400; ++i) // let the time glide settle
+    for (int i = 0; i < 400; ++i)
     {
         d.setControls({ time01, 0.0f, 1.0f, 0.0f, 0.0f, 0.0f }, ctx);
         std::vector<float> zl(512), zr(512);
@@ -100,12 +93,9 @@ TEST_CASE("Synced loops fire on whole beats and follow the host's song position"
     syncedLoops(a);
     const auto fires = loopFires(a, 0.0, 200.0, 120.0, true);
     REQUIRE(fires.size() > 10);
-    // Every note lands on a beat (within a block of 256 samples, 0.01 beat at 120 BPM).
     for (double p : fires)
         CHECK(std::abs(p - std::round(p)) < 0.02);
 
-    // A second run that starts mid-song (the DAW's play head placed at beat 100)
-    // plays the same notes from there on: the loops follow the song, not the clock.
     engine::Engine b;
     syncedLoops(b);
     const auto later = loopFires(b, 100.0, 200.0, 120.0, true);

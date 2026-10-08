@@ -62,7 +62,7 @@ TEST_CASE("ScopedFlushDenormals flushes subnormal arithmetic")
     float result = 0.0f;
     {
         const ScopedFlushDenormals guard;
-        result = tiny * 1.0e-3f; // subnormal without FTZ
+        result = tiny * 1.0e-3f;
     }
     REQUIRE(result == 0.0f);
 }

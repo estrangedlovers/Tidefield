@@ -7,10 +7,6 @@
 #include <vector>
 
 namespace tf::dsp {
-
-/** In-place iterative radix-2 complex FFT. prepare() allocates the twiddle and
-    bit-reversal tables (off the audio thread); transforms are realtime-safe.
-    Unnormalised: inverse(forward(x)) == size * x. */
 class Fft
 {
 public:
@@ -56,8 +52,6 @@ private:
             for (int start = 0; start < size; start += len)
                 for (int k = 0; k < half; ++k)
                 {
-                    // Written out: std::complex's operator* takes the slow NaN-safe
-                    // library path unless built with fast-math.
                     const auto& w = twiddles[static_cast<std::size_t>(k * step)];
                     const float wr = w.real();
                     const float wi = inv ? -w.imag() : w.imag();
@@ -77,5 +71,4 @@ private:
     std::vector<Complex> twiddles;
     std::vector<int> reversed;
 };
-
-} // namespace tf::dsp
+}

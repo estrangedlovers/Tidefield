@@ -5,9 +5,7 @@
 #include <BinaryData.h>
 
 namespace tf::app::gui {
-
 namespace {
-
 using C = juce::Colour;
 
 const Palette kSlate {
@@ -27,8 +25,7 @@ const Palette kPaper {
 };
 
 Theme current = Theme::slate;
-
-} // namespace
+}
 
 const Palette& palette() { return current == Theme::paper ? kPaper : kSlate; }
 const Palette& displayPalette() { return kSlate; }
@@ -55,7 +52,6 @@ void drawWordmark(juce::Graphics& g, juce::Rectangle<float> r, float markSize, j
     logo::drawMark(g, r.removeFromLeft(markSize).withSizeKeepingCentre(markSize, markSize));
     r.removeFromLeft(markSize * 0.42f);
     g.setColour(textColour);
-    // Quicksand sits low in its box; nudge it up so the x-height centres on the mark.
     g.setFont(brandFont(markSize * 1.02f));
     g.drawText("tidefield", r.translated(0.0f, -markSize * 0.06f), juce::Justification::centredLeft, false);
 }
@@ -84,11 +80,9 @@ void drawWell(juce::Graphics& g, juce::Rectangle<float> r)
     g.setColour(colour::wellLine());
     g.drawRoundedRectangle(r.reduced(0.5f), metric::radius, 1.0f);
 }
-
-} // namespace tf::app::gui
+}
 
 namespace tf::app::gui {
-
 LookAndFeel::LookAndFeel() { applyPalette(); }
 
 void LookAndFeel::applyPalette()
@@ -133,7 +127,6 @@ void LookAndFeel::applyPalette()
 
 juce::Typeface::Ptr LookAndFeel::getTypefaceForFont(const juce::Font& f)
 {
-    // Everything in Inter, whatever a stock component asks for.
     if (f.getTypefaceName() == juce::Font::getDefaultSansSerifFontName())
         return font(f.getHeight(), f.isBold() ? 600 : 400).getTypefacePtr();
     return juce::LookAndFeel_V4::getTypefaceForFont(f);
@@ -194,5 +187,4 @@ void LookAndFeel::drawScrollbar(juce::Graphics& g, juce::ScrollBar&, int x, int 
     g.setColour(colour::lift(colour::panelHi(), over || down ? 0.35f : 0.18f));
     g.fillRoundedRectangle(thumb.toFloat().reduced(1.5f), 3.0f);
 }
-
-} // namespace tf::app::gui
+}

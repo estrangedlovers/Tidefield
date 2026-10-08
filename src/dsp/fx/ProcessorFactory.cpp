@@ -9,7 +9,6 @@
 #include "strings/SympatheticStrings.h"
 
 namespace tf::dsp {
-
 ProcessorFactory& ProcessorFactory::instance()
 {
     static ProcessorFactory factory;
@@ -53,5 +52,4 @@ const ProcessorInfo* ProcessorFactory::find(std::string_view typeId) const noexc
             return e.info;
     return nullptr;
 }
-
-} // namespace tf::dsp
+}

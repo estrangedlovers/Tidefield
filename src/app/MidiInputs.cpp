@@ -1,10 +1,9 @@
 #include "MidiInputs.h"
 
 namespace tf::app {
-
 namespace {
 constexpr auto kDisabledKey = "midiDisabledInputs";
-} // namespace
+}
 
 MidiInputs::MidiInputs(engine::Engine& e, juce::PropertiesFile& s) : engine(e), settings(s)
 {
@@ -73,7 +72,6 @@ void MidiInputs::setEnabled(const juce::String& identifier, bool enabled)
 
 void MidiInputs::PortCallback::handleIncomingMidiMessage(juce::MidiInput*, const juce::MidiMessage& message)
 {
-    // MIDI thread. Only short channel messages matter; sysex and clock are ignored.
     if (message.getRawDataSize() > 3 || message.isSysEx() || message.isMidiClock() || message.isActiveSense())
         return;
     const auto* raw = message.getRawData();
@@ -83,5 +81,4 @@ void MidiInputs::PortCallback::handleIncomingMidiMessage(juce::MidiInput*, const
     m.data2 = message.getRawDataSize() > 2 ? raw[2] : 0;
     engine.postMidi(port, m);
 }
-
-} // namespace tf::app
+}

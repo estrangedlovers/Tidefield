@@ -7,7 +7,6 @@
 #include <cmath>
 
 namespace tf::dsp {
-
 void SpectralFreeze::prepare(const ProcessSpec& s, std::uint64_t seed)
 {
     spec = s;
@@ -73,8 +72,6 @@ void SpectralFreeze::analyse() noexcept
 
 void SpectralFreeze::synthesise() noexcept
 {
-    // Unnormalised inverse of a hann-analysed sinusoid, times a hann synthesis window
-    // that overlap-adds to 2 at 4x: 1/kSize restores the original amplitude.
     constexpr float kScale = 1.0f / static_cast<float>(kSize);
     const float jitter = drift * kPi;
     for (int ch = 0; ch < 2; ++ch)
@@ -86,8 +83,6 @@ void SpectralFreeze::synthesise() noexcept
         {
             const auto uk = static_cast<std::size_t>(k);
             float r = rotRe[uk], i = rotIm[uk];
-            // Centre-frequency advance per hop is 2*pi*k*hop/size = k*pi/2: an exact
-            // quarter-turn rotation, applied by swapping components.
             switch (k & 3)
             {
                 case 1: { const float t = r; r = -i; i = t; break; }
@@ -95,7 +90,6 @@ void SpectralFreeze::synthesise() noexcept
                 case 3: { const float t = r; r = i; i = -t; break; }
                 default: break;
             }
-            // Plus a small random turn (drift), renormalised.
             const float a = jitter * (rng.nextFloat() - 0.5f);
             const float c = 1.0f - 0.5f * a * a;
             const float nr = r * c - i * a;
@@ -141,11 +135,10 @@ void SpectralFreeze::process(const float* in, float* outL, float* outR, int n) n
         {
             hopCount = 0;
             if (! frozen)
-                analyse(); // frozen: the held spectrum needs no fresh analysis
+                analyse();
             if (haveSpectrum && (frozen || gain > 0.0f))
                 synthesise();
         }
     }
 }
-
-} // namespace tf::dsp
+}

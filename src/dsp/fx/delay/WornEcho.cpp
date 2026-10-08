@@ -8,11 +8,10 @@
 #include <cmath>
 
 namespace tf::dsp {
-
 namespace {
 const char* const kMediumChoices[] = { "Cassette", "Vinyl", "Sampler" };
 constexpr float kMaxSeconds = 2.2f;
-} // namespace
+}
 
 using Curve = DisplayMap::Curve;
 
@@ -62,7 +61,7 @@ void WornEcho::setControls(const std::array<float, 6>& c, const ModContext& ctx)
     Medium::Params m;
     m.type = static_cast<Medium::Type>(type + 1);
     m.age = age;
-    m.noise = 0.1f + 0.25f * age; // hiss builds up generation after generation
+    m.noise = 0.1f + 0.25f * age;
     m.wobble = std::clamp(c[4], 0.0f, 1.0f);
     m.drive = 0.2f + 0.4f * age;
     m.mix = 1.0f;
@@ -73,8 +72,6 @@ void WornEcho::setControls(const std::array<float, 6>& c, const ModContext& ctx)
 
 void WornEcho::processChunk(float* left, float* right, int n) noexcept
 {
-    // Read the whole chunk of echoes first (sample i is read i pushes early), then
-    // run them through the Medium, then write input + feedback back to the tape.
     const float latency = static_cast<float>(medium.getLatencySamples());
     const float maxDelay = static_cast<float>(lineL.capacity()) - 4.0f;
     for (int i = 0; i < n; ++i)
@@ -105,5 +102,4 @@ void WornEcho::process(float* left, float* right, int n) noexcept
     for (int done = 0; done < n; done += kChunk)
         processChunk(left + done, right + done, std::min(kChunk, n - done));
 }
-
-} // namespace tf::dsp
+}

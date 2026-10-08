@@ -9,16 +9,9 @@
 #include <cstdint>
 
 namespace tf::engine {
-
-/** Master safety chain:
-    non-finite guard -> master level -> master fade -> DC blocker -> limiter -> panic gain.
-
-    The guard sits first so a NaN never reaches the limiter's state. Panic sits last so
-    it acts within one sample of the limiter output, without waiting on the lookahead. */
 class MasterChain
 {
 public:
-    /** Things the engine needs to react to after a block. */
     struct Events
     {
         bool guardTripped = false;
@@ -41,7 +34,6 @@ public:
     void panic() noexcept;
     void resumeFromPanic() noexcept;
 
-    /** In place. levelStart/levelEnd are linear gains to ramp across the block. */
     Events process(float* left, float* right, int numSamples, float levelStart, float levelEnd) noexcept;
 
     FadeState getFadeState() const noexcept { return fadeState; }
@@ -51,8 +43,6 @@ public:
     int getLatencySamples() const noexcept { return limiter.getLatencySamples(); }
     std::uint32_t getGuardTrips() const noexcept { return guardTrips; }
 
-    /** Cubic curve: close to linear in dB over the range that matters, so long fades
-        feel even instead of jumping at the start. */
     static float fadeCurve(float position) noexcept { return position * position * position; }
 
 private:
@@ -63,8 +53,8 @@ private:
     dsp::Limiter limiter;
 
     float fadeSeconds = 8.0f;
-    float fadePosition = 0.0f;     // 0 = silent, 1 = open
-    float fadeIncrement = 0.0f;    // per sample, signed
+    float fadePosition = 0.0f;
+    float fadeIncrement = 0.0f;
     FadeState fadeState = FadeState::Silent;
 
     bool panicActive = false;
@@ -74,5 +64,4 @@ private:
 
     std::uint32_t guardTrips = 0;
 };
-
-} // namespace tf::engine
+}

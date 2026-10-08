@@ -8,12 +8,10 @@
 #include <cmath>
 
 namespace tf::dsp {
-
 namespace {
 constexpr float kMinEnv = 1.0e-4f;
-// Scale degrees Constellation may scatter to, relative to the played note.
 constexpr std::array<int, 7> kConstellationDegrees { -3, 2, 4, 5, 7, 9, 11 };
-} // namespace
+}
 
 const char* BloomSampler::transformName(Transform t) noexcept
 {
@@ -61,7 +59,7 @@ void BloomSampler::setBuffer(const SampleBuffer* b) noexcept
 {
     if (b == buffer)
         return;
-    reset(); // voices index into the old buffer
+    reset();
     buffer = b;
 }
 
@@ -95,7 +93,6 @@ void BloomSampler::noteOn(int note, float velocity) noexcept
         }
     if (target == nullptr)
     {
-        // Steal the quietest voice, preferring ones already releasing.
         float best = 1.0e9f;
         for (std::size_t i = 0; i < pool; ++i)
         {
@@ -193,7 +190,7 @@ void BloomSampler::startVoice(Voice& v, int note, float velocity) noexcept
     v.stage = Stage::Attack;
 
     const auto pans = equalPowerPan(v.pan);
-    const float cut = 400.0f * std::pow(45.0f, std::clamp(p.tone, 0.0f, 1.0f)); // 400 Hz .. 18 kHz
+    const float cut = 400.0f * std::pow(45.0f, std::clamp(p.tone, 0.0f, 1.0f));
     v.lpL.setCutoff(cut);
     v.lpR.setCutoff(cut);
 
@@ -212,8 +209,6 @@ void BloomSampler::startVoice(Voice& v, int note, float velocity) noexcept
     {
         case Transform::Swell:
         {
-            // Reverse from up to `swell` seconds into the sample back to its start, then
-            // hold the attack region as a slowly scanning pad.
             const double swellSamples = std::min(size - 2.0, static_cast<double>(lerp(0.6f, 4.0f, amount) * fs) * v.ratio);
             auto& t = v.taps[0];
             t.active = true;
@@ -222,7 +217,7 @@ void BloomSampler::startVoice(Voice& v, int note, float velocity) noexcept
             t.inc = -v.ratio;
             t.gainL = pans.left;
             t.gainR = pans.right;
-            v.attackStep = 1.0f / static_cast<float>(swellSamples / v.ratio); // the swell is the attack
+            v.attackStep = 1.0f / static_cast<float>(swellSamples / v.ratio);
             grains(0.01 * size, 0.12 * size / (static_cast<double>(p.lengthSeconds) * spec.sampleRate), 0.22f, 18.0f, 0.02f, 0.03f);
             v.grainsStartAt = static_cast<int>(swellSamples / v.ratio * 0.85);
             break;
@@ -244,7 +239,7 @@ void BloomSampler::startVoice(Voice& v, int note, float velocity) noexcept
             const double start = std::clamp(static_cast<double>(std::max(p.position, 0.12f)), 0.0, 0.9) * size;
             const double stretch = static_cast<double>(lerp(2.0f, 8.0f, amount));
             grains(start, v.ratio / stretch, 0.3f, 14.0f, 0.03f, 0.05f);
-            v.attackStep = std::min(v.attackStep, 1.0f / (1.5f * fs)); // never an attack
+            v.attackStep = std::min(v.attackStep, 1.0f / (1.5f * fs));
             v.lpL.setCutoff(cut * 0.4f);
             v.lpR.setCutoff(cut * 0.4f);
             break;
@@ -323,7 +318,6 @@ void BloomSampler::renderVoice(Voice& v, float* left, float* right, int n, float
 {
     const bool stereo = buffer->isStereo();
     const double sizeD = static_cast<double>(buffer->size());
-    // Reads from the band-limited level for that speed (positions in level-0 samples).
     auto readAt = [&](int mip, double pos, float& sl, float& sr) {
         const double p = pos / static_cast<double>(1 << mip);
         const auto sz = buffer->mipSize(mip);
@@ -338,7 +332,6 @@ void BloomSampler::renderVoice(Voice& v, float* left, float* right, int n, float
 
     for (int i = 0; i < n; ++i)
     {
-        // Envelope.
         switch (v.stage)
         {
             case Stage::Attack:
@@ -361,7 +354,6 @@ void BloomSampler::renderVoice(Voice& v, float* left, float* right, int n, float
         float l = 0.0f, r = 0.0f;
         bool anyTap = false;
 
-        // Taps (Swell reverse, Constellation, Tape).
         for (auto& t : v.taps)
         {
             if (! t.active)
@@ -375,7 +367,6 @@ void BloomSampler::renderVoice(Voice& v, float* left, float* right, int n, float
             double inc = t.inc;
             if (v.transform == Transform::Tape)
             {
-                // Wow, flutter, and a tape stop once the note releases.
                 v.wowPhase += 0.45f * timeScale * dt;
                 v.wowPhase -= std::floor(v.wowPhase);
                 v.flutterPhase += 8.5f * timeScale * dt;
@@ -396,7 +387,6 @@ void BloomSampler::renderVoice(Voice& v, float* left, float* right, int n, float
                 t.active = false;
         }
 
-        // Grains (Swell pad, Smear, Freeze, Ghost).
         if (v.grainsOn && v.age >= v.grainsStartAt)
         {
             v.nextGrain -= 1.0;
@@ -423,7 +413,7 @@ void BloomSampler::renderVoice(Voice& v, float* left, float* right, int n, float
 
         if (v.transform == Transform::Tape && v.tapeSpeed <= 0.0f)
             for (auto& t : v.taps)
-                t.active = false; // the tape has stopped
+                t.active = false;
         if (v.transform == Transform::Tape)
         {
             l = std::tanh(l * (1.0f + 2.0f * amount)) / (1.0f + amount);
@@ -438,7 +428,6 @@ void BloomSampler::renderVoice(Voice& v, float* left, float* right, int n, float
         peak = std::max(peak, std::fabs(l) + std::fabs(r));
         ++v.age;
 
-        // A tap-only voice whose taps all finished has nothing left to say.
         if (! v.grainsOn && ! anyTap && v.stage != Stage::Release)
             v.stage = Stage::Release;
     }
@@ -477,5 +466,4 @@ BloomSampler::VoiceView BloomSampler::getVoice(int i) const noexcept
     const auto& v = voices[static_cast<size_t>(i)];
     return { v.active, v.playedNote, v.active ? v.env * v.velocityGain : 0.0f };
 }
-
-} // namespace tf::dsp
+}

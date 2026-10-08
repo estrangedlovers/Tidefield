@@ -8,16 +8,9 @@
 #include <vector>
 
 namespace tf::engine {
-
-/** Audio-thread-owned parameter values. Targets arrive from ControlEvents; every
-    control tick the smoothers advance and consumers read the smoothed values.
-    `previous()` and `current()` bracket the tick so per-sample consumers can
-    interpolate across it. */
 class ParamState
 {
 public:
-    /** Re-preparing (for example after an audio device change) keeps the current
-        targets, so the performer's settings survive a sample-rate switch. */
     void prepare(const ParamRegistry& registry, double sampleRate)
     {
         const auto n = registry.size();
@@ -49,7 +42,6 @@ public:
         }
     }
 
-    /** Sets a target (clamped). Audio thread only. */
     void setTarget(ParamIndex i, float plain) noexcept
     {
         if (i >= smoothers.size())
@@ -57,7 +49,6 @@ public:
         smoothers[i].setTarget(specs->spec(i).clamp(plain));
     }
 
-    /** Jumps straight to a value with no smoothing (session load, reset). */
     void snap(ParamIndex i, float plain) noexcept
     {
         if (i >= smoothers.size())
@@ -67,10 +58,6 @@ public:
         prev[i] = cur[i] = v;
     }
 
-    /** Modulation (swell, seasons): offsets in the normalised domain, added on top of
-        the smoothed value at the next advance() and never touching the target, so
-        scenes, MIDI pickup and saved values see the performer's setting. Rebuilt
-        every tick: clear, then add. Discrete parameters are never modulated. */
     static constexpr int kMaxModulated = 96;
 
     void clearModulation() noexcept
@@ -92,10 +79,9 @@ public:
         }
         mod[i] += normalisedOffset;
         if (mod[i] == 0.0f)
-            mod[i] = 1.0e-9f; // stays registered so clearModulation() finds it
+            mod[i] = 1.0e-9f;
     }
 
-    /** Advances every parameter by one control tick of numSamples. */
     void advance(int numSamples) noexcept
     {
         for (std::size_t i = 0; i < smoothers.size(); ++i)
@@ -111,7 +97,6 @@ public:
         }
     }
 
-    /** The value including modulation, for telemetry rings. */
     float modulation(ParamIndex i) const noexcept { return mod[i]; }
 
     float current(P p) const noexcept { return cur[idx(p)]; }
@@ -138,5 +123,4 @@ private:
     std::array<ParamIndex, kMaxModulated> modded {};
     int numModded = 0;
 };
-
-} // namespace tf::engine
+}

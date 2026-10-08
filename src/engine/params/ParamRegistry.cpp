@@ -5,10 +5,8 @@
 #include <stdexcept>
 
 namespace tf::engine {
-
 float ParamSpec::clamp(float v) const noexcept
 {
-    // NaN or infinity (a damaged file, a bad controller value) never reaches the DSP.
     return std::isfinite(v) ? std::clamp(v, minValue, maxValue) : defaultValue;
 }
 
@@ -52,5 +50,4 @@ std::optional<ParamIndex> ParamRegistry::find(std::string_view id) const
         return it->second;
     return std::nullopt;
 }
-
-} // namespace tf::engine
+}

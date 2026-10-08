@@ -1,14 +1,11 @@
 #include "AudioHost.h"
 
 namespace tf::app {
-
 namespace {
 constexpr auto kDeviceStateKey = "audioDeviceState";
-} // namespace
+}
 
 namespace {
-
-/** Drives the engine like an audio device would, at real-time pace, output discarded. */
 class NullAudioThread final : public juce::Thread
 {
 public:
@@ -36,8 +33,7 @@ public:
 private:
     engine::Engine& engine;
 };
-
-} // namespace
+}
 
 AudioHost::AudioHost(juce::PropertiesFile& s, bool nullAudio) : settings(s)
 {
@@ -48,7 +44,6 @@ AudioHost::AudioHost(juce::PropertiesFile& s, bool nullAudio) : settings(s)
         return;
     }
     const auto saved = settings.getXmlValue(kDeviceStateKey);
-    // Stereo out, up to two inputs for the live channel (guitar/cello).
     const auto error = deviceManager.initialise(2, 2, saved.get(), true);
     if (error.isNotEmpty())
         juce::Logger::writeToLog("Audio device error: " + error);
@@ -104,5 +99,4 @@ void AudioHost::audioDeviceIOCallbackWithContext(const float* const* inputs, int
     const juce::AudioProcessLoadMeasurer::ScopedTimer timer(loadMeasurer, numSamples);
     engine.process(inputs, numInputs, outputs, numOutputs, numSamples);
 }
-
-} // namespace tf::app
+}

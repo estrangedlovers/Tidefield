@@ -26,7 +26,7 @@ void* allocateAligned(std::size_t size, std::align_val_t alignment)
         return p;
     throw std::bad_alloc();
 }
-} // namespace
+}
 
 void* operator new(std::size_t size) { return allocate(size); }
 void* operator new[](std::size_t size) { return allocate(size); }
@@ -42,7 +42,6 @@ void operator delete(void* p, std::size_t, std::align_val_t) noexcept { std::fre
 void operator delete[](void* p, std::size_t, std::align_val_t) noexcept { std::free(p); }
 
 namespace tf::test {
-
 ScopedAllocationCounter::ScopedAllocationCounter() noexcept
 {
     allocations = 0;
@@ -52,5 +51,4 @@ ScopedAllocationCounter::ScopedAllocationCounter() noexcept
 ScopedAllocationCounter::~ScopedAllocationCounter() noexcept { tracking = false; }
 
 std::size_t ScopedAllocationCounter::count() const noexcept { return allocations; }
-
-} // namespace tf::test
+}

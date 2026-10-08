@@ -7,10 +7,7 @@
 #include <optional>
 
 namespace tf::plugin {
-
 namespace {
-
-/** The standalone interface inside the DAW's plugin window. */
 class Editor final : public juce::AudioProcessorEditor
 {
 public:
@@ -26,8 +23,7 @@ public:
 private:
     app::gui::MainView view;
 };
-
-} // namespace
+}
 
 TidefieldProcessor::TidefieldProcessor()
     : juce::AudioProcessor(BusesProperties()
@@ -40,10 +36,8 @@ TidefieldProcessor::TidefieldProcessor()
     options.osxLibrarySubFolder = "Application Support";
     options.folderName = "Tidefield";
     settings.setStorageParameters(options);
-    // Sensible until the DAW says otherwise; the DAW's prepareToPlay replaces it.
     engine.prepare(48000.0, 512);
     core = std::make_unique<app::AppCore>(*this);
-    // An instrument in a DAW should sound when the track plays, not wait for Fade in.
     engine.command(engine::Command::FadeIn);
     snapshot = captureNow();
     startTimer(1000);
@@ -91,8 +85,6 @@ void TidefieldProcessor::processBlock(juce::AudioBuffer<float>& buffer, juce::Mi
 {
     const juce::AudioProcessLoadMeasurer::ScopedTimer timer(loadMeasurer, buffer.getNumSamples());
 
-    // The track's MIDI goes through the same port a controller would: notes play
-    // Bloom, CCs drive mappings and MIDI learn hears them.
     for (const auto meta : midi)
     {
         const auto m = meta.getMessage();
@@ -108,7 +100,6 @@ void TidefieldProcessor::processBlock(juce::AudioBuffer<float>& buffer, juce::Mi
     }
     midi.clear();
 
-    // The DAW's tempo and song position: synced loops and delays follow them.
     double tempo = 0.0, ppq = 0.0;
     bool playing = false;
     if (auto* head = getPlayHead())
@@ -122,7 +113,6 @@ void TidefieldProcessor::processBlock(juce::AudioBuffer<float>& buffer, juce::Mi
 
     const int numIn = getTotalNumInputChannels();
     const int numOut = getTotalNumOutputChannels();
-    // In place: the engine reads each block's inputs before writing its outputs.
     engine.process(buffer.getArrayOfReadPointers(), numIn, buffer.getArrayOfWritePointers(), numOut, buffer.getNumSamples());
 }
 
@@ -136,8 +126,6 @@ std::shared_ptr<const io::SessionData> TidefieldProcessor::captureNow()
 
 void TidefieldProcessor::timerCallback()
 {
-    // Keep a recent snapshot for hosts that ask for state from another thread (the
-    // managers belong to this one). Cheap: sounds are shared, not copied.
     if (restorePending.load())
         return;
     auto fresh = captureNow();
@@ -147,10 +135,6 @@ void TidefieldProcessor::timerCallback()
 
 void TidefieldProcessor::getStateInformation(juce::MemoryBlock& dest)
 {
-    // The whole piece, sounds included, in the same format as a .tidefield file. On the
-    // message thread it is captured now; from another thread (or while a restore is
-    // still on its way) the latest snapshot is used. Nothing here blocks on another
-    // thread, so a host cannot deadlock against us.
     std::shared_ptr<const io::SessionData> session;
     if (juce::MessageManager::getInstance()->isThisTheMessageThread() && ! restorePending.load())
         session = captureNow();
@@ -178,7 +162,6 @@ void TidefieldProcessor::setStateInformation(const void* data, int size)
     }
     auto restored = std::make_shared<const io::SessionData>(std::move(*session));
     {
-        // Until it is applied, saving returns exactly what was restored.
         const std::scoped_lock lock(stateLock);
         snapshot = restored;
     }
@@ -192,11 +175,10 @@ void TidefieldProcessor::setStateInformation(const void* data, int size)
         apply();
     else
         juce::MessageManager::callAsync([weak = std::weak_ptr<bool>(alive), apply] {
-            if (! weak.expired()) // the host may delete us before the message loop runs
+            if (! weak.expired())
                 apply();
         });
 }
-
-} // namespace tf::plugin
+}
 
 juce::AudioProcessor* JUCE_CALLTYPE createPluginFilter() { return new tf::plugin::TidefieldProcessor(); }

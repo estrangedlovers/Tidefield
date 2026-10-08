@@ -8,16 +8,11 @@
 #include <vector>
 
 namespace tf::app::gui {
-
-/** One device box in the bottom panel: a title bar and controls flowing into
-    columns, top to bottom, like a device in a studio's device chain. An optional
-    full-width widget (a waveform, a type menu) sits above the controls. */
 class Device : public juce::Component
 {
 public:
     Device(Model& m, juce::String title, juce::Colour tab = colour::accent());
 
-    /** Adds the natural control for a parameter: a knob, a switch or a row of choices. */
     ParamComponent* add(engine::P p, juce::String help = {});
     ParamComponent* addKnob(engine::P p, juce::String label = {}, juce::String help = {}, int w = metric::knobW, int h = metric::knobH);
     template <typename T>
@@ -46,8 +41,6 @@ public:
     void mouseMove(const juce::MouseEvent& e) override;
     void mouseExit(const juce::MouseEvent& e) override;
 
-    /** Gives the device a Presets menu in its title bar: presets of `kind`, whose keys
-        are these parameters' IDs without `prefix`. */
     void setPresets(std::string kind, std::string prefix, std::vector<engine::P> params);
 
 protected:
@@ -64,7 +57,6 @@ protected:
     Item top;
     std::vector<std::unique_ptr<juce::Component>> owned;
 
-    // Presets.
     juce::Rectangle<int> presetButton() const;
     virtual void showPresetMenu();
     virtual void applyPreset(const io::Preset& p);
@@ -74,8 +66,6 @@ protected:
     bool presetHover = false;
 };
 
-/** The bottom panel: a row of tabs (Drone, Clouds, ... MIDI) and the selected page's
-    devices side by side, scrolling sideways when they do not fit. */
 class DeviceView final : public juce::Component
 {
 public:
@@ -88,7 +78,6 @@ public:
     void show(int page);
     int getPage() const noexcept { return page; }
     int getEffectsChain() const noexcept { return fxChain; }
-    /** Effects page: which chain (strip index, or kNumStrips + 0/1/2 for the buses and master). */
     void showEffectsFor(int chain);
 
     std::function<void(int slot)> onLoadSample;
@@ -112,5 +101,4 @@ private:
     juce::Component row;
     std::vector<std::unique_ptr<Device>> devices;
 };
-
-} // namespace tf::app::gui
+}

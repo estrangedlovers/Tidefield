@@ -53,8 +53,8 @@ own JUCE modules, so JUCE module code is never linked twice.
 - Factory sounds: generate in `tools/scripts/make_samples.py` (library section),
   list in `src/app/FactoryContent.cpp`. Starter scenes and factory presets live there
   too (the self-test checks every preset value names a parameter).
-- Your own JUCE effects (shimmer, fuzz): `src/fx_juce/UserEffects.cpp` (instructions
-  inside); they become FX types like the built-in ones.
+- Your own JUCE effects (shimmer, fuzz): `src/fx_juce/UserEffects.cpp`, registered the
+  same way as the existing ones; they become FX types like the built-in ones.
 - A performance gesture that moves many parameters at once: add offsets in
   `Engine::updateModulation` (never set targets for this).
 - A new expensive voice or grain pool: give it a limit setter and add a column to
@@ -85,7 +85,12 @@ pass `-DTIDEFIELD_BUILD_APP=ON` (needs ALSA/X11 headers) to compile-check it.
 Native JUCE drawing in C++, one typeface (Inter, embedded), palette and metrics in
 `gui/Style.h`. The logo lives in `gui/Logo.h` (Quicksand for the wordmark only);
 after changing it, regenerate the icons with `tidefield_icon resources/icon
-resources/fonts/Quicksand-Medium.ttf`. Shared by the app and the plugin (`tidefield_app_core`).
+resources/fonts/Quicksand-Medium.ttf`.
+- Two themes, Slate and Paper (`Palette` in `gui/Style.cpp`, switched from the session
+  menu). Panel colours come from `colour::`; anything drawn inside a dark display (the
+  terrain, meters, waveforms, faders, readouts) uses `display::`, which stays the same in
+  both themes. Hover and press states use `colour::lift`, never `brighter()` directly.
+- Playable tiles (pads) use the mark's corner ratio (`tileCorner`); panels stay square. Shared by the app and the plugin (`tidefield_app_core`).
 - Controls bind to a parameter through `Model` (`gui/Model.h`): `Knob`, `Fader`,
   `Toggle`, `Choice`, `Pad`. They get MIDI learn, release, reset, hover help and the
   live/learn/pickup colours for free. A device page is a list of parameters in
@@ -123,4 +128,6 @@ plugin, run `tidefield_plugincheck <path to Tidefield.vst3>` (CI also runs auval
 - New DSP gets a unit test in `tests/` and, when it makes sound, a score in `scores/`.
 - Prefer rendering a score and checking the analysis report over guessing what
   something sounds like.
+- No comments in source files (C++, CMake, Python). Names carry the meaning; the why
+  goes in commit messages and `docs/ARCHITECTURE.md`.
 - Commit messages: imperative mood, one subject line, body explaining why.

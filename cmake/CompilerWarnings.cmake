@@ -1,4 +1,3 @@
-# Strict warnings for Tidefield's own targets (not third-party code).
 function(tf_set_warnings target)
     if(MSVC)
         target_compile_options(${target} PRIVATE /W4 /permissive-)

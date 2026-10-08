@@ -12,7 +12,6 @@ using namespace tf::engine;
 using Catch::Approx;
 
 namespace {
-
 constexpr double kFs = 48000.0;
 constexpr int kBlock = 256;
 
@@ -40,8 +39,7 @@ struct Rig
     }
     float target(P p) const { return f.paramTargets[idx(p)]; }
 };
-
-} // namespace
+}
 
 TEST_CASE("A gesture records the performer's moves with their times, nothing else", "[gesture]")
 {
@@ -50,10 +48,10 @@ TEST_CASE("A gesture records the performer's moves with their times, nothing els
     rig.gestures.record();
     rig.runUntil(0.6);
     rig.engine.setParam(P::DroneCutoff, 2000.0f);
-    rig.engine.post(ControlEvent::setParam(idx(P::DroneShape), 0.9f, ControlSource::Terrain)); // the terrain, not a move
+    rig.engine.post(ControlEvent::setParam(idx(P::DroneShape), 0.9f, ControlSource::Terrain));
     rig.runUntil(1.1);
     rig.engine.noteOn(64, 0.7f);
-    rig.engine.command(Command::FadeOut); // transport, not part of a gesture
+    rig.engine.command(Command::FadeOut);
     rig.runUntil(2.1);
     rig.gestures.stop();
     rig.runUntil(2.2);
@@ -66,7 +64,6 @@ TEST_CASE("A gesture records the performer's moves with their times, nothing els
     CHECK(static_cast<double>(take.events[0].time) / kFs == Approx(0.5).margin(0.01));
     CHECK(take.events[1].event.type == ControlEvent::Type::Note);
     CHECK(static_cast<double>(take.events[1].time) / kFs == Approx(1.0).margin(0.01));
-    // The key still held when recording stopped is released at the end of the take.
     CHECK(take.events[2].event.type == ControlEvent::Type::Note);
     CHECK(take.events[2].event.value == 0.0f);
     CHECK(take.events[2].time == take.length);
@@ -94,7 +91,6 @@ TEST_CASE("A take plays back on time and loops", "[gesture]")
     rig.runUntil(start + 0.6);
     CHECK(rig.target(P::DroneCutoff) == Approx(2000.0f));
 
-    // Change it by hand; the next pass plays the move again.
     rig.engine.setParam(P::DroneCutoff, 700.0f);
     rig.runUntil(start + 1.4);
     CHECK(rig.target(P::DroneCutoff) == Approx(700.0f));
@@ -102,7 +98,6 @@ TEST_CASE("A take plays back on time and loops", "[gesture]")
     CHECK(rig.target(P::DroneCutoff) == Approx(2000.0f));
     CHECK(rig.f.gestureLength == Approx(1.0f));
 
-    // Once: it stops by itself at the end.
     rig.gestures.setLoop(false, true);
     rig.runUntil(rig.t + 1.2);
     CHECK(rig.f.gestureState == GestureState::Idle);
@@ -115,7 +110,7 @@ TEST_CASE("Restarting the audio ends a recording cleanly", "[gesture]")
     rig.runUntil(0.5);
     rig.engine.setParam(P::DroneCutoff, 1500.0f);
     rig.runUntil(1.0);
-    rig.engine.prepare(44100.0, kBlock); // e.g. the device changed rate
+    rig.engine.prepare(44100.0, kBlock);
     rig.gestures.tick();
     REQUIRE(rig.gestures.hasTake());
     CHECK(rig.gestures.getTake().events.size() == 1);
@@ -128,8 +123,6 @@ TEST_CASE("Loading a take while recording keeps the loaded take", "[gesture]")
     rig.gestures.record();
     rig.runUntil(0.3);
     rig.engine.setParam(P::DroneCutoff, 1500.0f);
-    // A session is opened mid-recording: its take must not be replaced by the
-    // abandoned recording's moves or end marker.
     GestureTake loaded;
     loaded.sampleRate = kFs;
     loaded.length = static_cast<std::uint64_t>(3.0 * kFs);
@@ -141,7 +134,6 @@ TEST_CASE("Loading a take while recording keeps the loaded take", "[gesture]")
     CHECK(rig.gestures.getTake().events[0].event.param == idx(P::DroneShape));
     CHECK_FALSE(rig.gestures.isRecording());
 
-    // Recording twice in a row: only the second take survives.
     rig.gestures.record();
     rig.runUntil(1.2);
     rig.engine.setParam(P::DroneCutoff, 800.0f);
@@ -167,10 +159,8 @@ TEST_CASE("Stopping playback releases the notes the take was holding", "[gesture
     GestureTake take;
     take.sampleRate = kFs;
     take.length = static_cast<std::uint64_t>(10.0 * kFs);
-    take.events.push_back({ static_cast<std::uint64_t>(0.1 * kFs), ControlEvent::note(60, 0.8f) }); // held, no note-off
+    take.events.push_back({ static_cast<std::uint64_t>(0.1 * kFs), ControlEvent::note(60, 0.8f) });
     rig.gestures.setTake(take);
-    // A Bloom note lasts at least Length, and as long as it is held: short values
-    // make "released" and "still held" easy to tell apart.
     rig.engine.setParam(P::BloomLength, 0.5f);
     rig.engine.setParam(P::BloomRelease, 0.1f);
     rig.runUntil(0.1);

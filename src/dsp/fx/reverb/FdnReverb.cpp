@@ -8,16 +8,12 @@
 #include <cstdio>
 
 namespace tf::dsp {
-
 namespace {
-
-// Mutually prime-ish line lengths in ms at size 1.
 constexpr std::array<float, 8> kLineMs { 31.7f, 37.3f, 41.9f, 47.3f, 53.1f, 59.9f, 67.7f, 73.1f };
 constexpr std::array<float, 4> kDiffuserMs { 4.7f, 6.1f, 7.9f, 11.3f };
 constexpr float kMaxSize = 2.0f;
 constexpr float kMaxModMs = 1.2f;
-
-} // namespace
+}
 
 using Curve = DisplayMap::Curve;
 
@@ -32,9 +28,9 @@ const ProcessorInfo FdnReverb::kInfo {
     true
 };
 
-float FdnReverb::decayFrom01(float v) noexcept { return 0.3f * std::pow(200.0f, std::clamp(v, 0.0f, 1.0f)); } // 0.3..60 s
+float FdnReverb::decayFrom01(float v) noexcept { return 0.3f * std::pow(200.0f, std::clamp(v, 0.0f, 1.0f)); }
 
-float FdnReverb::dampingFrom01(float v) noexcept { return 1000.0f * std::pow(16.0f, std::clamp(v, 0.0f, 1.0f)); } // 1k..16k
+float FdnReverb::dampingFrom01(float v) noexcept { return 1000.0f * std::pow(16.0f, std::clamp(v, 0.0f, 1.0f)); }
 
 void FdnReverb::prepare(const ProcessSpec& spec)
 {
@@ -78,20 +74,14 @@ void FdnReverb::setControls(const std::array<float, 6>& c, const ModContext& ctx
     dampingHz = dampingFrom01(c[2]);
     predelay = predelayFrom01(c[3]) * 0.001f * static_cast<float>(fs);
     hold = std::clamp(c[5], 0.0f, 1.0f);
-    // Modulated (fractional) reads lowpass the loop a little each pass; fade them out
-    // under hold so a frozen tail does not slowly lose its top end.
     modDepth = c[4] * (1.0f - hold) * kMaxModMs * 0.001f * static_cast<float>(fs);
     timeScale = ctx.timeScale;
 
     for (int i = 0; i < kLines; ++i)
     {
-        // Whole-sample line lengths: with modulation faded out under hold, reads are
-        // then exact and the loop is truly lossless.
         const float delaySamples = std::round(kLineMs[static_cast<size_t>(i)] * size * 0.001f * static_cast<float>(fs));
         baseDelay[static_cast<size_t>(i)] = delaySamples;
-        // Per-line gain for the requested T60: g = 10^(-3 * delay / (T60 * fs)).
         const float g = std::pow(10.0f, -3.0f * delaySamples / (decaySeconds * static_cast<float>(fs)));
-        // Hold blends toward exactly 1 (lossless). Never above 1.
         gains[static_cast<size_t>(i)] = std::min(1.0f, lerp(g, 1.0f, hold));
         damping[static_cast<size_t>(i)].setCutoff(dampingHz);
     }
@@ -110,8 +100,6 @@ void FdnReverb::process(float* left, float* right, int n) noexcept
         const float inL = predelay >= 1.0f ? predelayL.read(predelay) : predelayL.at(0);
         const float inR = predelay >= 1.0f ? predelayR.read(predelay) : predelayR.at(0);
 
-        // Input diffusion: four Schroeder allpasses on the mid signal; the side is
-        // kept so stereo sources stay wide.
         float x = 0.5f * (inL + inR);
         for (int d = 0; d < 4; ++d)
         {
@@ -123,13 +111,12 @@ void FdnReverb::process(float* left, float* right, int n) noexcept
         }
         const float side = 0.5f * (inL - inR);
 
-        // Read the lines (modulated), damp, apply decay gain.
         std::array<float, kLines> out {};
         float sum = 0.0f;
         for (int i = 0; i < kLines; ++i)
         {
             const auto ui = static_cast<size_t>(i);
-            modPhase[ui] += modRate[ui] * timeScale * invFs; // cycles per sample
+            modPhase[ui] += modRate[ui] * timeScale * invFs;
             if (modPhase[ui] >= 1.0f)
                 modPhase[ui] -= 1.0f;
             const float mod = modDepth * fastSin01(modPhase[ui]);
@@ -140,7 +127,6 @@ void FdnReverb::process(float* left, float* right, int n) noexcept
             sum += y;
         }
 
-        // Householder feedback: y - (2/N) * sum(y). Orthogonal, so lossless at gain 1.
         const float householder = sum * (2.0f / kLines);
         for (int i = 0; i < kLines; ++i)
         {
@@ -149,10 +135,8 @@ void FdnReverb::process(float* left, float* right, int n) noexcept
             lines[ui].push(flushDenormal(out[ui] - householder + injected));
         }
 
-        // Decorrelated stereo taps.
         left[s] = (out[0] - out[2] + out[4] - out[6]) * 0.5f;
         right[s] = (out[1] - out[3] + out[5] - out[7]) * 0.5f;
     }
 }
-
-} // namespace tf::dsp
+}

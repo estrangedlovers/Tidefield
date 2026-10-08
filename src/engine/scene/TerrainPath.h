@@ -9,20 +9,14 @@
 #include <vector>
 
 namespace tf::engine {
-
-/** A loop drawn on the terrain for the Path wander style to travel. Immutable once
-    built: the message thread resamples the drawn stroke into evenly spaced points
-    (so the sound moves at a steady speed however the hand moved), and the audio
-    thread only reads it. */
 struct TerrainPath
 {
     static constexpr int kPoints = 128;
 
-    int count = 0; // 0 = no path
+    int count = 0;
     std::array<Point2, kPoints> points {};
     std::uint64_t version = 0;
 
-    /** Position at phase 0..1 around the closed loop (any thread, no allocation). */
     Point2 at(float phase) const noexcept
     {
         if (count == 0)
@@ -36,8 +30,6 @@ struct TerrainPath
         return { a.x + (b.x - a.x) * t, a.y + (b.y - a.y) * t };
     }
 
-    /** Message thread: a closed, smoothed, evenly resampled loop from a drawn stroke.
-        Fewer than two distinct points gives an empty path. */
     static TerrainPath build(const std::vector<Point2>& stroke, std::uint64_t version)
     {
         TerrainPath p;
@@ -49,7 +41,6 @@ struct TerrainPath
         if (pts.size() < 2)
             return p;
 
-        // Light smoothing (closed loop) so a shaky hand still gives a calm path.
         for (int pass = 0; pass < 2; ++pass)
         {
             const auto src = pts;
@@ -62,7 +53,6 @@ struct TerrainPath
             }
         }
 
-        // Arc length around the closed loop, then even resampling.
         const auto n = pts.size();
         std::vector<float> cum(n + 1, 0.0f);
         for (std::size_t i = 0; i < n; ++i)
@@ -90,5 +80,4 @@ struct TerrainPath
         return p;
     }
 };
-
-} // namespace tf::engine
+}

@@ -7,15 +7,12 @@
 #include <cmath>
 
 namespace tf::dsp {
-
 namespace {
-
 constexpr float kMinLoopSeconds = 0.25f;
 constexpr float kClearSeconds = 0.5f;
-constexpr float kPassLoss = 0.035f;     // level lost per pass at full erosion
-constexpr float kHissPerPass = 2.0e-4f; // noise settling in per pass at full erosion
-
-} // namespace
+constexpr float kPassLoss = 0.035f;
+constexpr float kHissPerPass = 2.0e-4f;
+}
 
 void Disintegrator::prepare(const ProcessSpec& s, std::uint64_t seed)
 {
@@ -71,7 +68,7 @@ void Disintegrator::clear() noexcept
 {
     if (state == State::Recording)
     {
-        state = State::Empty; // nothing audible yet: drop the take
+        state = State::Empty;
         length = pos = 0;
     }
     else if (state == State::Playing || state == State::Overdubbing)
@@ -89,7 +86,6 @@ void Disintegrator::closeLoop() noexcept
         return;
     }
     length = pos;
-    // Short fades at both ends so the seam never clicks.
     const int e = std::min(edge, length / 4);
     for (int i = 0; i < e; ++i)
     {
@@ -128,7 +124,7 @@ void Disintegrator::process(const float* inL, const float* inR, float* outL, flo
         return;
     }
 
-    const float flakeChance = params.flakes * params.erosion * 0.8f / fs; // per sample
+    const float flakeChance = params.flakes * params.erosion * 0.8f / fs;
     const float clearStep = 1.0f / (kClearSeconds * fs);
 
     for (int i = 0; i < n; ++i)
@@ -157,7 +153,6 @@ void Disintegrator::process(const float* inL, const float* inR, float* outL, flo
         outL[i] = l * clearGain;
         outR[i] = r * clearGain;
 
-        // Oxide flaking: a raised-cosine dent, written into the tape for good.
         float flake = 1.0f;
         if (flakeRemaining > 0)
         {
@@ -175,7 +170,6 @@ void Disintegrator::process(const float* inL, const float* inR, float* outL, flo
         float wr = erode(r, 1) * flake;
         if (state == State::Overdubbing)
         {
-            // Layers pile up pass after pass: a soft ceiling keeps the tape bounded.
             wl = 1.5f * std::tanh((wl + xl * params.overdub) * (1.0f / 1.5f));
             wr = 1.5f * std::tanh((wr + xr * params.overdub) * (1.0f / 1.5f));
         }
@@ -213,5 +207,4 @@ float Disintegrator::getLengthSeconds() const noexcept
     const int n = state == State::Recording ? pos : length;
     return static_cast<float>(n / spec.sampleRate);
 }
-
-} // namespace tf::dsp
+}

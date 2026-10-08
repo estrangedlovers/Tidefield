@@ -6,31 +6,20 @@
 #include <array>
 
 namespace tf::app::gui::logo {
-
-/** The Tidefield mark: a rounded tile of layered tides, light water at the top
-    settling into deep water at the bottom, the layers parted by thin foam lines.
-    Drawn from paths at any size, so the app icon (tools/icon), the header and the
-    projector all use this one definition. Depends only on juce_graphics. */
-
 inline const juce::Colour sky { 0xffc6dcdb };
 inline const juce::Colour mist { 0xffa2bfbc };
 inline const juce::Colour sage { 0xff92ab9f };
 inline const juce::Colour sea { 0xff6e9091 };
 inline const juce::Colour deep { 0xff4a6368 };
 inline const juce::Colour foam { 0xfff6f5ef };
-inline const juce::Colour ink { 0xff4a6368 }; // the wordmark on light grounds
+inline const juce::Colour ink { 0xff4a6368 };
 
-/** Corner radius as a fraction of the tile: the macOS icon grid's (185 / 824). */
 inline constexpr float kCorner = 0.225f;
 
 namespace detail {
 struct Pt { float x, y; };
-/** A tide line: a start point and cubic segments (c1, c2, end), in unit space. */
 struct Line { Pt start; std::array<Pt, 9> seg; int numSegs; };
 
-// From the top: sky | mist | sage | sea | deep. Lines start and end outside the
-// tile so the clip trims them cleanly. The third line carries the S-bend where the
-// middle layer pours down between its neighbours.
 inline constexpr std::array<Line, 4> kLines { {
     { { -0.05f, 0.37f }, { { { 0.22f, 0.29f }, { 0.42f, 0.38f }, { 0.57f, 0.355f },
                              { 0.72f, 0.33f }, { 0.80f, 0.245f }, { 1.05f, 0.25f } } }, 2 },
@@ -56,9 +45,8 @@ inline juce::Path linePath(const Line& l, juce::Rectangle<float> r)
     }
     return p;
 }
-} // namespace detail
+}
 
-/** The tile's outline, square and centred in r. */
 inline juce::Path outline(juce::Rectangle<float> r)
 {
     const float s = std::min(r.getWidth(), r.getHeight());
@@ -68,8 +56,6 @@ inline juce::Path outline(juce::Rectangle<float> r)
     return p;
 }
 
-/** Draws the mark, square and centred in r. Below about 24 px the foam lines would
-    be thinner than a pixel, so they keep a 1 px floor. */
 inline void drawMark(juce::Graphics& g, juce::Rectangle<float> r)
 {
     const float s = std::min(r.getWidth(), r.getHeight());
@@ -80,7 +66,6 @@ inline void drawMark(juce::Graphics& g, juce::Rectangle<float> r)
     g.reduceClipRegion(outline(sq));
     g.setColour(sky);
     g.fillRect(sq);
-    // Each layer is the region under its line; later layers paint over earlier ones.
     for (std::size_t i = 0; i < detail::kLines.size(); ++i)
     {
         auto p = detail::linePath(detail::kLines[i], sq);
@@ -95,5 +80,4 @@ inline void drawMark(juce::Graphics& g, juce::Rectangle<float> r)
     for (const auto& l : detail::kLines)
         g.strokePath(detail::linePath(l, sq), juce::PathStrokeType(stroke, juce::PathStrokeType::curved, juce::PathStrokeType::rounded));
 }
-
-} // namespace tf::app::gui::logo
+}

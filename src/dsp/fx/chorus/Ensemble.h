@@ -6,11 +6,6 @@
 #include "../../filters/OnePole.h"
 
 namespace tf::dsp {
-
-/** String-machine ensemble (Solina / bucket-brigade style): several short delay
-    taps per side, each swept by a slow LFO and a fast vibrato with evenly spaced
-    phases, so the sum shimmers without obvious pitch wobble. Wet only; the slot's
-    mix sets the blend. */
 class Ensemble final : public Processor
 {
 public:
@@ -32,5 +27,4 @@ private:
     int voices = 3;
     float timeScale = 1.0f;
 };
-
-} // namespace tf::dsp
+}

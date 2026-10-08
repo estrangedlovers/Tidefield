@@ -8,7 +8,6 @@
 #include <cmath>
 
 namespace tf::engine {
-
 CatchManager::CatchManager(Engine& e) : engine(e) {}
 
 int CatchManager::chooseCloud(int requested) const
@@ -52,7 +51,6 @@ bool CatchManager::handle(const EngineNotice& notice)
         return true;
     }
 
-    // Normalise and fade the edges so grains never start on a click.
     const float gain = dsp::dbToGain(kTargetPeakDb) / peak;
     const auto n = buffer->size();
     const auto fade = std::min(n / 2, static_cast<std::size_t>(kFadeSeconds * buffer->sampleRate));
@@ -70,7 +68,7 @@ bool CatchManager::handle(const EngineNotice& notice)
     shape(buffer->left);
     if (buffer->isStereo())
         shape(buffer->right);
-    dsp::buildMips(*buffer); // so the cloud can be pitched up without aliasing
+    dsp::buildMips(*buffer);
 
     const int cloud = chooseCloud(notice.target);
     ++counter;
@@ -87,5 +85,4 @@ bool CatchManager::handle(const EngineNotice& notice)
         onCaught(cloud, name);
     return true;
 }
-
-} // namespace tf::engine
+}

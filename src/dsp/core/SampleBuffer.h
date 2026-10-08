@@ -7,14 +7,10 @@
 #include <vector>
 
 namespace tf::dsp {
-
-/** Immutable stereo audio held by granular clouds and Bloom. Built off the audio
-    thread (Catch, sample import) and only read on it. A mono source stores the same
-    data in both channels' slots by keeping `right` empty. */
 struct SampleBuffer
 {
     std::vector<float> left;
-    std::vector<float> right; // empty = mono
+    std::vector<float> right;
     double sampleRate = 48000.0;
     std::string name;
 
@@ -23,9 +19,6 @@ struct SampleBuffer
     const float* channel(int ch) const noexcept { return ch == 1 && isStereo() ? right.data() : left.data(); }
     double seconds() const noexcept { return sampleRate > 0.0 ? static_cast<double>(size()) / sampleRate : 0.0; }
 
-    // Band-limited copies at 1/2, 1/4, 1/8 the rate (see buildMips). Readers playing
-    // the sample faster than about 1.1x read a coarser level, so pitching up never
-    // folds content back below Nyquist. Empty until built; level 0 is the sample.
     std::vector<std::vector<float>> mipLeft, mipRight;
 
     int mipLevels() const noexcept { return static_cast<int>(mipLeft.size()); }
@@ -42,8 +35,6 @@ struct SampleBuffer
     }
 };
 
-/** Which mip level to read when playing at `absIncrement` source samples per output
-    sample: the coarsest-but-one that keeps every partial below Nyquist. */
 inline int mipLevelFor(double absIncrement, int available) noexcept
 {
     if (absIncrement <= 1.1 || available <= 0)
@@ -52,14 +43,11 @@ inline int mipLevelFor(double absIncrement, int available) noexcept
     return std::min(level, available);
 }
 
-/** Builds `levels` half-rate copies of the sample with a 63-tap windowed-sinc
-    low-pass (cutoff 0.45 of the new Nyquist, > 80 dB stopband), centred so level k
-    sample j lines up with level 0 sample j * 2^k. Allocates: off the audio thread. */
 inline void buildMips(SampleBuffer& b, int levels = 3)
 {
     constexpr int kHalf = 31;
     std::vector<float> h(2 * kHalf + 1);
-    constexpr double kCut = 0.225; // cycles per input sample
+    constexpr double kCut = 0.225;
     double sum = 0.0;
     for (int k = -kHalf; k <= kHalf; ++k)
     {
@@ -107,5 +95,4 @@ inline void buildMips(SampleBuffer& b, int levels = 3)
             srcR = &b.mipRight.back();
     }
 }
-
-} // namespace tf::dsp
+}

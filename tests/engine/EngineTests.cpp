@@ -10,7 +10,6 @@
 using namespace tf::engine;
 
 namespace {
-
 struct Render
 {
     std::vector<float> left, right;
@@ -35,8 +34,7 @@ Render renderEngine(Engine& engine, int totalSamples, int blockSize)
     }
     return out;
 }
-
-} // namespace
+}
 
 TEST_CASE("Engine::process never allocates")
 {
@@ -56,7 +54,7 @@ TEST_CASE("Engine::process never allocates")
         for (int i = 0; i < 48000 * 5 / 512; ++i)
         {
             if (i == 200)
-                engine.post(ControlEvent::makeCommand(Command::Panic)); // posting from this thread is allowed here
+                engine.post(ControlEvent::makeCommand(Command::Panic));
             engine.process(nullptr, 0, ptrs, 2, 512);
         }
         allocations = counter.count();
@@ -125,7 +123,7 @@ TEST_CASE("Telemetry frames arrive at roughly the configured rate")
     std::vector<float> l(512), r(512);
     float* ptrs[2] = { l.data(), r.data() };
     int frames = 0;
-    for (int i = 0; i < 48000 / 512; ++i) // ~1 s
+    for (int i = 0; i < 48000 / 512; ++i)
     {
         engine.process(nullptr, 0, ptrs, 2, 512);
         TelemetryFrame f;

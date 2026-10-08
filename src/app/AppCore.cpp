@@ -7,7 +7,6 @@
 #include <io/Session.h>
 
 namespace tf::app {
-
 AppCore::AppCore(Host& h)
     : host(h), engine(h.getEngine()), scenes(h.getEngine()), fx(h.getEngine()), catcher(h.getEngine()), midi(h.getEngine()), seasons(h.getEngine()), paths(h.getEngine()), gestures(h.getEngine()),
       session(h.getEngine(), scenes, fx, &midi, &seasons, &paths, &gestures), recorder(h.getEngine().getRecordTap())
@@ -20,7 +19,7 @@ AppCore::AppCore(Host& h)
     session.onApplied = [this](const io::SessionData& s) { seedTargets(s); };
     if (h.getDeviceManager() != nullptr)
         midiInputs = std::make_unique<MidiInputs>(engine, h.getSettings());
-    fxjuce::registerUserEffects(); // before any slot or session asks for an FX type
+    fxjuce::registerUserEffects();
     fx.loadDefaultLayout();
     loadRigMidi();
     addFactoryPresets(presets);
@@ -59,7 +58,7 @@ AppCore::AppCore(Host& h)
 AppCore::~AppCore()
 {
     stopTimer();
-    recorder.onFinished = nullptr; // the take is still finished by the recorder
+    recorder.onFinished = nullptr;
     saveRigMidi();
 }
 
@@ -133,8 +132,6 @@ void AppCore::captureSceneAtCursor()
 
 void AppCore::loadFactoryContent()
 {
-    // A first launch (and every New) should play from the first touch: factory sounds
-    // loaded and a terrain of starter scenes.
     session.makeNewSession = [this] { return makeStarterSession(engine); };
     session.newSession();
 }
@@ -152,8 +149,6 @@ void AppCore::seedTargets(const io::SessionData& s)
 
 void AppCore::loadRigMidi()
 {
-    // The controller mapping belongs to the rig: it persists in the app settings and
-    // only changes when a session that carries its own mapping is opened.
     const auto stored = host.getSettings().getValue("midiMapping");
     if (stored.isNotEmpty())
         io::applyMidiJson(juce::JSON::parse(stored), midi, engine.getRegistry());
@@ -207,7 +202,6 @@ void AppCore::timerCallback()
             onTelemetry(lastFrame);
     }
 
-    // A sample-rate change mid-take would corrupt the file: end it there.
     if (recorder.getStatus().state == io::Recorder::State::Recording && engine.getSampleRate() != recordingRate)
     {
         recorder.stop();
@@ -227,5 +221,4 @@ void AppCore::timerCallback()
         session.handleNotice(notice);
     }
 }
-
-} // namespace tf::app
+}

@@ -3,11 +3,10 @@
 #include <thread>
 
 namespace tf::app {
-
 namespace {
 constexpr float kSwapFadeSeconds = 1.5f;
 const char* const kWildcard = "*.tidefield";
-} // namespace
+}
 
 SessionController::SessionController(engine::Engine& e, engine::SceneManager& s, engine::FxManager& f, engine::MidiManager* m,
                                      engine::SeasonManager* sm, engine::PathManager* pm,
@@ -76,7 +75,6 @@ void SessionController::apply(std::shared_ptr<io::SessionData> data)
         applyNow();
         return;
     }
-    // Fade out, swap at silence (FadeOutComplete), fade back in.
     waitingForFadeOut = true;
     engine.post(engine::ControlEvent::snapParam(engine::idx(engine::P::MasterFadeSecs), kSwapFadeSeconds));
     engine.command(engine::Command::FadeOut);
@@ -98,7 +96,6 @@ void SessionController::applyNow()
 
     if (resume)
     {
-        // Fade back in over the swap time, then restore the session's own fade length.
         engine.post(engine::ControlEvent::snapParam(engine::idx(engine::P::MasterFadeSecs), kSwapFadeSeconds));
         engine.command(engine::Command::FadeIn);
         engine.post(engine::ControlEvent::setParam(engine::idx(engine::P::MasterFadeSecs), sessionFade));
@@ -143,8 +140,6 @@ void SessionController::saveTo(const juce::File& file)
     if (busy)
         return;
     busy = true;
-    // Capture on the message thread (cheap: values plus shared sample references),
-    // encode and write on a worker.
     auto data = std::make_shared<io::SessionData>(io::captureSession(engine, latest, scenes, fx, midi, seasons, path, gestures));
     data->name = file.getFileNameWithoutExtension().toStdString();
     if (onStatus)
@@ -169,5 +164,4 @@ void SessionController::saveTo(const juce::File& file)
         });
     });
 }
-
-} // namespace tf::app
+}

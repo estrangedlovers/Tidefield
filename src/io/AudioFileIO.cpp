@@ -4,9 +4,7 @@
 #include <new>
 
 namespace tf::io {
-
 namespace {
-
 std::unique_ptr<dsp::SampleBuffer> readAll(std::unique_ptr<juce::AudioFormatReader> reader, const juce::String& name,
                                            juce::String& error, double maxSeconds)
 {
@@ -27,9 +25,7 @@ std::unique_ptr<dsp::SampleBuffer> readAll(std::unique_ptr<juce::AudioFormatRead
         return nullptr;
     }
 
-    // A length limit in frames as well as seconds: a header claiming an absurd rate
-    // must not make us allocate gigabytes.
-    constexpr juce::int64 kMaxFrames = 24 * 1000 * 1000; // ~8 minutes at 48 kHz
+    constexpr juce::int64 kMaxFrames = 24 * 1000 * 1000;
     const auto maxLength = std::min(kMaxFrames, static_cast<juce::int64>(maxSeconds * reader->sampleRate));
     const int length = static_cast<int>(std::min(reader->lengthInSamples, maxLength));
     const int channels = static_cast<int>(std::min<unsigned int>(reader->numChannels, 2));
@@ -51,8 +47,8 @@ std::unique_ptr<dsp::SampleBuffer> readAll(std::unique_ptr<juce::AudioFormatRead
         for (auto* ch : { &buffer->left, &buffer->right })
             for (auto& v : *ch)
                 if (! std::isfinite(v))
-                    v = 0.0f; // float files can carry NaN
-        dsp::buildMips(*buffer); // band-limited copies for pitched-up playback
+                    v = 0.0f;
+        dsp::buildMips(*buffer);
         return buffer;
     }
     catch (const std::bad_alloc&)
@@ -61,8 +57,7 @@ std::unique_ptr<dsp::SampleBuffer> readAll(std::unique_ptr<juce::AudioFormatRead
         return nullptr;
     }
 }
-
-} // namespace
+}
 
 std::unique_ptr<dsp::SampleBuffer> loadSample(const juce::File& file, juce::String& error, double maxSeconds)
 {
@@ -99,7 +94,7 @@ bool encodeFlac(const dsp::SampleBuffer& buffer, juce::MemoryBlock& out, juce::S
         error = "FLAC encoding failed";
         return false;
     }
-    writer.reset(); // flushes into `out`
+    writer.reset();
     return true;
 }
 
@@ -140,5 +135,4 @@ bool writeSample(const dsp::SampleBuffer& buffer, const juce::File& file, juce::
     }
     return true;
 }
-
-} // namespace tf::io
+}

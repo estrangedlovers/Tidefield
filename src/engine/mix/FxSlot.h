@@ -9,21 +9,12 @@
 #include <memory>
 
 namespace tf::engine {
-
-/** One FX slot on the audio thread. Processors arrive prepared from the message
-    thread (FxManager) and are swapped in with a short crossfade; the outgoing one
-    goes back through a retire queue to be deleted on the message thread. A null
-    processor means "empty slot" and passes audio through.
-
-    The in-flight bound lives in FxManager: it never has more than kQueueSize
-    processors outstanding per slot, so these queues cannot overflow. */
 class FxSlot
 {
 public:
     static constexpr std::size_t kQueueSize = 4;
     static constexpr float kCrossfadeSeconds = 0.05f;
 
-    /** Wrapper so "empty slot" can travel through the queue too. */
     struct Handoff
     {
         dsp::Processor* processor = nullptr;
@@ -45,7 +36,6 @@ public:
     FxSlot(const FxSlot&) = delete;
     FxSlot& operator=(const FxSlot&) = delete;
 
-    // --- Message thread ---------------------------------------------------------------
     bool send(dsp::ProcessorPtr p)
     {
         if (! incoming.push({ p.get() }))
@@ -54,7 +44,6 @@ public:
         return true;
     }
 
-    /** Deletes retired processors; returns how many. */
     int collect()
     {
         int n = 0;
@@ -67,7 +56,6 @@ public:
         return n;
     }
 
-    /** Message thread while audio is stopped (Engine::prepare). */
     void prepareAll(const dsp::ProcessSpec& spec)
     {
         Handoff h;
@@ -84,11 +72,9 @@ public:
         fadeStep = 1.0f / static_cast<float>(kCrossfadeSeconds * spec.sampleRate);
     }
 
-    // --- Audio thread -------------------------------------------------------------------
-    /** Adopts a newly published processor, if any, starting a crossfade. */
     void acquire() noexcept
     {
-        if (outgoing != nullptr) // finish one swap before starting the next
+        if (outgoing != nullptr)
             return;
         Handoff h;
         if (! incoming.pop(h))
@@ -116,8 +102,6 @@ public:
 
     bool isActive() const noexcept { return current != nullptr || outgoing != nullptr; }
 
-    /** In place. mixStart/mixEnd ramp the dry/wet mix across the block. Scratch
-        buffers must hold n samples each. */
     void process(float* left, float* right, int n, float mixStart, float mixEnd,
                  float* dryL, float* dryR, float* altL, float* altR) noexcept
     {
@@ -131,7 +115,7 @@ public:
             current->process(left, right, n);
         else
         {
-            std::copy_n(dryL, n, left); // fading toward empty: the "new" signal is dry
+            std::copy_n(dryL, n, left);
             std::copy_n(dryR, n, right);
         }
 
@@ -168,7 +152,7 @@ private:
     void retire(dsp::Processor* p) noexcept
     {
         if (p != nullptr)
-            retired.push({ p }); // bounded by FxManager's in-flight limit
+            retired.push({ p });
     }
 
     SpscQueue<Handoff> incoming;
@@ -178,5 +162,4 @@ private:
     float fade = 1.0f;
     float fadeStep = 0.001f;
 };
-
-} // namespace tf::engine
+}

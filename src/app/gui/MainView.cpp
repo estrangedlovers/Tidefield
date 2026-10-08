@@ -11,21 +11,17 @@
 #include <thread>
 
 namespace tf::app::gui {
-
 using engine::P;
 
 namespace {
-
 constexpr int kTopH = 42;
 constexpr int kStatusH = 24;
 constexpr int kBrowserW = 214;
 constexpr int kMacroW = 244;
 constexpr int kPadsH = 78;
-std::vector<MainView*> openViews; // message thread only
+std::vector<MainView*> openViews;
 constexpr const char* kThemeKey = "theme";
 
-/** One button for gestures: record, stop, play, stop. Shift (or recordNew) always
-    records a new take. */
 void gestureToggle(AppCore& core, bool recordNew)
 {
     const auto state = core.latest().gestureState;
@@ -67,7 +63,6 @@ juce::String clock(double seconds)
     return h > 0 ? juce::String::formatted("%d:%02d:%02d", h, m, s % 60) : juce::String::formatted("%d:%02d", m, s % 60);
 }
 
-/** A discrete parameter shown as its current choice; click for the list. */
 class MenuBox final : public ParamComponent
 {
 public:
@@ -102,7 +97,6 @@ public:
     }
 };
 
-/** Record button: click records; right-click for stems and the folder. */
 class RecordButton final : public juce::Component, public Animated
 {
 public:
@@ -178,8 +172,6 @@ private:
     std::unique_ptr<juce::FileChooser> chooser;
 };
 
-/** Tempo, like a studio's transport: Sync on/off, the tempo (drag to change, or
-    the DAW's when hosted) with a dot on every beat, and Tap. */
 class TempoWidget final : public juce::Component, public Animated
 {
 public:
@@ -266,7 +258,7 @@ private:
     {
         const double now = juce::Time::getMillisecondCounterHiRes();
         if (! taps.empty() && now - taps.back() > 2000.0)
-            taps.clear(); // a pause starts a new count
+            taps.clear();
         taps.push_back(now);
         if (taps.size() > 5)
             taps.erase(taps.begin());
@@ -282,11 +274,8 @@ private:
     float dragStart = 90.0f, shownBpm = 0.0f, shownBeat = 0.0f;
     bool shownOn = false, shownHost = false;
 };
+}
 
-} // namespace
-
-/** The projector: the terrain alone, for the audience, full screen on another
-    display when there is one. Double-click or F toggles full screen; Esc leaves it. */
 class ProjectorWindow final : public juce::DocumentWindow
 {
 public:
@@ -298,7 +287,6 @@ public:
         setResizable(true, false);
         view.onDoubleClick = [this] { setFullScreen(! isFullScreen()); };
 
-        // Prefer a display the main window is not on: that is the projector.
         const auto& displays = juce::Desktop::getInstance().getDisplays();
         const auto mainCentre = mainWindow != nullptr ? mainWindow->getScreenBounds().getCentre() : juce::Point<int>();
         const juce::Displays::Display* target = displays.getPrimaryDisplay();
@@ -336,8 +324,6 @@ private:
     TerrainView view;
     std::function<void()> onClosed;
 };
-
-// --- Top bar --------------------------------------------------------------------------
 
 class TopBar final : public juce::Component, public Animated
 {
@@ -382,7 +368,7 @@ public:
         audio.onClick = [this] { view.showAudioSettings(); };
         for (auto* c : std::initializer_list<juce::Component*> { &sessionButton, &fade, &panic, &keys, &audio, &meter, &rec, &autoMaster, &tempo })
             addAndMakeVisible(c);
-        audio.setVisible(model.core.host.getDeviceManager() != nullptr); // in a DAW, the DAW owns the device
+        audio.setVisible(model.core.host.getDeviceManager() != nullptr);
     }
     ~TopBar() override { model.remove(this); }
 
@@ -408,7 +394,7 @@ public:
     void resized() override
     {
         auto r = getLocalBounds().reduced(8, 7);
-        r.removeFromLeft(112); // wordmark
+        r.removeFromLeft(112);
         sessionButton.setBounds(r.removeFromLeft(150));
         r.removeFromLeft(14);
         fade.setBounds(r.removeFromLeft(96));
@@ -427,7 +413,7 @@ public:
         r.removeFromRight(8);
         meter.setBounds(r.removeFromRight(150).reduced(0, 4));
         r.removeFromRight(10);
-        cpuArea = r.removeFromRight(std::min(190, r.getWidth())); // shrinks first when the window is narrow
+        cpuArea = r.removeFromRight(std::min(190, r.getWidth()));
     }
 
     void paint(juce::Graphics& g) override
@@ -436,10 +422,8 @@ public:
         g.setColour(colour::line());
         g.fillRect(getLocalBounds().removeFromBottom(1));
 
-        // The mark and the lowercase name, as on the icon.
         drawWordmark(g, getLocalBounds().reduced(12, 0).removeFromLeft(110).toFloat(), 18.0f, colour::text());
 
-        // Device and load.
         const auto& f = model.frame();
         const float load = f.dspLoad > 0.0f ? f.dspLoad : static_cast<float>(model.core.host.getCpuLoad());
         g.setFont(font(11.5f, 500));
@@ -472,8 +456,6 @@ private:
     int slow = 0;
 };
 
-// --- Browser --------------------------------------------------------------------------
-
 class Browser final : public juce::Component, public Animated
 {
 public:
@@ -494,7 +476,7 @@ public:
         bool weightsMoved = false;
         for (std::size_t k = 0; k < scenes.size() && k < shownWeights.size(); ++k)
             weightsMoved = weightsMoved || std::abs(shownWeights[k] - f.sceneWeights[k]) > 0.01f;
-        if (model.core.scenes.getVersion() != shownVersion) // added, removed or renamed
+        if (model.core.scenes.getVersion() != shownVersion)
         {
             shownVersion = model.core.scenes.getVersion();
             layout();
@@ -702,8 +684,6 @@ private:
     std::vector<float> shownWeights;
 };
 
-// --- Macro panel ----------------------------------------------------------------------
-
 class MacroPanel final : public juce::Component
 {
 public:
@@ -728,7 +708,6 @@ public:
     void resized() override
     {
         auto r = getLocalBounds().withTrimmedTop(metric::header).reduced(metric::pad, 8);
-        // The choices need ~232 px; the faders take what is left (all of it on a tall window).
         auto faders = r.removeFromTop(juce::jlimit(60, 170, r.getHeight() - 240));
         const int w = (faders.getWidth() - 3 * 6) / 4;
         for (auto* f : { &tide, &wander, &gravity, &glide })
@@ -738,8 +717,6 @@ public:
         }
         r.removeFromTop(8);
         labels.clear();
-        // Short window: drop the section labels before any control loses its room
-        // (hovering still names each one).
         const int labelH = r.getHeight() >= 4 * 16 + 48 + 24 + 48 + 24 + 4 * 6 ? 16 : 0;
         auto place = [&](juce::Component& c, const juce::String& label, int h) {
             if (labelH > 0)
@@ -769,8 +746,6 @@ private:
     Choice medium, style;
     std::vector<std::pair<juce::Rectangle<int>, juce::String>> labels;
 };
-
-// --- Pads -----------------------------------------------------------------------------
 
 class PadRow final : public juce::Component
 {
@@ -861,7 +836,7 @@ public:
     void resized() override
     {
         auto r = getLocalBounds();
-        const int n = static_cast<int>(pads.size()) + 1; // + shape pad (wider)
+        const int n = static_cast<int>(pads.size()) + 1;
         const int unit = (r.getWidth() - (n - 1) * metric::gap) / (n + 1);
         for (std::size_t k = 0; k < pads.size(); ++k)
         {
@@ -880,8 +855,6 @@ private:
     std::vector<std::unique_ptr<Pad>> pads;
     ShapePad shape;
 };
-
-// --- Status bar -----------------------------------------------------------------------
 
 class StatusBar final : public juce::Component, public Animated
 {
@@ -952,8 +925,6 @@ private:
     double messageTime = 0.0;
     float alpha = 0.0f;
 };
-
-// --- MainView -------------------------------------------------------------------------
 
 MainView::MainView(AppCore& c) : core(c), model(c)
 {
@@ -1075,14 +1046,11 @@ void MainView::frame()
 
 void MainView::timerCallback()
 {
-    // Keep keys coming here (no beeps), and never leave a gesture held when the app
-    // is in the background: a key released elsewhere never reaches us.
     if (! juce::Process::isForegroundProcess())
     {
         releaseHolds();
         return;
     }
-    // Standalone only: in a DAW, taking focus would take the keyboard from the DAW.
     if (! core.host.isPlugin() && juce::Component::getCurrentlyFocusedComponent() == nullptr && isShowing()
         && ! juce::ModalComponentManager::getInstance()->getNumModalComponents())
         grabKeyboardFocus();
@@ -1116,8 +1084,6 @@ void MainView::resized()
     r.removeFromRight(metric::gap);
     terrain->setBounds(r);
 }
-
-// --- Keys -----------------------------------------------------------------------------
 
 void MainView::releaseHolds()
 {
@@ -1161,7 +1127,7 @@ bool MainView::handleNoteKey(const juce::KeyPress& key)
     const int semitone = row.indexOfChar(static_cast<juce::juce_wchar>(code));
     if (semitone >= 0 && code < static_cast<int>(keyNote.size()))
     {
-        if (keyNote[static_cast<std::size_t>(code)] == 0) // ignore auto-repeat
+        if (keyNote[static_cast<std::size_t>(code)] == 0)
         {
             const int note = juce::jlimit(0, 127, (octave + 1) * 12 + semitone);
             core.engine.noteOn(note, velocity);
@@ -1218,11 +1184,10 @@ bool MainView::keyPressed(const juce::KeyPress& key)
         else if (code == 'P')
             toggleProjector();
         else
-            return false; // Cmd+Q and the system's own shortcuts
+            return false;
         return true;
     }
 
-    // In a DAW, Space is the DAW's transport.
     if (key == juce::KeyPress::spaceKey && ! core.host.isPlugin())
     {
         const auto st = model.frame().fadeState;
@@ -1275,7 +1240,7 @@ bool MainView::keyPressed(const juce::KeyPress& key)
     for (auto& h : holds)
         if (code == h.keyCode)
         {
-            if (! h.down) // ignore auto-repeat
+            if (! h.down)
             {
                 h.down = true;
                 model.set(h.param, 1.0f);
@@ -1304,12 +1269,8 @@ bool MainView::keyPressed(const juce::KeyPress& key)
             break;
         default: break;
     }
-    // Standalone, every key is ours so macOS never beeps; in a DAW, unused keys go
-    // on to the host.
     return ! core.host.isPlugin() || std::string_view("FIELKCRPSHTMG").find(static_cast<char>(code)) != std::string_view::npos;
 }
-
-// --- Loading sounds -------------------------------------------------------------------
 
 void MainView::chooseSample(int slot)
 {
@@ -1361,7 +1322,6 @@ void MainView::loadFactory(int soundIndex, int slot)
             else
             {
                 core.engine.loadCloudSample(slot, buffer);
-                // A cloud that was muted would make loading look broken.
                 const auto level = engine::kStrips[static_cast<std::size_t>(slot + 1)].level;
                 if (safe->model.value(level) <= -59.0f)
                     safe->model.set(level, -6.0f);
@@ -1386,5 +1346,4 @@ void MainView::showAudioSettings()
     options.resizable = false;
     options.launchAsync();
 }
-
-} // namespace tf::app::gui
+}

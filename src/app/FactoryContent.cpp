@@ -284,5 +284,38 @@ void addFactoryPresets(io::PresetLibrary& library)
     add("fx:tf.grainDelay", "Scattered grains", effect(0.55f, 0.6f, 0.55f, 0.25f, 0.5f, 0.7f, 0.5f));
     add("fx:tf.compressor", "Bus glue", effect(0.62f, 0.375f, 0.65f, 0.5f, 0.1f, 0.35f, 1.0f));
     add("fx:tf.lofi", "Dusty sampler", effect(0.45f, 0.45f, 0.25f, 0.3f, 0.6f, 0.25f, 1.0f));
+    add("fx:tf.reverb", "Small room", effect(0.2f, 0.3f, 0.5f, 0.05f, 0.2f, 0.0f, 0.35f));
+    add("fx:tf.reverb", "Cathedral", effect(0.85f, 0.75f, 0.55f, 0.25f, 0.35f, 0.0f, 0.6f));
+    add("fx:tf.reverb", "Endless wash", effect(1.0f, 0.95f, 0.7f, 0.1f, 0.6f, 0.0f, 0.8f));
+    add("fx:tf.reverb", "Frozen hall", effect(0.9f, 0.85f, 0.6f, 0.2f, 0.4f, 1.0f, 0.7f));
+    add("fx:tf.delay", "Slap back", effect(0.25f, 0.15f, 0.6f, 0.1f, 0.1f, 0.1f, 0.4f));
+    add("fx:tf.delay", "Long tape trails", effect(0.8f, 0.7f, 0.4f, 0.5f, 0.35f, 0.4f, 0.5f));
+    add("fx:tf.delay", "Wide ping", effect(0.6f, 0.5f, 0.6f, 1.0f, 0.15f, 0.15f, 0.45f));
+    add("fx:tf.wornEcho", "Fading cassette", effect(0.65f, 0.6f, 0.0f, 0.6f, 0.45f, 0.3f, 0.5f));
+    add("fx:tf.wornEcho", "Vinyl ghosts", effect(0.75f, 0.7f, 0.5f, 0.7f, 0.3f, 0.5f, 0.45f));
+    add("fx:tf.wornEcho", "Crushed repeats", effect(0.5f, 0.75f, 1.0f, 0.8f, 0.2f, 0.4f, 0.5f));
+    add("fx:tf.ensemble", "Slow strings", effect(0.25f, 0.5f, 0.15f, 0.67f, 0.9f, 0.6f, 0.7f));
+    add("fx:tf.ensemble", "Seasick", effect(0.45f, 0.9f, 0.8f, 0.33f, 0.6f, 0.5f, 0.8f));
+    add("fx:tf.ensemble", "Wide choir", effect(0.35f, 0.7f, 0.3f, 1.0f, 1.0f, 0.8f, 0.6f));
+    add("fx:tf.blur", "Soft haze", effect(0.4f, 0.3f, 0.3f, 0.0f, 0.4f, 0.0f, 0.5f));
+    add("fx:tf.blur", "Glacier", effect(0.85f, 0.7f, 0.6f, 0.2f, 0.3f, 0.0f, 0.8f));
+    add("fx:tf.blur", "Shimmer cloud", effect(0.6f, 0.5f, 0.5f, 0.7f, 0.7f, 0.0f, 0.6f));
+    add("fx:tf.strings", "Sitar halo", effect(0.6f, 0.6f, 0.7f, 0.33f, 1.0f, 0.55f, 1.0f));
+    add("fx:tf.strings", "Low resonance", effect(0.5f, 0.75f, 0.3f, 0.0f, 0.5f, 0.6f, 1.0f));
+    add("fx:tf.strings", "Glass harp", effect(0.4f, 0.8f, 0.9f, 1.0f, 0.5f, 0.5f, 1.0f));
+    add("fx:tf.filter", "Dark lowpass", effect(0.0f, 0.3f, 0.2f, 0.0f, 0.0f, 0.2f, 1.0f));
+    add("fx:tf.filter", "Radio band", effect(0.35f, 0.6f, 0.5f, 0.4f, 0.0f, 0.2f, 1.0f));
+    add("fx:tf.phaser", "Deep throb", effect(0.4f, 1.0f, 0.85f, 1.0f, 0.3f, 0.5f, 1.0f));
+    add("fx:tf.phaser", "Subtle motion", effect(0.1f, 0.5f, 0.3f, 0.25f, 0.5f, 0.4f, 0.7f));
+    add("fx:tf.tremolo", "Helicopter", effect(0.75f, 1.0f, 0.5f, 0.0f, 0.2f, 0.0f, 1.0f));
+    add("fx:tf.saturator", "Hot valve", effect(0.6f, 0.45f, 0.6f, 0.3f, 1.0f, 0.5f, 1.0f));
+    add("fx:tf.saturator", "Broken speaker", effect(0.95f, 0.8f, 0.3f, 0.0f, 1.0f, 0.45f, 0.8f));
+    add("fx:tf.grainDelay", "Pitched rain", effect(0.4f, 0.25f, 0.8f, 0.7f, 0.4f, 0.8f, 0.5f));
+    add("fx:tf.grainDelay", "Frozen grains", effect(0.8f, 0.8f, 0.4f, 0.1f, 0.85f, 0.4f, 0.6f));
+    add("fx:tf.pitchShimmer", "Low undertow", effect(0.0f, 0.5f, 0.3f, 0.7f, 0.2f, 0.1f, 0.35f));
+    add("fx:tf.compressor", "Gentle leveller", effect(0.5f, 0.125f, 0.5f, 0.6f, 0.15f, 0.2f, 1.0f));
+    add("fx:tf.compressor", "Pumping", effect(0.3f, 1.0f, 0.2f, 0.25f, 0.4f, 0.1f, 1.0f));
+    add("fx:tf.lofi", "Old radio", effect(0.7f, 0.6f, 0.4f, 0.2f, 0.25f, 0.4f, 1.0f));
+    add("fx:tf.lofi", "Bit dust", effect(0.9f, 0.85f, 0.1f, 0.0f, 0.8f, 0.1f, 0.7f));
 }
 }

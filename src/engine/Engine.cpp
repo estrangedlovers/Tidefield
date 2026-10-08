@@ -72,7 +72,7 @@ void Engine::prepare(double newSampleRate, int maxBlockSize)
     resonator.setHarmony(&harmony);
     bloom.prepare(spec, config.seed + 400u);
     bloom.setHarmony(&harmony);
-    bloom.setBuffer(rawBuffer(bloomBuffers.current()));
+    applyBloomZones();
     bloomSwapping = false;
     looper.prepare(spec, config.seed + 500u);
     weather.prepare(spec, config.seed + 600u);
@@ -188,12 +188,45 @@ bool Engine::loadCloudSample(int cloud, std::shared_ptr<const dsp::SampleBuffer>
 
 bool Engine::loadBloomSample(std::shared_ptr<const dsp::SampleBuffer> buffer)
 {
-    auto handle = std::make_unique<SampleHandle>();
-    handle->buffer = buffer;
-    if (! bloomBuffers.publish(std::move(handle)))
+    std::vector<BloomZone> zones;
+    if (buffer != nullptr)
+        zones.push_back({ std::move(buffer), -1.0f });
+    return loadBloomZones(zones);
+}
+
+bool Engine::loadBloomZones(const std::vector<BloomZone>& zones)
+{
+    auto set = std::make_unique<BloomZoneSet>();
+    for (const auto& z : zones)
+        if (z.buffer != nullptr && set->count < static_cast<int>(set->buffers.size()))
+        {
+            set->buffers[static_cast<std::size_t>(set->count)] = z.buffer;
+            set->roots[static_cast<std::size_t>(set->count)] = z.root;
+            ++set->count;
+        }
+    const auto mirror = *set;
+    if (! bloomBuffers.publish(std::move(set)))
         return false;
-    bloomMirror = std::move(buffer);
+    bloomMirror = mirror;
     return true;
+}
+
+std::vector<Engine::BloomZone> Engine::getBloomZones() const
+{
+    std::vector<BloomZone> out;
+    for (int k = 0; k < bloomMirror.count; ++k)
+        out.push_back({ bloomMirror.buffers[static_cast<std::size_t>(k)], bloomMirror.roots[static_cast<std::size_t>(k)] });
+    return out;
+}
+
+void Engine::applyBloomZones() noexcept
+{
+    std::array<dsp::BloomSampler::Zone, dsp::BloomSampler::kMaxZones> zones {};
+    int count = 0;
+    if (const auto* set = bloomBuffers.current())
+        for (int k = 0; k < set->count && k < dsp::BloomSampler::kMaxZones; ++k)
+            zones[static_cast<std::size_t>(count++)] = { set->buffers[static_cast<std::size_t>(k)].get(), set->roots[static_cast<std::size_t>(k)] };
+    bloom.setZones(zones.data(), count);
 }
 
 bool Engine::previewSample(std::shared_ptr<const dsp::SampleBuffer> buffer)
@@ -1378,7 +1411,7 @@ void Engine::processChunk(const float* const* inputs, int numInputs, int inputOf
         if (bloom.isSilent())
         {
             bloomBuffers.acquire();
-            bloom.setBuffer(rawBuffer(bloomBuffers.current()));
+            applyBloomZones();
             bloomSwapping = false;
         }
     }
@@ -1810,7 +1843,7 @@ void Engine::accumulateTelemetry(const float* l, const float* r, int n) noexcept
         f.modeLevel[static_cast<std::size_t>(m)] = resonator.getModeLevel(m);
         f.modeNote[static_cast<std::size_t>(m)] = resonator.getModeNote(m);
     }
-    f.bloomLoaded = rawBuffer(bloomBuffers.current()) != nullptr;
+    f.bloomLoaded = bloomBuffers.current() != nullptr && bloomBuffers.current()->count > 0;
     for (int v = 0; v < dsp::BloomSampler::kMaxVoices; ++v)
         f.bloomVoices[static_cast<std::size_t>(v)] = bloom.getVoice(v);
     f.inputLevel = liveInput.getLevel();

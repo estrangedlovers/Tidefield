@@ -84,7 +84,15 @@ public:
 
     bool loadBloomSample(std::shared_ptr<const dsp::SampleBuffer> buffer);
     bool previewSample(std::shared_ptr<const dsp::SampleBuffer> buffer);
-    std::shared_ptr<const dsp::SampleBuffer> getBloomSample() const { return bloomMirror; }
+    std::shared_ptr<const dsp::SampleBuffer> getBloomSample() const { return bloomMirror.count > 0 ? bloomMirror.buffers[0] : nullptr; }
+
+    struct BloomZone
+    {
+        std::shared_ptr<const dsp::SampleBuffer> buffer;
+        float root = -1.0f;
+    };
+    bool loadBloomZones(const std::vector<BloomZone>& zones);
+    std::vector<BloomZone> getBloomZones() const;
 
     void setHostTransport(double tempoBpm, double ppqPosition, bool playing) noexcept
     {
@@ -239,8 +247,9 @@ private:
     std::array<CloudSlot, kNumClouds> clouds;
     dsp::ResonatorBank resonator;
     dsp::BloomSampler bloom;
-    SnapshotChannel<SampleHandle> bloomBuffers { 4 };
-    std::shared_ptr<const dsp::SampleBuffer> bloomMirror;
+    SnapshotChannel<BloomZoneSet> bloomBuffers { 4 };
+    BloomZoneSet bloomMirror;
+    void applyBloomZones() noexcept;
     bool bloomSwapping = false;
     SnapshotChannel<SampleHandle> previewBuffers { 4 };
     const dsp::SampleBuffer* preview = nullptr;

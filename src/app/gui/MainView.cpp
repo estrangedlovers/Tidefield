@@ -757,6 +757,8 @@ private:
             }
             const auto bloom = model.engine.getBloomSample();
             m.addItem(engine::kNumClouds + 1, "Bloom" + (bloom != nullptr ? "   (" + juce::String(bloom->name) + ")" : juce::String()));
+            if (row.kind == Row::Sound && bloom != nullptr && factorySounds()[static_cast<std::size_t>(row.index)].rootNote >= 0)
+                m.addItem(engine::kNumClouds + 2, "Add to Bloom's keyboard");
             showMenu(m, this, [this, row](int r) {
                 if (r <= 0)
                     return;
@@ -1421,45 +1423,69 @@ bool MainView::keyPressed(const juce::KeyPress& key)
 void MainView::chooseSample(int slot)
 {
     const bool isBloom = slot == engine::kNumClouds;
-    chooser = std::make_unique<juce::FileChooser>(isBloom ? juce::String("Load a one-shot into Bloom") : "Load a sample into Cloud " + juce::String(slot + 1),
+    chooser = std::make_unique<juce::FileChooser>(isBloom ? juce::String("Load one or more sounds into Bloom") : "Load a sample into Cloud " + juce::String(slot + 1),
                                                   juce::File(), "*.wav;*.aif;*.aiff;*.flac;*.ogg;*.mp3");
     juce::Component::SafePointer<MainView> safe(this);
-    chooser->launchAsync(juce::FileBrowserComponent::openMode | juce::FileBrowserComponent::canSelectFiles, [safe, slot](const juce::FileChooser& fc) {
-        const auto file = fc.getResult();
-        if (safe == nullptr || file == juce::File())
+    const int flags = juce::FileBrowserComponent::openMode | juce::FileBrowserComponent::canSelectFiles
+                      | (isBloom ? juce::FileBrowserComponent::canSelectMultipleItems : 0);
+    chooser->launchAsync(flags, [safe, slot](const juce::FileChooser& fc) {
+        const auto files = fc.getResults();
+        if (safe == nullptr || files.isEmpty())
             return;
-        safe->core.workers.addJob([safe, slot, file] {
-            juce::String error;
-            std::shared_ptr<dsp::SampleBuffer> buffer(io::loadSample(file, error).release());
-            std::optional<dsp::PitchEstimate> pitch;
-            if (buffer != nullptr && slot == engine::kNumClouds)
-                pitch = dsp::detectPitch(*buffer);
-            juce::MessageManager::callAsync([safe, slot, buffer, error, pitch] {
+        safe->core.workers.addJob([safe, slot, files] {
+            std::vector<engine::Engine::BloomZone> zones;
+            juce::String error, firstName;
+            std::optional<dsp::PitchEstimate> firstPitch;
+            for (const auto& file : files)
+            {
+                juce::String fileError;
+                std::shared_ptr<dsp::SampleBuffer> buffer(io::loadSample(file, fileError).release());
+                if (buffer == nullptr)
+                {
+                    error = fileError;
+                    continue;
+                }
+                const auto pitch = slot == engine::kNumClouds ? dsp::detectPitch(*buffer) : std::nullopt;
+                if (zones.empty())
+                {
+                    firstName = buffer->name;
+                    firstPitch = pitch;
+                }
+                zones.push_back({ buffer, pitch.has_value() ? std::round(pitch->midiNote) : 60.0f });
+                if (zones.size() >= static_cast<std::size_t>(dsp::BloomSampler::kMaxZones) || slot != engine::kNumClouds)
+                    break;
+            }
+            juce::MessageManager::callAsync([safe, slot, zones, error, firstName, firstPitch]() mutable {
                 if (safe == nullptr)
                     return;
-                if (buffer == nullptr)
+                if (zones.empty())
                     return safe->core.status(error, true);
-                juce::String detail;
-                if (slot == engine::kNumClouds)
+                if (slot != engine::kNumClouds)
                 {
-                    safe->core.engine.loadBloomSample(buffer);
-                    if (pitch.has_value())
-                    {
-                        const float root = std::round(pitch->midiNote);
-                        safe->model.set(P::BloomRoot, root);
-                        detail = ", tuned to " + Model::noteName(root);
-                    }
-                    else
-                        detail = ", no clear pitch: set Sample Root by ear";
-                }
-                else
-                {
-                    safe->core.engine.loadCloudSample(slot, buffer);
+                    safe->core.engine.loadCloudSample(slot, zones.front().buffer);
                     const auto level = engine::kStrips[static_cast<std::size_t>(slot + 1)].level;
                     if (safe->model.value(level) <= -59.0f)
                         safe->model.set(level, -6.0f);
+                    return safe->core.status("Loaded " + firstName);
                 }
-                safe->core.status("Loaded " + juce::String(buffer->name) + detail);
+                if (zones.size() == 1)
+                {
+                    zones.front().root = -1.0f;
+                    safe->core.engine.loadBloomZones(zones);
+                    if (firstPitch.has_value())
+                    {
+                        const float root = std::round(firstPitch->midiNote);
+                        safe->model.set(P::BloomRoot, root);
+                        return safe->core.status("Loaded " + firstName + ", tuned to " + Model::noteName(root));
+                    }
+                    return safe->core.status("Loaded " + firstName + ", no clear pitch: set Sample Root by ear");
+                }
+                std::sort(zones.begin(), zones.end(), [](const auto& x, const auto& y) { return x.root < y.root; });
+                safe->core.engine.loadBloomZones(zones);
+                juce::String roots;
+                for (const auto& z : zones)
+                    roots << (roots.isEmpty() ? "" : ", ") << Model::noteName(z.root);
+                safe->core.status("Bloom now plays " + juce::String(static_cast<int>(zones.size())) + " sounds across the keyboard, rooted at " + roots);
             });
         });
     });
@@ -1478,6 +1504,18 @@ void MainView::loadFactory(int soundIndex, int slot)
             if (safe == nullptr || buffer == nullptr)
                 return;
             auto& core = safe->core;
+            if (slot == engine::kNumClouds + 1)
+            {
+                auto zones = core.engine.getBloomZones();
+                if (zones.size() == 1 && zones.front().root < 0.0f)
+                    zones.front().root = safe->model.value(P::BloomRoot);
+                if (zones.size() >= static_cast<std::size_t>(dsp::BloomSampler::kMaxZones))
+                    return core.status("Bloom already plays 8 sounds; load one sound to start again.", true);
+                zones.push_back({ buffer, sound.rootNote >= 0 ? static_cast<float>(sound.rootNote) : 60.0f });
+                std::sort(zones.begin(), zones.end(), [](const auto& x, const auto& y) { return x.root < y.root; });
+                core.engine.loadBloomZones(zones);
+                return core.status("Added " + juce::String(sound.name) + " to Bloom's keyboard (" + juce::String(static_cast<int>(zones.size())) + " sounds)");
+            }
             if (slot == engine::kNumClouds)
             {
                 core.engine.loadBloomSample(buffer);

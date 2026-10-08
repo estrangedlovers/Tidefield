@@ -177,7 +177,9 @@ void Waveform::paint(juce::Graphics& g)
         g.fillRect(r.getX() + pos * r.getWidth() - 0.75f, r.getY(), 1.5f, r.getHeight());
     }
 
-    const auto caption = juce::String(shown->name) + "  " + juce::String(shown->seconds(), 1) + " s";
+    const int zones = slot == engine::kNumClouds ? static_cast<int>(model.engine.getBloomZones().size()) : 1;
+    const auto caption = zones > 1 ? juce::String(shown->name) + "  + " + juce::String(zones - 1) + " more across the keyboard"
+                                   : juce::String(shown->name) + "  " + juce::String(shown->seconds(), 1) + " s";
     g.setFont(font(10.5f, 600));
     const auto pill = juce::Rectangle<float>(r.getX(), r.getY(), juce::GlyphArrangement::getStringWidth(g.getCurrentFont(), caption) + 12.0f, 16.0f);
     g.setColour(display::well().withAlpha(0.8f));
@@ -320,6 +322,19 @@ void KeyboardStrip::tick()
         lit = next;
         repaint();
     }
+    if (++zoneFrames % 15 == 0)
+    {
+        std::vector<float> roots;
+        const auto zones = model.engine.getBloomZones();
+        if (zones.size() > 1)
+            for (const auto& z : zones)
+                roots.push_back(z.root);
+        if (roots != zoneRoots)
+        {
+            zoneRoots = std::move(roots);
+            repaint();
+        }
+    }
 }
 
 juce::Rectangle<float> KeyboardStrip::keyRect(int note) const
@@ -367,6 +382,12 @@ void KeyboardStrip::paint(juce::Graphics& g)
             g.setColour(colour::tide());
             g.drawRoundedRectangle(k.reduced(1.0f), 2.0f, 2.0f);
         }
+        for (float zoneRoot : zoneRoots)
+            if (juce::roundToInt(zoneRoot) == n)
+            {
+                g.setColour(colour::tide());
+                g.fillEllipse(juce::Rectangle<float>(6.0f, 6.0f).withCentre({ k.getCentreX(), k.getY() + 8.0f }));
+            }
         if (! black && n % 12 == 0)
         {
             g.setColour(colour::well().withAlpha(0.6f));

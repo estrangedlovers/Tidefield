@@ -84,5 +84,7 @@ private:
     Model& model;
     int heldNote = -1;
     std::array<float, 128> lit {};
+    std::vector<float> zoneRoots;
+    int zoneFrames = 0;
 };
 }

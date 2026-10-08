@@ -502,3 +502,42 @@ TEST_CASE("Preset names that share a file name do not overwrite each other", "[p
     CHECK(list[0].values.at("root") == Approx(55.0f));
     dir.deleteRecursively();
 }
+
+TEST_CASE("Bloom's keyboard of sounds round-trips through a session file", "[session][bloom]")
+{
+    engine::Engine e;
+    e.prepare(kFs, 256);
+    engine::SceneManager scenes(e);
+    engine::FxManager fx(e);
+    auto tone = [](float hz) {
+        auto b = std::make_shared<dsp::SampleBuffer>();
+        b->sampleRate = kFs;
+        b->left.resize(24000);
+        for (std::size_t i = 0; i < b->left.size(); ++i)
+            b->left[i] = 0.3f * std::sin(2.0f * 3.14159265f * hz * static_cast<float>(i) / static_cast<float>(kFs));
+        b->name = "tone";
+        return b;
+    };
+    REQUIRE(e.loadBloomZones({ { tone(220.0f), 57.0f }, { tone(440.0f), 69.0f }, { tone(880.0f), 81.0f } }));
+
+    engine::TelemetryFrame frame;
+    auto data = io::captureSession(e, frame, scenes, fx);
+    const auto file = juce::File::createTempFile(".tidefield");
+    juce::String error;
+    REQUIRE(io::saveSession(data, file, error));
+    auto loaded = io::loadSession(file, error);
+    file.deleteFile();
+    REQUIRE(loaded.has_value());
+
+    engine::Engine e2;
+    e2.prepare(kFs, 256);
+    engine::SceneManager scenes2(e2);
+    engine::FxManager fx2(e2);
+    io::applySession(*loaded, e2, scenes2, fx2, true);
+    const auto zones = e2.getBloomZones();
+    REQUIRE(zones.size() == 3);
+    CHECK(zones[0].root == 57.0f);
+    CHECK(zones[1].root == 69.0f);
+    CHECK(zones[2].root == 81.0f);
+    CHECK(zones[2].buffer->size() == 24000);
+}

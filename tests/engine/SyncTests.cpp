@@ -158,3 +158,32 @@ TEST_CASE("Pitch bend moves Bloom; in MPE mode each channel bends only its own n
     const float memberBent = zeroCrossingRate(rig, 0.3);
     CHECK(memberBent / plain == Approx(std::exp2(12.0f / 12.0f)).margin(0.05f));
 }
+
+TEST_CASE("Bloom plays each note from the sound whose root is nearest", "[bloom]")
+{
+    Rig rig;
+    rig.engine.loadBloomZones({ { sine(110.0f), 45.0f }, { sine(440.0f), 69.0f } });
+    rig.engine.setParam(engine::P::BloomTransform, 5.0f);
+    rig.engine.setParam(engine::P::BloomAmount, 0.0f);
+    rig.engine.setParam(engine::P::BloomGravity, 0.0f);
+    rig.engine.setParam(engine::P::BloomTone, 1.0f);
+    rig.engine.setParam(engine::P::BloomSendA, -60.0f);
+    rig.engine.setParam(engine::P::BloomSendB, -60.0f);
+    rig.engine.setParam(engine::P::ResLevel, -60.0f);
+    rig.engine.setParam(engine::P::DroneLevel, -60.0f);
+    rig.engine.setParam(engine::P::MasterFadeSecs, 0.5f);
+    rig.engine.command(engine::Command::FadeIn);
+    for (int b = 0; b < 400; ++b)
+        rig.block();
+
+    for (const auto& [note, hz] : { std::pair { 47, 110.0f * std::exp2(2.0f / 12.0f) }, std::pair { 67, 440.0f * std::exp2(-2.0f / 12.0f) } })
+    {
+        rig.engine.noteOn(note, 0.9f);
+        for (int b = 0; b < 40; ++b)
+            rig.block();
+        CHECK(zeroCrossingRate(rig, 0.3) == Approx(hz).margin(hz * 0.03f));
+        rig.engine.noteOff(note);
+        for (int b = 0; b < 1500; ++b)
+            rig.block();
+    }
+}

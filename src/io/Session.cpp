@@ -22,6 +22,8 @@ std::vector<std::string> sampleSlotNames()
     for (int k = 0; k < engine::kNumClouds; ++k)
         names.push_back("cloud" + std::to_string(k + 1));
     names.push_back("bloom");
+    for (int k = 2; k <= 8; ++k)
+        names.push_back("bloom" + std::to_string(k));
     return names;
 }
 
@@ -344,8 +346,12 @@ SessionData captureSession(const engine::Engine& engine, const engine::Telemetry
     for (int k = 0; k < engine::kNumClouds; ++k)
         if (auto b = engine.getCloudSample(k))
             s.samples["cloud" + std::to_string(k + 1)] = b;
-    if (auto b = engine.getBloomSample())
-        s.samples["bloom"] = b;
+    const auto zones = engine.getBloomZones();
+    for (std::size_t k = 0; k < zones.size(); ++k)
+    {
+        s.samples[k == 0 ? std::string("bloom") : "bloom" + std::to_string(k + 1)] = zones[k].buffer;
+        s.bloomRoots.push_back(zones[k].root);
+    }
     if (midi != nullptr)
         s.midi = midiToJson(*midi, reg);
     if (seasons != nullptr)
@@ -450,8 +456,15 @@ std::vector<std::string> applySession(const SessionData& session, engine::Engine
         if (! engine.loadCloudSample(k, it != session.samples.end() ? it->second : nullptr))
             warnings.push_back("Cloud " + std::to_string(k + 1) + ": the sound could not be loaded yet (audio is not running); load it again once it is");
     }
-    const auto bloom = session.samples.find("bloom");
-    if (! engine.loadBloomSample(bloom != session.samples.end() ? bloom->second : nullptr))
+    std::vector<engine::Engine::BloomZone> zones;
+    for (int k = 0; k < 8; ++k)
+    {
+        const auto it = session.samples.find(k == 0 ? std::string("bloom") : "bloom" + std::to_string(k + 1));
+        if (it == session.samples.end() || it->second == nullptr)
+            continue;
+        zones.push_back({ it->second, static_cast<std::size_t>(k) < session.bloomRoots.size() ? session.bloomRoots[static_cast<std::size_t>(k)] : -1.0f });
+    }
+    if (! engine.loadBloomZones(zones))
         warnings.push_back("Bloom: the sound could not be loaded yet (audio is not running); load it again once it is");
 
     if (seasons != nullptr)
@@ -513,6 +526,13 @@ juce::var sessionToJson(const SessionData& s)
         root->setProperty("seasons", s.seasons);
     if (s.modRoutes.isArray())
         root->setProperty("modRoutes", s.modRoutes);
+    if (s.bloomRoots.size() > 1 || (s.bloomRoots.size() == 1 && s.bloomRoots[0] >= 0.0f))
+    {
+        juce::Array<juce::var> roots;
+        for (float r : s.bloomRoots)
+            roots.add(r);
+        root->setProperty("bloomRoots", roots);
+    }
     if (! s.path.empty())
     {
         juce::Array<juce::var> pts;
@@ -584,6 +604,9 @@ std::optional<SessionData> sessionFromJson(const juce::var& json, juce::String& 
     s.midi = root->getProperty("midi");
     s.seasons = root->getProperty("seasons");
     s.modRoutes = root->getProperty("modRoutes");
+    if (const auto* roots = root->getProperty("bloomRoots").getArray())
+        for (const auto& r : *roots)
+            s.bloomRoots.push_back(std::clamp(static_cast<float>(static_cast<double>(r)), -1.0f, 127.0f));
     s.gesture = root->getProperty("gesture");
     if (const auto* pts = root->getProperty("path").getArray())
         for (int i = 0; i + 1 < pts->size(); i += 2)

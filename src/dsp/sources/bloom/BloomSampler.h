@@ -18,6 +18,13 @@ public:
     static constexpr int kMaxGrains = 8;
     static constexpr int kMaxTaps = 6;
     static constexpr int kWindowSize = 512;
+    static constexpr int kMaxZones = 8;
+
+    struct Zone
+    {
+        const SampleBuffer* buffer = nullptr;
+        float root = -1.0f;
+    };
 
     enum class Transform : int { Swell = 0, Smear, Freeze, Ghost, Constellation, Tape };
     static constexpr int kNumTransforms = 6;
@@ -51,6 +58,8 @@ public:
     void setParams(const Params& p) noexcept { params = p; }
     void setHarmony(const HarmonicGravity* h) noexcept { harmony = h; }
     void setBuffer(const SampleBuffer* b) noexcept;
+    void setZones(const Zone* zones, int count) noexcept;
+    int getNumZones() const noexcept { return numZones; }
 
     static constexpr int kChannels = 16;
 
@@ -118,6 +127,8 @@ private:
         float level = 0.0f;
         int channel = -1;
         float bendNow = 0.0f, pressureNow = 0.0f;
+        const SampleBuffer* buffer = nullptr;
+        float root = 60.0f;
     };
 
     void startVoice(Voice& v, int note, float velocity) noexcept;
@@ -130,8 +141,10 @@ private:
 
     ProcessSpec spec;
     Params params;
-    const SampleBuffer* buffer = nullptr;
+    std::array<Zone, kMaxZones> zones {};
+    int numZones = 0;
     const HarmonicGravity* harmony = nullptr;
+    const Zone& zoneFor(int note) const noexcept;
     Random rng;
     std::array<Voice, kMaxVoices> voices {};
     std::vector<float> hann;

@@ -61,10 +61,40 @@ void BloomSampler::reset() noexcept
 
 void BloomSampler::setBuffer(const SampleBuffer* b) noexcept
 {
-    if (b == buffer)
+    const Zone z { b, -1.0f };
+    setZones(&z, b != nullptr ? 1 : 0);
+}
+
+void BloomSampler::setZones(const Zone* z, int count) noexcept
+{
+    count = std::clamp(count, 0, kMaxZones);
+    bool same = count == numZones;
+    for (int k = 0; same && k < count; ++k)
+        same = zones[static_cast<std::size_t>(k)].buffer == z[k].buffer && zones[static_cast<std::size_t>(k)].root == z[k].root;
+    if (same)
         return;
     reset();
-    buffer = b;
+    numZones = 0;
+    for (int k = 0; k < count; ++k)
+        if (z[k].buffer != nullptr && z[k].buffer->size() >= 256)
+            zones[static_cast<std::size_t>(numZones++)] = z[k];
+}
+
+const BloomSampler::Zone& BloomSampler::zoneFor(int note) const noexcept
+{
+    std::size_t best = 0;
+    float distance = 1.0e9f;
+    for (std::size_t k = 0; k < static_cast<std::size_t>(numZones); ++k)
+    {
+        const float root = zones[k].root >= 0.0f ? zones[k].root : params.rootNote;
+        const float d = std::abs(static_cast<float>(note) - root);
+        if (d < distance)
+        {
+            distance = d;
+            best = k;
+        }
+    }
+    return zones[best];
 }
 
 float BloomSampler::window(float phase) const noexcept
@@ -106,7 +136,7 @@ void BloomSampler::setChannelExpression(int channel, float bendSemitones, float 
 
 void BloomSampler::noteOn(int note, float velocity, int channel) noexcept
 {
-    if (buffer == nullptr || buffer->size() < 256 || velocity <= 0.0f)
+    if (numZones == 0 || velocity <= 0.0f)
         return;
 
     const auto pool = static_cast<std::size_t>(voiceLimit);
@@ -192,6 +222,8 @@ void BloomSampler::startVoice(Voice& v, int note, float velocity) noexcept
 {
     const auto& p = params;
     const float fs = static_cast<float>(spec.sampleRate);
+    const Zone& zone = zoneFor(note);
+    const SampleBuffer* buffer = zone.buffer;
     const double size = static_cast<double>(buffer->size());
     const float rnd = std::clamp(p.random, 0.0f, 1.0f);
     const float amount = std::clamp(p.amount, 0.0f, 1.0f);
@@ -204,10 +236,12 @@ void BloomSampler::startVoice(Voice& v, int note, float velocity) noexcept
     v.note = note;
     v.transform = p.transform;
     v.velocityGain = std::pow(std::clamp(velocity, 0.0f, 1.0f), 1.5f);
+    v.buffer = buffer;
+    v.root = zone.root >= 0.0f ? zone.root : p.rootNote;
 
     const float seed = v.rng.nextFloat();
     v.playedNote = quantizedNote(static_cast<float>(note) + p.pitch, seed) + rnd * 0.08f * v.rng.nextBipolar();
-    v.ratio = std::exp2((static_cast<double>(v.playedNote) - static_cast<double>(p.rootNote)) / 12.0) * buffer->sampleRate / spec.sampleRate;
+    v.ratio = std::exp2((static_cast<double>(v.playedNote) - static_cast<double>(v.root)) / 12.0) * buffer->sampleRate / spec.sampleRate;
     v.pan = std::clamp(p.spread * v.rng.nextBipolar(), -1.0f, 1.0f);
 
     const float attack = std::max(0.002f, p.attackSeconds * (1.0f + rnd * 0.5f * v.rng.nextBipolar()));
@@ -286,7 +320,7 @@ void BloomSampler::startVoice(Voice& v, int note, float velocity) noexcept
                 t.active = true;
                 t.mip = -1;
                 t.pos = 0.0;
-                t.inc = std::exp2((static_cast<double>(tapNote) - static_cast<double>(p.rootNote)) / 12.0) * buffer->sampleRate / spec.sampleRate;
+                t.inc = std::exp2((static_cast<double>(tapNote) - static_cast<double>(v.root)) / 12.0) * buffer->sampleRate / spec.sampleRate;
                 t.delay = i == 0 ? 0 : static_cast<int>(v.rng.nextFloat() * (0.4f + 2.6f * amount) * fs);
                 const float g = i == 0 ? 1.0f : 0.45f + 0.4f * v.rng.nextFloat();
                 const auto tp = equalPowerPan(std::clamp(p.spread * v.rng.nextBipolar(), -1.0f, 1.0f));
@@ -324,6 +358,7 @@ void BloomSampler::spawnGrain(Voice& v) noexcept
     if (g == nullptr)
         return;
 
+    const SampleBuffer* buffer = v.buffer;
     const double size = static_cast<double>(buffer->size());
     const double span = v.grainLength * v.ratio;
     double pos = v.centre + static_cast<double>(v.grainJitter * v.rng.nextBipolar()) * size;
@@ -342,6 +377,7 @@ void BloomSampler::spawnGrain(Voice& v) noexcept
 
 void BloomSampler::renderVoice(Voice& v, float* left, float* right, int n, float timeScale, double pitchRatio, float expressionGain) noexcept
 {
+    const SampleBuffer* buffer = v.buffer;
     const bool stereo = buffer->isStereo();
     const double sizeD = static_cast<double>(buffer->size());
     auto readAt = [&](int mip, double pos, float& sl, float& sr) {
@@ -470,7 +506,7 @@ void BloomSampler::process(float* left, float* right, int n, float timeScale) no
 {
     std::fill_n(left, n, 0.0f);
     std::fill_n(right, n, 0.0f);
-    if (buffer == nullptr || buffer->size() < 256)
+    if (numZones == 0)
         return;
     if (params.tone != toneFor)
     {

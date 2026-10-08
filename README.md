@@ -26,6 +26,8 @@ Unit and a VST3 instrument. Copy `Tidefield.component` to
 `~/Library/Audio/Plug-Ins/VST3`, then rescan. Track MIDI plays Bloom and drives your
 mappings, and the whole piece (sounds included) is saved in the project.
 
+The full guide to every control is the [user manual](docs/MANUAL.md).
+
 ## First five minutes
 
 Press **Space** to fade in. A starter terrain is already laid out: six scenes
@@ -82,7 +84,7 @@ Gravity, reverb return, Cloud 1 density and master level.
 - **Sources**: drone, four granular clouds, resonator bank, live input (with spectral
   hold), Bloom one-shot keyboard, disintegrating looper, weather (wind, rain, surf),
   freeze all.
-- **Recording type** (on the master, heard live): digital, cassette, vinyl, noisy sampler.
+- **Recording type** (on the master, heard live): digital, cassette, vinyl, sampler.
 - **Effects** for any of 28 slots: reverb with infinite hold, tape delay, worn echo
   (a Medium inside the feedback), ensemble, spectral blur, sympathetic strings, Medium.
   Your own JUCE effects plug in through `src/fx_juce/UserEffects.cpp`.

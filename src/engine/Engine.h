@@ -83,6 +83,7 @@ public:
     std::shared_ptr<const dsp::SampleBuffer> getCloudSample(int cloud) const;
 
     bool loadBloomSample(std::shared_ptr<const dsp::SampleBuffer> buffer);
+    bool previewSample(std::shared_ptr<const dsp::SampleBuffer> buffer);
     std::shared_ptr<const dsp::SampleBuffer> getBloomSample() const { return bloomMirror; }
 
     void setHostTransport(double tempoBpm, double ppqPosition, bool playing) noexcept
@@ -241,6 +242,10 @@ private:
     SnapshotChannel<SampleHandle> bloomBuffers { 4 };
     std::shared_ptr<const dsp::SampleBuffer> bloomMirror;
     bool bloomSwapping = false;
+    SnapshotChannel<SampleHandle> previewBuffers { 4 };
+    const dsp::SampleBuffer* preview = nullptr;
+    double previewPos = 0.0;
+    void mixPreview(int numSamples) noexcept;
     dsp::Disintegrator looper;
     dsp::WeatherBed weather;
     dsp::SpectralFreeze inputFreeze;

@@ -196,6 +196,44 @@ bool Engine::loadBloomSample(std::shared_ptr<const dsp::SampleBuffer> buffer)
     return true;
 }
 
+bool Engine::previewSample(std::shared_ptr<const dsp::SampleBuffer> buffer)
+{
+    auto handle = std::make_unique<SampleHandle>();
+    handle->buffer = std::move(buffer);
+    return previewBuffers.publish(std::move(handle));
+}
+
+void Engine::mixPreview(int n) noexcept
+{
+    if (previewBuffers.acquire())
+    {
+        preview = rawBuffer(previewBuffers.current());
+        previewPos = 0.0;
+    }
+    if (preview == nullptr || preview->size() < 2)
+        return;
+    const double step = preview->sampleRate / sampleRate;
+    const double size = static_cast<double>(preview->size());
+    const double fadeLength = 0.01 * preview->sampleRate;
+    const bool stereo = preview->isStereo();
+    for (int i = 0; i < n; ++i)
+    {
+        if (previewPos >= size - 1.0)
+        {
+            preview = nullptr;
+            return;
+        }
+        const auto k = static_cast<std::size_t>(previewPos);
+        const float frac = static_cast<float>(previewPos - static_cast<double>(k));
+        const float l = dsp::lerp(preview->left[k], preview->left[k + 1], frac);
+        const float r = stereo ? dsp::lerp(preview->right[k], preview->right[k + 1], frac) : l;
+        const float edge = static_cast<float>(std::min({ 1.0, previewPos / fadeLength, (size - previewPos) / fadeLength }));
+        masterL[static_cast<std::size_t>(i)] += 0.5f * edge * l;
+        masterR[static_cast<std::size_t>(i)] += 0.5f * edge * r;
+        previewPos += step;
+    }
+}
+
 std::shared_ptr<const dsp::SampleBuffer> Engine::getCloudSample(int cloud) const
 {
     if (cloud < 0 || cloud >= kNumClouds)
@@ -287,6 +325,7 @@ void Engine::collectGarbage()
     gestureChannel.collectGarbage();
     midiMapChannel.collectGarbage();
     bloomBuffers.collectGarbage();
+    previewBuffers.collectGarbage();
     for (auto& c : clouds)
         c.buffers.collectGarbage();
 }
@@ -1591,6 +1630,7 @@ void Engine::process(const float* const* inputs, int numInputs, float* const* ou
         };
         runBus(kBusASlot, busAL, busAR, busAStart, P::BusALevel, kNumStrips);
         runBus(kBusBSlot, busBL, busBR, busBStart, P::BusBLevel, kNumStrips + 1);
+        mixPreview(block);
 
         for (int slotIndex : { kMasterSlot, kMasterSlot + 1 })
         {

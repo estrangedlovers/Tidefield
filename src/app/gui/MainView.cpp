@@ -2,6 +2,7 @@
 
 #include "../FactoryContent.h"
 
+#include <dsp/analysis/PitchDetect.h>
 #include <io/AudioFileIO.h>
 
 #include <juce_audio_utils/juce_audio_utils.h>
@@ -1306,16 +1307,35 @@ void MainView::chooseSample(int slot)
         safe->core.workers.addJob([safe, slot, file] {
             juce::String error;
             std::shared_ptr<dsp::SampleBuffer> buffer(io::loadSample(file, error).release());
-            juce::MessageManager::callAsync([safe, slot, buffer, error] {
+            std::optional<dsp::PitchEstimate> pitch;
+            if (buffer != nullptr && slot == engine::kNumClouds)
+                pitch = dsp::detectPitch(*buffer);
+            juce::MessageManager::callAsync([safe, slot, buffer, error, pitch] {
                 if (safe == nullptr)
                     return;
                 if (buffer == nullptr)
                     return safe->core.status(error, true);
+                juce::String detail;
                 if (slot == engine::kNumClouds)
+                {
                     safe->core.engine.loadBloomSample(buffer);
+                    if (pitch.has_value())
+                    {
+                        const float root = std::round(pitch->midiNote);
+                        safe->model.set(P::BloomRoot, root);
+                        detail = ", tuned to " + Model::noteName(root);
+                    }
+                    else
+                        detail = ", no clear pitch: set Sample Root by ear";
+                }
                 else
+                {
                     safe->core.engine.loadCloudSample(slot, buffer);
-                safe->core.status("Loaded " + juce::String(buffer->name));
+                    const auto level = engine::kStrips[static_cast<std::size_t>(slot + 1)].level;
+                    if (safe->model.value(level) <= -59.0f)
+                        safe->model.set(level, -6.0f);
+                }
+                safe->core.status("Loaded " + juce::String(buffer->name) + detail);
             });
         });
     });

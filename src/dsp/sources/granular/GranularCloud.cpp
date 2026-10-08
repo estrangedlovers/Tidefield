@@ -186,6 +186,35 @@ void GranularCloud::process(float* left, float* right, int n, float timeScale) n
         const float gl = g.gainL, gr = g.gainR;
         double pos = g.readPos * scale;
         const double inc = g.increment * scale;
+
+        // Most chunks lie wholly inside the sample: check both ends once, then run a
+        // loop with no bounds checks and no per-sample channel test.
+        const double endPos = pos + inc * static_cast<double>(std::max(0, run - 1));
+        if (run > 0 && std::min(pos, endPos) >= 1.0 && static_cast<std::size_t>(std::max(pos, endPos)) + 2 < size)
+        {
+            if (stereo)
+                for (int i = 0; i < run; ++i)
+                {
+                    const auto k = static_cast<std::size_t>(pos);
+                    const float t = static_cast<float>(pos - static_cast<double>(k));
+                    left[i] += hermite(srcL[k - 1], srcL[k], srcL[k + 1], srcL[k + 2], t) * w * gl;
+                    right[i] += hermite(srcR[k - 1], srcR[k], srcR[k + 1], srcR[k + 2], t) * w * gr;
+                    pos += inc;
+                    w += wStep;
+                }
+            else
+                for (int i = 0; i < run; ++i)
+                {
+                    const auto k = static_cast<std::size_t>(pos);
+                    const float t = static_cast<float>(pos - static_cast<double>(k));
+                    const float v = hermite(srcL[k - 1], srcL[k], srcL[k + 1], srcL[k + 2], t) * w;
+                    left[i] += v * gl;
+                    right[i] += v * gr;
+                    pos += inc;
+                    w += wStep;
+                }
+        }
+        else
         for (int i = 0; i < run; ++i)
         {
             float sl, sr;

@@ -4,6 +4,7 @@
 #include <dsp/fx/medium/Medium.h>
 #include <dsp/harmony/Scale.h>
 #include <dsp/sources/bloom/BloomSampler.h>
+#include <dsp/sources/drone/DroneGenerator.h>
 
 namespace tf::app::gui {
 namespace {
@@ -120,6 +121,14 @@ juce::StringArray Model::choices(P p) const
         c = { "Auto", "Cloud 1", "Cloud 2", "Cloud 3", "Cloud 4" };
     else if (id == "input.channel")
         c = { "Input 1", "Input 2", "1 + 2" };
+    else if (id == "drone.wave")
+        for (int w = 0; w < dsp::DroneGenerator::kNumWaves; ++w)
+            c.add(dsp::DroneGenerator::waveName(w));
+    else if (id == "drone.chord")
+        for (int k = 0; k < dsp::DroneGenerator::kNumChords; ++k)
+            c.add(dsp::DroneGenerator::chordName(k));
+    else if (id == "drone.filterType")
+        c = { "Low-pass", "Band-pass", "High-pass" };
     else if (id == "space.mode")
         c = { "Stereo", "Headphones", "Quad", "6 speakers", "8 speakers" };
     else if (id == "loop.source")

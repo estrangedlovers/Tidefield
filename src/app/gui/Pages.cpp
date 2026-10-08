@@ -23,7 +23,20 @@ juce::String helpFor(P p)
     static const std::map<P, const char*> help {
         { P::DroneRoot, "the drone's lowest note; the voices stack on it in the key" },
         { P::DroneCutoff, "opens the drone's filter" },
-        { P::DroneShape, "each voice's tone: a bright saw on the left, a pure sine on the right" },
+        { P::DroneShape, "each voice's tone; Classic: saw to sine, Pulse: square to thin pulse, Fold: folds the sine harder, Organ: dark to bright drawbars, FM: modulation index" },
+        { P::DroneWave, "the oscillator: Classic, Pulse, Fold, Organ or FM; Shape changes what each one does" },
+        { P::DroneChord, "which notes the voices stack and wander between; changing it revoices smoothly" },
+        { P::DroneSub, "a pure sine an octave below the root" },
+        { P::DroneFmRatio, "FM wave only: the modulator's pitch against the voice; whole numbers are harmonic, others bell-like" },
+        { P::DroneTilt, "quietens the higher voices so the low notes lead" },
+        { P::DroneFilterType, "low-pass, band-pass or high-pass" },
+        { P::DroneKeyTrack, "lets higher voices open the filter further" },
+        { P::DroneDrive, "saturation, matched in level so only the colour changes" },
+        { P::DroneBreathTone, "the colour of the breath noise, dark to bright" },
+        { P::DroneRevoice, "how long a voice takes to fade to a new note" },
+        { P::DroneGlide, "how long the voices take to follow a new root" },
+        { P::DroneVibrato, "pitch wobble on every voice" },
+        { P::DroneTremolo, "a slow or fast swell in level" },
         { P::DroneDensity, "how many voices sound at once" },
         { P::DroneEvolve, "how often voices move to new notes of the chord" },
         { P::DroneGravity, "how strongly voices are pulled into the key" },
@@ -1636,6 +1649,12 @@ void Device::showPresetMenu()
 
 void Device::applyPreset(const io::Preset& p)
 {
+    for (auto param : presetParams)
+    {
+        std::string id = model.spec(param).id;
+        if (id.rfind(presetPrefix, 0) == 0 && p.values.count(id.substr(presetPrefix.size())) == 0)
+            model.set(param, model.spec(param).defaultValue);
+    }
     for (const auto& [key, value] : p.values)
         if (const auto index = model.registry.find(presetPrefix + key))
             model.set(static_cast<engine::P>(*index), value);
@@ -1816,11 +1835,16 @@ void DeviceView::build()
         case Drone:
         {
             auto& d = device("Drone", sceneTint(0));
-            params(d, { P::DroneRoot, P::DroneDensity, P::DroneShape, P::DroneDetune, P::DroneCutoff, P::DroneResonance, P::DroneNoise, P::DroneEvolve });
+            params(d, { P::DroneWave, P::DroneChord, P::DroneRoot, P::DroneDensity, P::DroneShape, P::DroneFmRatio, P::DroneDetune, P::DroneSub });
+            auto& t = device("Tone", sceneTint(0));
+            params(t, { P::DroneFilterType, P::DroneCutoff, P::DroneResonance, P::DroneKeyTrack, P::DroneTilt, P::DroneDrive, P::DroneNoise, P::DroneBreathTone });
             auto& m = device("Motion", sceneTint(0));
-            params(m, { P::DroneDriftDepth, P::DroneDriftRate, P::DroneSpread, P::DroneGravity });
-            d.setPresets("drone", "drone.", { P::DroneRoot, P::DroneDensity, P::DroneShape, P::DroneDetune, P::DroneCutoff, P::DroneResonance, P::DroneNoise,
-                                              P::DroneEvolve, P::DroneDriftDepth, P::DroneDriftRate, P::DroneSpread, P::DroneGravity });
+            params(m, { P::DroneEvolve, P::DroneRevoice, P::DroneGlide, P::DroneDriftDepth, P::DroneDriftRate, P::DroneVibrato, P::DroneVibratoRate,
+                        P::DroneTremolo, P::DroneTremoloRate, P::DroneSpread, P::DroneGravity });
+            std::vector<P> all;
+            for (auto p = engine::idx(P::DroneRoot); p <= engine::idx(P::DroneBreathTone); ++p)
+                all.push_back(static_cast<P>(p));
+            d.setPresets("drone", "drone.", all);
             strip(static_cast<int>(engine::StripId::Drone), sceneTint(0));
             break;
         }

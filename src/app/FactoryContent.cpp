@@ -182,6 +182,34 @@ void addFactoryPresets(io::PresetLibrary& library)
     add("drone", "Bright organ", drone(43, 5, 0.25f, 4, 3200, 0.1f, 0.02f, 0.35f, 0.3f, 0.05f, 0.8f, 1.0f));
     add("drone", "Breathing reed", drone(38, 4, 0.45f, 12, 1300, 0.45f, 0.4f, 0.5f, 0.6f, 0.08f, 0.7f, 0.8f));
     add("drone", "Wide shimmer", drone(50, 6, 0.3f, 20, 6000, 0.25f, 0.1f, 0.7f, 0.7f, 0.12f, 1.0f, 0.9f));
+    auto deep = [&drone](V base, V extra) {
+        for (auto& [key, value] : extra)
+            base[key] = value;
+        return base;
+    };
+    add("drone", "Tanpura field", deep(drone(37, 4, 0.4f, 5, 2200, 0.2f, 0.05f, 0.1f, 0.3f, 0.04f, 0.7f, 1.0f),
+                                       { { "chord", 1 }, { "tremolo", 0.15f }, { "tremoloRate", 0.25f }, { "keyTrack", 0.3f } }));
+    add("drone", "Pipe organ", deep(drone(36, 5, 0.6f, 2, 6000, 0.05f, 0.02f, 0.05f, 0.1f, 0.03f, 0.6f, 1.0f),
+                                    { { "wave", 3 }, { "chord", 2 }, { "sub", 0.5f } }));
+    add("drone", "Glass FM bells", deep(drone(48, 5, 0.7f, 3, 9000, 0.1f, 0.0f, 0.5f, 0.3f, 0.06f, 1.0f, 0.3f),
+                                        { { "wave", 4 }, { "fmRatio", 3.5f }, { "chord", 7 }, { "tremolo", 0.3f }, { "tremoloRate", 0.6f } }));
+    add("drone", "Dark pulse", deep(drone(33, 4, 0.6f, 8, 500, 0.5f, 0.05f, 0.3f, 0.5f, 0.03f, 0.7f, 1.0f),
+                                    { { "wave", 1 }, { "chord", 3 }, { "drive", 0.4f } }));
+    add("drone", "Folded choir", deep(drone(41, 6, 0.5f, 10, 1400, 0.3f, 0.3f, 0.4f, 0.5f, 0.05f, 0.8f, 1.0f),
+                                      { { "wave", 2 }, { "chord", 5 }, { "filterType", 1 }, { "vibrato", 0.25f }, { "vibratoRate", 5.0f }, { "breathTone", 0.4f } }));
+    add("drone", "Cluster haze", deep(drone(40, 6, 0.8f, 25, 1800, 0.2f, 0.1f, 0.6f, 0.8f, 0.1f, 1.0f, 0.6f),
+                                      { { "chord", 6 }, { "revoice", 10.0f } }));
+    add("drone", "Sub cathedral", deep(drone(26, 3, 0.3f, 3, 900, 0.1f, 0.02f, 0.15f, 0.3f, 0.02f, 0.5f, 1.0f),
+                                       { { "wave", 3 }, { "chord", 2 }, { "sub", 1.0f }, { "tilt", 0.5f }, { "glide", 8.0f } }));
+    add("drone", "Major dawn", deep(drone(40, 5, 0.65f, 6, 2500, 0.15f, 0.05f, 0.4f, 0.4f, 0.05f, 0.8f, 1.0f),
+                                    { { "chord", 4 }, { "keyTrack", 0.5f }, { "revoice", 8.0f }, { "tremolo", 0.1f }, { "tremoloRate", 0.1f } }));
+    add("drone", "Distorted engine", deep(drone(28, 3, 0.3f, 7, 1200, 0.6f, 0.05f, 0.2f, 0.4f, 0.05f, 0.6f, 1.0f),
+                                          { { "wave", 1 }, { "chord", 1 }, { "drive", 0.8f }, { "tremolo", 0.5f }, { "tremoloRate", 3.5f } }));
+    add("drone", "Wind harmonium", deep(drone(38, 4, 0.45f, 6, 3000, 0.15f, 0.45f, 0.3f, 0.4f, 0.05f, 0.7f, 1.0f),
+                                        { { "wave", 3 }, { "chord", 5 }, { "breathTone", 0.35f }, { "vibrato", 0.1f }, { "vibratoRate", 4.0f }, { "tremolo", 0.2f },
+                                          { "tremoloRate", 0.3f } }));
+    add("drone", "High shimmer", deep(drone(55, 6, 0.4f, 9, 600, 0.3f, 0.05f, 0.5f, 0.5f, 0.08f, 1.0f, 0.8f),
+                                      { { "wave", 4 }, { "fmRatio", 2.0f }, { "chord", 7 }, { "filterType", 2 } }));
 
     auto cloud = [](float density, float grainMs, float position, float spray, float scan, float pitch, float detune, float harmonize, float reverse,
                     float envelope, float stereo, float gravity) {

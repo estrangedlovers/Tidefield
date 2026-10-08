@@ -266,21 +266,60 @@ A level or send turned all the way down reads Off and is silent.
 
 ### Drone
 
-A stack of up to six slowly drifting voices built on one root note.
+The heart of most pieces: a stack of up to six slowly drifting voices built on one
+root note. Its controls are in three groups on the Drone tab.
+
+**Drone**
 
 | Control | Range | What it does |
 |---|---|---|
+| Wave | Classic, Pulse, Fold, Organ, FM | the oscillator each voice uses |
+| Chord | Open, Fifths, Octaves, Minor, Major, Suspended, Cluster, Harmonics | which notes the voices stack and wander between; changing it revoices smoothly |
 | Root Note | C1 to C5 | the lowest note; the voices stack on it in the key |
 | Density | 1 to 6 | how many voices sound at once |
-| Shape | 0 to 100% | from a bright saw (left) to a pure sine (right) |
-| Detune | 0 to 50 cents | how far the voices spread from true pitch |
-| Brightness | 60 Hz to 12 kHz | the filter |
-| Resonance | 0 to 95% | the filter's peak |
-| Breath | 0 to 100% | air and breath under the tone |
-| Evolve | 0 to 100% | how often voices move to new notes of the chord |
-| Drift Depth, Drift Rate | | how far and how fast each voice wanders in pitch and tone |
-| Spread | 0 to 100% | stereo width of the voices |
-| Gravity | 0 to 100% | this source's pull into the key |
+| Shape | 0 to 100% | depends on the wave (see below) |
+| FM Ratio | 0.5x to 8x | FM only: the modulator's pitch against the voice; whole numbers sound harmonic, others like bells |
+| Detune | 0 to 50 cents | how far each voice's three oscillators spread from true pitch |
+| Sub | 0 to 100% | a pure sine an octave below the root |
+
+What Shape does for each wave:
+
+| Wave | Left | Right |
+|---|---|---|
+| Classic | bright saw | pure sine |
+| Pulse | square | thin, nasal pulse |
+| Fold | soft sine | sine folded over on itself, rich and hollow |
+| Organ | dark, few drawbars | bright, many drawbars |
+| FM | pure sine | strong modulation, metallic |
+
+**Tone**
+
+| Control | What it does |
+|---|---|
+| Filter | Low-pass, Band-pass or High-pass |
+| Brightness | the filter frequency, 60 Hz to 12 kHz |
+| Resonance | the filter's peak |
+| Key Track | lets higher voices open the filter further |
+| Tilt | quietens the higher voices so the low notes lead |
+| Drive | saturation, matched in level so only the colour changes |
+| Breath, Breath Tone | air under the tone, and how dark or bright it is |
+
+**Motion**
+
+| Control | What it does |
+|---|---|
+| Evolve | how often voices move to new notes of the chord |
+| Revoice Time | how long a voice takes to fade to its new note, 0.5 to 30 s |
+| Glide | how long the voices take to follow a new root, 0.05 to 30 s |
+| Drift Depth, Drift Rate | how far and how fast each voice wanders in pitch, tone, level and position |
+| Vibrato, Vibrato Rate | pitch wobble on every voice |
+| Tremolo, Tremolo Rate | a swell in level, from slow breathing to a fast flutter |
+| Spread | stereo width of the voices |
+| Gravity | this source's pull into the key |
+
+The drone has fifteen factory presets in the Presets menu on its title bar, from Low
+hum and Tanpura field to Glass FM bells, Sub cathedral and Distorted engine. Loading a
+preset sets every drone control, so it sounds the same whatever was set before.
 
 ### Clouds
 
@@ -524,7 +563,8 @@ under **Plugins**, grouped by maker.
 
 When a plugin is loaded, the slot's six knobs take over its first six automatable
 controls, showing the plugin's own values, so they can be MIDI learned, modulated and
-recorded like any other knob. **Open** shows the plugin's own window, and changes made
+recorded like any other knob. **Choose controls** lists every parameter the plugin
+offers and points any knob at any of them; the choice is saved with the session. **Open** shows the plugin's own window, and changes made
 there move the knobs too. The plugin's full state is saved with the session. If a
 session names a plugin this Mac does not have, the slot opens empty and the status bar
 says which plugin was missing.

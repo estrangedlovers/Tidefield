@@ -18,6 +18,7 @@ struct Preset
     std::string kind;   // "drone", "cloud", "fx:tf.reverb", ...
     std::map<std::string, float> values;
     bool factory = false;
+    juce::File file; // where a user preset was read from
 };
 
 /** User presets as JSON files, one folder per kind, plus the built-in ones the app

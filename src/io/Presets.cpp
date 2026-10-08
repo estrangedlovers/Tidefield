@@ -42,7 +42,10 @@ std::vector<Preset> PresetLibrary::list(const std::string& kind) const
     std::vector<Preset> user;
     for (const auto& file : folderFor(kind).findChildFiles(juce::File::findFiles, false, "*.json"))
         if (auto p = fromJson(juce::JSON::parse(file.loadFileAsString())); p && p->kind == kind)
+        {
+            p->file = file;
             user.push_back(std::move(*p));
+        }
     auto byName = [](const Preset& a, const Preset& b) { return juce::String(a.name).compareNatural(juce::String(b.name)) < 0; };
     std::sort(out.begin(), out.end(), byName);
     std::sort(user.begin(), user.end(), byName);
@@ -58,7 +61,16 @@ bool PresetLibrary::save(const Preset& p, juce::String& error)
         error = "Could not create " + dir.getFullPathName();
         return false;
     }
-    const auto file = dir.getChildFile(safeName(p.name) + ".json");
+    // Same name: replace it. A different name that maps to the same file name ("Pad?"
+    // and "Pad") gets its own file instead of overwriting the other preset.
+    auto file = dir.getChildFile(safeName(p.name) + ".json");
+    for (int n = 2; file.existsAsFile(); ++n)
+    {
+        const auto existing = fromJson(juce::JSON::parse(file.loadFileAsString()));
+        if (existing && existing->name == p.name)
+            break;
+        file = dir.getChildFile(safeName(p.name) + " " + juce::String(n) + ".json");
+    }
     if (! file.replaceWithText(juce::JSON::toString(toJson(p), false)))
     {
         error = "Could not write " + file.getFullPathName();
@@ -69,7 +81,11 @@ bool PresetLibrary::save(const Preset& p, juce::String& error)
 
 bool PresetLibrary::remove(const Preset& p)
 {
-    return ! p.factory && folderFor(p.kind).getChildFile(safeName(p.name) + ".json").deleteFile();
+    if (p.factory)
+        return false;
+    // The file it was listed from (two names can share a sanitised file name).
+    const auto file = p.file != juce::File() ? p.file : folderFor(p.kind).getChildFile(safeName(p.name) + ".json");
+    return file.isAChildOf(folder) && file.deleteFile();
 }
 
 juce::var PresetLibrary::toJson(const Preset& p)

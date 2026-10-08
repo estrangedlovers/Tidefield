@@ -7,12 +7,14 @@
 
 namespace tf::engine {
 
-/** One performer action, stamped with its time in samples from the start of the take.
-    A take's end is marked by an event with Type::Command and Command::None. */
+/** One performer action, stamped with its time in samples from the start of the take
+    and the recording it belongs to. A take's end is marked by an event with
+    Type::Command and Command::None whose value is the sample rate `time` counts in. */
 struct GestureEvent
 {
     std::uint64_t time = 0;
     ControlEvent event;
+    std::uint16_t generation = 0; // which recording (GestureRecord's param)
 
     bool isEnd() const noexcept { return event.type == ControlEvent::Type::Command && event.command == Command::None; }
 };

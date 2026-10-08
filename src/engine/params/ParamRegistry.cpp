@@ -6,7 +6,11 @@
 
 namespace tf::engine {
 
-float ParamSpec::clamp(float v) const noexcept { return std::clamp(v, minValue, maxValue); }
+float ParamSpec::clamp(float v) const noexcept
+{
+    // NaN or infinity (a damaged file, a bad controller value) never reaches the DSP.
+    return std::isfinite(v) ? std::clamp(v, minValue, maxValue) : defaultValue;
+}
 
 float ParamSpec::toNormalised(float plain) const noexcept
 {

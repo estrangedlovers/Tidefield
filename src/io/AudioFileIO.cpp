@@ -1,5 +1,8 @@
 #include "AudioFileIO.h"
 
+#include <cmath>
+#include <new>
+
 namespace tf::io {
 
 namespace {
@@ -18,21 +21,45 @@ std::unique_ptr<dsp::SampleBuffer> readAll(std::unique_ptr<juce::AudioFormatRead
         return nullptr;
     }
 
-    const auto maxLength = static_cast<juce::int64>(maxSeconds * reader->sampleRate);
+    if (reader->sampleRate < 4000.0 || reader->sampleRate > 768000.0 || reader->numChannels == 0)
+    {
+        error = "Unsupported audio format: " + name;
+        return nullptr;
+    }
+
+    // A length limit in frames as well as seconds: a header claiming an absurd rate
+    // must not make us allocate gigabytes.
+    constexpr juce::int64 kMaxFrames = 24 * 1000 * 1000; // ~8 minutes at 48 kHz
+    const auto maxLength = std::min(kMaxFrames, static_cast<juce::int64>(maxSeconds * reader->sampleRate));
     const int length = static_cast<int>(std::min(reader->lengthInSamples, maxLength));
     const int channels = static_cast<int>(std::min<unsigned int>(reader->numChannels, 2));
 
-    juce::AudioBuffer<float> temp(channels, length);
-    reader->read(&temp, 0, length, 0, true, channels > 1);
-
-    auto buffer = std::make_unique<dsp::SampleBuffer>();
-    buffer->sampleRate = reader->sampleRate;
-    buffer->name = name.toStdString();
-    buffer->left.assign(temp.getReadPointer(0), temp.getReadPointer(0) + length);
-    if (channels > 1)
-        buffer->right.assign(temp.getReadPointer(1), temp.getReadPointer(1) + length);
-    dsp::buildMips(*buffer); // band-limited copies for pitched-up playback
-    return buffer;
+    try
+    {
+        juce::AudioBuffer<float> temp(channels, length);
+        if (! reader->read(&temp, 0, length, 0, true, channels > 1))
+        {
+            error = "The audio in " + name + " is damaged or cut short";
+            return nullptr;
+        }
+        auto buffer = std::make_unique<dsp::SampleBuffer>();
+        buffer->sampleRate = reader->sampleRate;
+        buffer->name = name.toStdString();
+        buffer->left.assign(temp.getReadPointer(0), temp.getReadPointer(0) + length);
+        if (channels > 1)
+            buffer->right.assign(temp.getReadPointer(1), temp.getReadPointer(1) + length);
+        for (auto* ch : { &buffer->left, &buffer->right })
+            for (auto& v : *ch)
+                if (! std::isfinite(v))
+                    v = 0.0f; // float files can carry NaN
+        dsp::buildMips(*buffer); // band-limited copies for pitched-up playback
+        return buffer;
+    }
+    catch (const std::bad_alloc&)
+    {
+        error = "Not enough memory to load " + name;
+        return nullptr;
+    }
 }
 
 } // namespace

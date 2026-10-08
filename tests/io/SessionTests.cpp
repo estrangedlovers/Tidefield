@@ -12,6 +12,7 @@
 #include <catch2/catch_test_macros.hpp>
 
 #include <cmath>
+#include <limits>
 
 using namespace tf;
 using Catch::Approx;
@@ -395,5 +396,77 @@ TEST_CASE("Presets save, list after the factory ones, and delete", "[presets]")
     CHECK_FALSE(lib.remove(clouds[0])); // factory presets cannot be deleted
     CHECK(lib.remove(clouds[2]));
     CHECK(lib.list("cloud").size() == 2);
+    dir.deleteRecursively();
+}
+
+TEST_CASE("Damaged or hostile sessions are refused or made safe", "[session][robust]")
+{
+    engine::Engine e;
+    e.prepare(kFs, 256);
+    engine::SceneManager scenes(e);
+    engine::FxManager fx(e);
+    engine::SeasonManager seasons(e);
+
+    // A season with period 0 (would divide by zero) and absurd depth.
+    auto data = io::defaultSession(e);
+    auto* season = new juce::DynamicObject();
+    season->setProperty("param", "drone.cutoff");
+    season->setProperty("period", 0.0);
+    season->setProperty("depth", 50.0);
+    data.seasons = juce::Array<juce::var> { juce::var(season) };
+    // An effect type this build does not have, over a slot that holds one now.
+    fx.setType(engine::kBusASlot, "tf.reverb", false);
+    data.fx[engine::kFxSlots[static_cast<std::size_t>(engine::kBusASlot)].id] = "someone.elses.shimmer";
+    io::applySession(data, e, scenes, fx, true, nullptr, &seasons);
+    REQUIRE(seasons.getSeasons().size() == 1);
+    CHECK(seasons.getSeasons()[0].periodSeconds >= 20.0f);
+    CHECK(seasons.getSeasons()[0].depth <= 1.0f);
+    CHECK(fx.getType(engine::kBusASlot).empty());
+
+    // Running it stays finite.
+    std::vector<float> l(256), r(256);
+    float* outs[2] = { l.data(), r.data() };
+    bool finite = true;
+    for (int b = 0; b < 200; ++b)
+    {
+        e.process(nullptr, 0, outs, 2, 256);
+        for (float v : l)
+            finite = finite && std::isfinite(v);
+    }
+    CHECK(finite);
+
+    // NaN never reaches a parameter.
+    CHECK(e.getRegistry().spec(engine::P::DroneCutoff).clamp(std::numeric_limits<float>::quiet_NaN()) == Approx(900.0f));
+
+    // A truncated or garbage state blob is refused, not a crash.
+    juce::MemoryOutputStream out;
+    juce::String error;
+    REQUIRE(io::writeSession(io::defaultSession(e), out, error));
+    const auto block = out.getMemoryBlock();
+    CHECK_FALSE(io::readSession(block.getData(), block.getSize() / 2, error).has_value());
+    const char garbage[] = "PK\x03\x04 this is not really a zip at all";
+    CHECK_FALSE(io::readSession(garbage, sizeof(garbage), error).has_value());
+    CHECK(io::readSession(block.getData(), block.getSize(), error).has_value());
+}
+
+TEST_CASE("Preset names that share a file name do not overwrite each other", "[presets]")
+{
+    const auto dir = juce::File::getSpecialLocation(juce::File::tempDirectory).getChildFile("tidefield-preset-collide");
+    dir.deleteRecursively();
+    io::PresetLibrary lib(dir);
+    juce::String error;
+    REQUIRE(lib.save({ "Pad?", "drone", { { "root", 40.0f } }, false }, error));
+    REQUIRE(lib.save({ "Pad", "drone", { { "root", 50.0f } }, false }, error));
+    REQUIRE(lib.save({ "Pad", "drone", { { "root", 55.0f } }, false }, error)); // same name: replaced
+    auto list = lib.list("drone");
+    REQUIRE(list.size() == 2);
+    // Deleting one leaves the other.
+    for (const auto& p : list)
+        if (p.name == "Pad?")
+            CHECK(lib.remove(p));
+    list = lib.list("drone");
+    REQUIRE(list.size() == 1);
+    CHECK(list[0].name == "Pad");
+    CHECK(list[0].values.at("root") == Approx(55.0f));
     dir.deleteRecursively();
 }

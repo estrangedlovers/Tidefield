@@ -3,6 +3,7 @@
 #include "../Engine.h"
 
 #include <algorithm>
+#include <cmath>
 
 namespace tf::engine {
 
@@ -15,14 +16,25 @@ bool SeasonManager::valid(const Season& s) const
     return (engine.getRegistry().spec(s.param).flags & ParamFlag::kDiscrete) == 0;
 }
 
+namespace {
+/** Keeps a season in range; a damaged file can hold anything (period 0 would divide by zero). */
+Season sanitised(Season s)
+{
+    auto finiteOr = [](float v, float fallback) { return std::isfinite(v) ? v : fallback; };
+    s.depth = std::clamp(finiteOr(s.depth, 0.0f), -1.0f, 1.0f);
+    s.periodSeconds = std::clamp(finiteOr(s.periodSeconds, 300.0f), 20.0f, 3600.0f);
+    s.phase = std::clamp(finiteOr(s.phase, 0.0f), 0.0f, 1.0f);
+    if (static_cast<int>(s.shape) > 2)
+        s.shape = Season::Shape::Sine;
+    return s;
+}
+} // namespace
+
 bool SeasonManager::set(int index, const Season& season)
 {
     if (index < 0 || index > static_cast<int>(list.size()) || ! valid(season))
         return false;
-    auto s = season;
-    s.depth = std::clamp(s.depth, -1.0f, 1.0f);
-    s.periodSeconds = std::clamp(s.periodSeconds, 20.0f, 3600.0f);
-    s.phase = std::clamp(s.phase, 0.0f, 1.0f);
+    const auto s = sanitised(season);
     if (index == static_cast<int>(list.size()))
     {
         if (list.size() >= static_cast<std::size_t>(kMaxSeasons))
@@ -50,7 +62,7 @@ void SeasonManager::replaceAll(std::vector<Season> seasons)
     list.clear();
     for (const auto& s : seasons)
         if (list.size() < static_cast<std::size_t>(kMaxSeasons) && valid(s))
-            list.push_back(s);
+            list.push_back(sanitised(s));
     publish();
 }
 

@@ -44,6 +44,7 @@ private:
     bool recording = false;
     bool dirty = false;
     std::uint64_t version = 0;
+    std::uint16_t generation = 0;
 };
 
 } // namespace tf::engine

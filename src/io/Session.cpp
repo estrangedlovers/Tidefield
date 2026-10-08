@@ -57,7 +57,8 @@ std::map<std::string, float> varToMap(const juce::var& v)
     std::map<std::string, float> m;
     if (const auto* obj = v.getDynamicObject())
         for (const auto& prop : obj->getProperties())
-            m[prop.name.toString().toStdString()] = static_cast<float>(static_cast<double>(prop.value));
+            if (const double v = prop.value; std::isfinite(v)) // a damaged value is skipped (the default applies)
+                m[prop.name.toString().toStdString()] = static_cast<float>(v);
     return m;
 }
 
@@ -227,19 +228,25 @@ std::vector<std::string> applyGestureJson(const juce::var& json, engine::Gesture
         return warnings;
     }
     take.sampleRate = 48000.0;
-    take.length = static_cast<std::uint64_t>(std::max(0.0, static_cast<double>(json.getProperty("seconds", 0.0))) * take.sampleRate);
+    // Times in seconds, kept finite and within a day (a damaged file can hold anything).
+    auto seconds = [](const juce::var& v) {
+        const double s = v;
+        return std::isfinite(s) ? std::clamp(s, 0.0, 86400.0) : 0.0;
+    };
+    take.length = static_cast<std::uint64_t>(seconds(json.getProperty("seconds", 0.0)) * take.sampleRate);
     take.loop = static_cast<bool>(json.getProperty("loop", true));
     int unknown = 0;
     if (const auto* events = json.getProperty("events", {}).getArray())
         for (const auto& row : *events)
         {
             const auto* r = row.getArray();
-            if (r == nullptr || r->size() < 4)
+            if (r == nullptr || r->size() < 4 || take.events.size() >= 200000)
                 continue;
             engine::GestureEvent g;
-            g.time = static_cast<std::uint64_t>(std::max(0.0, static_cast<double>((*r)[0])) * take.sampleRate);
+            g.time = static_cast<std::uint64_t>(seconds((*r)[0]) * take.sampleRate);
             const auto kind = (*r)[1].toString();
-            const float value = static_cast<float>(static_cast<double>((*r)[3]));
+            const double raw = (*r)[3];
+            const float value = std::isfinite(raw) ? static_cast<float>(raw) : 0.0f;
             if (kind == "set" || kind == "release")
             {
                 const auto index = reg.find((*r)[2].toString().toStdString());
@@ -251,7 +258,7 @@ std::vector<std::string> applyGestureJson(const juce::var& json, engine::Gesture
                 g.event = kind == "set" ? engine::ControlEvent::setParam(*index, value) : engine::ControlEvent::releaseParam(*index);
             }
             else if (kind == "note")
-                g.event = engine::ControlEvent::note(static_cast<int>((*r)[2]), value);
+                g.event = engine::ControlEvent::note(std::clamp(static_cast<int>((*r)[2]), 0, 127), std::clamp(value, 0.0f, 1.0f));
             else if (kind == "catch")
                 g.event = engine::ControlEvent::makeCommand(engine::Command::Catch);
             else if (kind == "loopRecord")
@@ -344,7 +351,10 @@ std::vector<std::string> applySession(const SessionData& session, engine::Engine
         if (slot < 0)
             warnings.push_back("Unknown FX slot '" + slotId + "'");
         else if (! type.empty() && dsp::ProcessorFactory::instance().find(type) == nullptr)
+        {
             warnings.push_back("Unknown processor '" + type + "' in " + slotId + " (left empty)");
+            fx.setType(slot, "", false); // nothing from the previous piece stays in the slot
+        }
         else
             fx.setType(slot, type, false);
     }
@@ -395,10 +405,12 @@ std::vector<std::string> applySession(const SessionData& session, engine::Engine
     for (int k = 0; k < engine::kNumClouds; ++k)
     {
         const auto it = session.samples.find("cloud" + std::to_string(k + 1));
-        engine.loadCloudSample(k, it != session.samples.end() ? it->second : nullptr);
+        if (! engine.loadCloudSample(k, it != session.samples.end() ? it->second : nullptr))
+            warnings.push_back("Cloud " + std::to_string(k + 1) + ": the sound could not be loaded yet (audio is not running); load it again once it is");
     }
     const auto bloom = session.samples.find("bloom");
-    engine.loadBloomSample(bloom != session.samples.end() ? bloom->second : nullptr);
+    if (! engine.loadBloomSample(bloom != session.samples.end() ? bloom->second : nullptr))
+        warnings.push_back("Bloom: the sound could not be loaded yet (audio is not running); load it again once it is");
 
     if (seasons != nullptr)
         for (auto& w : applySeasonsJson(session.seasons, *seasons, reg))
@@ -558,17 +570,24 @@ bool saveSession(const SessionData& s, const juce::File& file, juce::String& err
         }
         out.setPosition(0);
         out.truncate();
-        if (! writeSession(s, out, error))
+        bool ok = writeSession(s, out, error);
+        out.flush(); // the last bytes: a full disk shows up here
+        if (ok && out.getStatus().failed())
         {
-            out.flush();
-            temp.deleteFile();
+            error = "Writing " + file.getFileName() + " failed: " + out.getStatus().getErrorMessage();
+            ok = false;
+        }
+        if (! ok)
+        {
+            temp.deleteFile(); // the previous file is untouched
             return false;
         }
     }
-    if (! temp.moveFileTo(file))
+    // Swap in atomically. If that fails, the complete new copy is kept beside the old
+    // one rather than deleted.
+    if (! temp.replaceFileIn(file))
     {
-        error = "Could not replace " + file.getFullPathName();
-        temp.deleteFile();
+        error = "Could not replace " + file.getFullPathName() + "; the new version was saved as " + temp.getFileName();
         return false;
     }
     return true;
@@ -585,6 +604,11 @@ std::optional<SessionData> loadFromZip(juce::ZipFile& zip, const juce::String& w
         return std::nullopt;
     }
     std::unique_ptr<juce::InputStream> jsonStream(zip.createStreamForEntry(*entry));
+    if (jsonStream == nullptr || entry->uncompressedSize > 64 * 1024 * 1024)
+    {
+        error = what + " is damaged";
+        return std::nullopt;
+    }
     juce::var json;
     const auto parsed = juce::JSON::parse(jsonStream->readEntireStreamAsString(), json);
     if (parsed.failed())

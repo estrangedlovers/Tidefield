@@ -83,6 +83,9 @@ public:
 
     bool hasPendingPublish() const noexcept { return dirty; }
 
+    /** Changes on every edit (views compare it instead of the scenes themselves). */
+    std::uint64_t getVersion() const noexcept { return version; }
+
     /** Builds the snapshot without publishing (tests, render harness, session save). */
     std::unique_ptr<SceneSet> build() const;
 

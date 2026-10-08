@@ -36,6 +36,8 @@
 #include <dsp/sources/resonator/ResonatorBank.h>
 
 #include <array>
+#include <bitset>
+#include <cmath>
 #include <atomic>
 #include <cstdint>
 #include <memory>
@@ -113,6 +115,8 @@ public:
         play head). bpm <= 0 means none; the Tempo parameter is used instead. */
     void setHostTransport(double tempoBpm, double ppqPosition, bool playing) noexcept
     {
+        if (! std::isfinite(tempoBpm) || ! std::isfinite(ppqPosition))
+            tempoBpm = ppqPosition = 0.0, playing = false;
         hostBpm = tempoBpm;
         hostPpq = ppqPosition;
         hostPlaying = playing && tempoBpm > 0.0;
@@ -223,8 +227,15 @@ private:
     std::uint64_t gestureStart = 0; // sampleTime the recording or the current pass began
     std::size_t gestureIndex = 0;   // next event to play
     std::uint64_t gesturePlayedVersion = 0;
+    float pendingPlayVersion = 0.0f;          // > 0: play once this take version arrives
+    std::uint16_t recordGeneration = 0;
+    GestureEvent endMarker;
+    bool endPending = false;
+    std::bitset<128> recordHeld, playHeld;    // notes held while recording / by playback
     void recordGesture(const ControlEvent& e) noexcept;
-    void stopGesture() noexcept;
+    void stopGesture(bool onAudioThread) noexcept;
+    void flushGestureEnd() noexcept;
+    void releasePlayedNotes() noexcept;
     void updateGesture() noexcept;
     SnapshotChannel<MidiMap> midiMapChannel { 4 };
     struct Pickup
@@ -298,6 +309,7 @@ private:
     float bpm = 90.0f;
     bool syncOn = false;
     std::array<std::int64_t, kMaxLoops> loopCycle {};
+    std::array<double, kMaxLoops> loopSyncPeriod {};
     dsp::Random loopRng;
 
     std::array<ChannelStrip, kNumStrips> strips;

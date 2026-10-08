@@ -48,7 +48,11 @@ Engine::Engine(const Config& c)
 
 void Engine::prepare(double newSampleRate, int maxBlockSize)
 {
-    stopGesture(); // sample time restarts: a recording in progress ends here, playback stops
+    // Sample time restarts: a recording in progress ends here (its end marker goes out
+    // from the audio thread later), playback stops.
+    stopGesture(false);
+    hostSampleTime = 0;
+    hostPlaying = false;
     sampleRate = newSampleRate;
     maxBlock = std::max(maxBlockSize, kControlInterval);
     sampleTime = 0;
@@ -480,29 +484,83 @@ void Engine::recordGesture(const ControlEvent& e) noexcept
         return;
     if (e.type == ControlEvent::Type::Command && e.command != Command::Catch && e.command != Command::LoopRecord && e.command != Command::LoopClear)
         return;
-    gestureOut.push({ sampleTime - gestureStart, e }); // full queue: the move is dropped, never blocks
+    if (e.type == ControlEvent::Type::Note)
+        recordHeld.set(e.param & 127u, e.value > 0.0f);
+    // A full queue drops the move; it never blocks.
+    gestureOut.push({ sampleTime - gestureStart, e, recordGeneration });
 }
 
-void Engine::stopGesture() noexcept
+void Engine::releasePlayedNotes() noexcept
+{
+    for (int n = 0; n < 128; ++n)
+        if (playHeld.test(static_cast<std::size_t>(n)))
+            bloom.noteOff(n);
+    playHeld.reset();
+}
+
+void Engine::stopGesture(bool onAudioThread) noexcept
 {
     if (gestureState == GestureState::Recording)
-        gestureOut.push({ sampleTime - gestureStart, ControlEvent::makeCommand(Command::None) }); // end marker: the take's length
+    {
+        const auto end = sampleTime - gestureStart;
+        // Keys still held end with the take, so playback never leaves a note hanging.
+        if (onAudioThread)
+            for (int n = 0; n < 128; ++n)
+                if (recordHeld.test(static_cast<std::size_t>(n)))
+                    gestureOut.push({ end, ControlEvent::note(n, 0.0f), recordGeneration });
+        recordHeld.reset();
+        // The end marker carries the take's length and the rate it was counted in. It
+        // is sent from the audio thread (the queue's one producer), retrying until
+        // there is room.
+        endMarker = { end, ControlEvent::makeCommand(Command::None), recordGeneration };
+        endMarker.event.value = static_cast<float>(sampleRate);
+        endPending = true;
+        if (onAudioThread)
+            flushGestureEnd();
+    }
+    if (onAudioThread)
+        releasePlayedNotes();
+    else
+        playHeld.reset(); // prepare(): the voices are reset anyway
     gestureState = GestureState::Idle;
+    pendingPlayVersion = 0.0f;
+}
+
+void Engine::flushGestureEnd() noexcept
+{
+    if (endPending && gestureOut.push(endMarker))
+        endPending = false;
 }
 
 void Engine::updateGesture() noexcept
 {
+    flushGestureEnd();
+    const auto* take = gestureChannel.current();
+
+    // Play waits until the take it was asked for has arrived (it is published just
+    // before the command and may land a block later).
+    if (pendingPlayVersion > 0.0f && take != nullptr && static_cast<float>(take->version) >= pendingPlayVersion)
+    {
+        pendingPlayVersion = 0.0f;
+        if (take->length > 0)
+        {
+            gestureState = GestureState::Playing;
+            gestureStart = sampleTime;
+            gestureIndex = 0;
+            gesturePlayedVersion = take->version;
+        }
+    }
     if (gestureState != GestureState::Playing)
         return;
-    const auto* take = gestureChannel.current();
     if (take == nullptr || take->length == 0 || take->version != gesturePlayedVersion)
     {
+        releasePlayedNotes();
         gestureState = GestureState::Idle; // the take was replaced or cleared
         return;
     }
     // Times are scaled if the take was recorded at another sample rate.
-    const double scale = sampleRate / take->sampleRate;
-    const auto length = static_cast<std::uint64_t>(static_cast<double>(take->length) * scale);
+    const double scale = take->sampleRate > 0.0 ? sampleRate / take->sampleRate : 1.0;
+    const auto length = std::max<std::uint64_t>(1, static_cast<std::uint64_t>(static_cast<double>(take->length) * scale));
     auto pos = sampleTime - gestureStart;
     while (true)
     {
@@ -511,16 +569,19 @@ void Engine::updateGesture() noexcept
         {
             auto e = take->events[gestureIndex++].event;
             e.source = ControlSource::Score;
+            if (e.type == ControlEvent::Type::Note)
+                playHeld.set(e.param & 127u, e.value > 0.0f);
             applyEvent(e);
         }
         if (pos < length)
             break;
+        releasePlayedNotes();
         if (! take->loop)
         {
             gestureState = GestureState::Idle;
             break;
         }
-        gestureStart += std::max<std::uint64_t>(1, length); // next pass
+        gestureStart += length; // next pass
         gestureIndex = 0;
         pos = sampleTime - gestureStart;
     }
@@ -551,7 +612,21 @@ void Engine::applyEvent(const ControlEvent& e) noexcept
             break;
 
         case ControlEvent::Type::Command:
-            applyCommand(e.command);
+            if (e.command == Command::GestureRecord)
+            {
+                stopGesture(true);
+                gestureState = GestureState::Recording;
+                gestureStart = sampleTime;
+                recordGeneration = e.param;
+                recordHeld.reset();
+            }
+            else if (e.command == Command::GesturePlay)
+            {
+                stopGesture(true);
+                pendingPlayVersion = std::max(1.0f, e.value); // starts in updateGesture()
+            }
+            else
+                applyCommand(e.command);
             break;
 
         case ControlEvent::Type::Note:
@@ -587,22 +662,9 @@ void Engine::applyCommand(Command c) noexcept
         case Command::Catch: requestCatch(); break;
         case Command::LoopRecord: looper.record(); break;
         case Command::LoopClear: looper.clear(); break;
-        case Command::GestureRecord:
-            stopGesture();
-            gestureState = GestureState::Recording;
-            gestureStart = sampleTime;
-            break;
-        case Command::GesturePlay:
-            stopGesture();
-            if (const auto* take = gestureChannel.current(); take != nullptr && take->length > 0)
-            {
-                gestureState = GestureState::Playing;
-                gestureStart = sampleTime;
-                gestureIndex = 0;
-                gesturePlayedVersion = take->version;
-            }
-            break;
-        case Command::GestureStop: stopGesture(); break;
+        case Command::GestureRecord: // handled in applyEvent (they carry data)
+        case Command::GesturePlay: break;
+        case Command::GestureStop: stopGesture(true); break;
         case Command::None: break;
     }
 }
@@ -974,11 +1036,16 @@ void Engine::updateLoops(float dt) noexcept
     const int target = std::clamp(toInt(params.current(P::LoopsTarget)), 0, 2);
     const float flashDecay = std::exp(-dt / 0.4f);
 
-    // Synced: each voice repeats every prime number of beats (so they still never
-    // line up), halved or doubled by Pace, and fires on the beat itself.
-    static constexpr std::array<double, kMaxLoops> kBeatPeriods { 23.0, 29.0, 31.0, 37.0, 41.0, 43.0, 47.0, 53.0 };
-    const double paceSteps = std::round(std::log2(std::max(0.01f, params.current(P::LoopsRate))));
-    const double beatScale = std::pow(2.0, -paceSteps);
+    // Synced: each voice repeats every prime number of beats, so they still never line
+    // up; Pace halves or doubles where the primes start (23 beats at Pace 1), and each
+    // voice takes the next prime up. Notes fall on the beat itself.
+    static constexpr std::array<int, 40> kPrimes { 2,  3,  5,  7,  11, 13, 17, 19, 23, 29, 31, 37, 41, 43, 47, 53, 59, 61, 67, 71,
+                                                   73, 79, 83, 89, 97, 101, 103, 107, 109, 113, 127, 131, 137, 139, 149, 151, 157, 163, 167, 173 };
+    const double paceSteps = std::clamp(std::round(std::log2(static_cast<double>(std::max(0.01f, params.current(P::LoopsRate))))), -2.0, 2.0);
+    const int startBeats = static_cast<int>(std::round(23.0 * std::pow(2.0, -paceSteps)));
+    std::size_t firstPrime = 0;
+    while (firstPrime + kMaxLoops < kPrimes.size() && kPrimes[firstPrime] < startBeats)
+        ++firstPrime;
 
     for (int k = 0; k < kMaxLoops; ++k)
     {
@@ -989,7 +1056,7 @@ void Engine::updateLoops(float dt) noexcept
             continue;
         if (syncOn)
         {
-            const double period = std::max(1.0, std::round(kBeatPeriods[uk] * beatScale)); // whole beats
+            const double period = kPrimes[firstPrime + uk]; // whole beats
             // The voice's offset, rounded to whole beats so it fires on a beat.
             const double offsetBeats = std::round(static_cast<double>(loopOffset[uk]) * period);
             const double t = (beatPos + offsetBeats) / period;
@@ -997,7 +1064,11 @@ void Engine::updateLoops(float dt) noexcept
             loopPhase[uk] = static_cast<float>(t - std::floor(t));
             const auto previous = loopCycle[uk];
             loopCycle[uk] = cycle;
-            if (cycle != previous + 1) // first tick, or the host jumped: no burst of notes
+            const bool periodChanged = loopSyncPeriod[uk] != period;
+            loopSyncPeriod[uk] = period;
+            // First tick, a jump in the song, or Pace changed the period (which renumbers
+            // the cycles): re-anchor without a burst of notes.
+            if (periodChanged || cycle != previous + 1)
                 continue;
         }
         else

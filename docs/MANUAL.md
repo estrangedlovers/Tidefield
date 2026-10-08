@@ -539,11 +539,26 @@ Cmd+N, Cmd+O, Cmd+S and Shift+Cmd+S. Opening a session crossfades to it.
 
 ### Sounds
 
-The **Browser** lists 18 factory sounds in three groups:
+The **Browser** lists 59 factory sounds in five groups. Every one is synthesised, so
+none of them is a recording of anyone else's instrument.
 
-- **Tonal**: Glass, Singing bowl, Kalimba, Felt piano, Marimba, Bell, Pluck.
-- **Pads**: Chord, Choir, Bowed strings, Harmonium, Sub organ, Shimmer.
-- **Textures**: Wind chimes, Breath, Ocean, Rain on leaves, Tape dust.
+- **Tonal** (18): Glass, Singing bowl, Kalimba, Felt piano, Marimba, Bell, Pluck,
+  Vibraphone, Glass harmonica, Music box, Celesta, Harp, Koto, Tongue drum, Electric
+  piano, Bonang, Temple bell, Crystal bowl.
+- **Pads** (14): Chord, Choir, Bowed strings, Harmonium, Sub organ, Shimmer, Warm
+  analog, String ensemble, Airy voices, Reed organ, Glass pad, Cello section, Chamber
+  choir, Warped tape.
+- **Drones** (5): Tanpura, Cello drone, Bowed metal, Organ pedal, Sub hum. Each one
+  loops seamlessly, so a cloud can sit anywhere in it.
+- **Textures** (15): Wind chimes, Breath, Ocean, Rain on leaves, Tape dust, Forest at
+  dawn, Stream, Distant thunder, Radio static, Vinyl crackle, Fire, Night insects, Wind
+  in wires, Rain on a tin roof, Underwater. The new textures loop seamlessly too.
+- **One-shots** (7): Wood knock, Bowl strike, Piano harmonic, Metal scrape, Breath
+  swell, Vocal swell, Felt mallet. They are made for Bloom: try Ghost or Constellation
+  on the struck ones and Swell on the voices.
+
+Pitched sounds show their note in the Browser, and loading one into Bloom sets the
+Sample Root so it plays in tune.
 
 Click a sound and choose a cloud or Bloom to load it into. Under **Your sounds**, load a
 WAV, AIFF, FLAC, Ogg or MP3 file from disk the same way.
@@ -551,7 +566,7 @@ WAV, AIFF, FLAC, Ogg or MP3 file from disk the same way.
 ### Presets
 
 Every device has a **Presets** menu in its title bar, and so does every effect. There
-are 29 factory presets to start from. **Save as preset** keeps the device's current
+are 34 factory presets to start from. **Save as preset** keeps the device's current
 settings under a name. Your presets live in `~/Music/Tidefield/Presets`, one folder per
 kind of device, and can be copied between machines.
 

@@ -2,13 +2,13 @@
 
 <img src="../resources/icon/logo.png" alt="tidefield" width="200">
 
-Tidefield is an instrument for playing ambient music live. It has no tracks and no
-timeline. A handful of sound sources run all the time, drifting on their own, and you
+Tidefield is an instrument for playing ambient music live. There are no tracks to
+arrange. A handful of sound sources run all the time, drifting on their own, and you
 steer the whole of them at once: where the sound sits on a map called the terrain, how
 fast everything moves, which key it settles into, and the gestures you play over the
 top. A performance can last five minutes or three hours.
 
-This manual covers version 1.2 on macOS, as a standalone app and as an Audio Unit or
+This manual covers version 1.3 on macOS, as a standalone app and as an Audio Unit or
 VST3 plugin.
 
 ## Contents
@@ -22,17 +22,21 @@ VST3 plugin.
 7. [Sound sources](#7-sound-sources)
 8. [Recorded on: the Medium](#8-recorded-on-the-medium)
 9. [Seasons](#9-seasons)
-10. [Mixer and effects](#10-mixer-and-effects)
-11. [Master, auto master and safety](#11-master-auto-master-and-safety)
-12. [Takes](#12-takes)
-13. [Recording to disk](#13-recording-to-disk)
-14. [Sessions, sounds and presets](#14-sessions-sounds-and-presets)
-15. [MIDI](#15-midi)
-16. [The projector](#16-the-projector)
-17. [Appearance](#17-appearance)
-18. [Tidefield in a DAW](#18-tidefield-in-a-daw)
-19. [Keyboard reference](#19-keyboard-reference)
-20. [Troubleshooting](#20-troubleshooting)
+10. [Modulation](#10-modulation)
+11. [Mixer and effects](#11-mixer-and-effects)
+12. [Master, auto master and safety](#12-master-auto-master-and-safety)
+13. [Space: speakers and headphones](#13-space-speakers-and-headphones)
+14. [Takes](#14-takes)
+15. [The timeline](#15-the-timeline)
+16. [Recording to disk](#16-recording-to-disk)
+17. [Sessions, sounds and presets](#17-sessions-sounds-and-presets)
+18. [MIDI and remote control](#18-midi-and-remote-control)
+19. [Installation mode](#19-installation-mode)
+20. [The projector](#20-the-projector)
+21. [Appearance](#21-appearance)
+22. [Tidefield in a DAW](#22-tidefield-in-a-daw)
+23. [Keyboard reference](#23-keyboard-reference)
+24. [Troubleshooting](#24-troubleshooting)
 
 ---
 
@@ -56,7 +60,7 @@ audio interface, sample rate and buffer size. A buffer of 256 samples is a good 
 **The plugins.** `Tidefield-Plugins-macOS-arm64.zip` holds an Audio Unit and a VST3.
 Copy `Tidefield.component` to `~/Library/Audio/Plug-Ins/Components` and
 `Tidefield.vst3` to `~/Library/Audio/Plug-Ins/VST3`, then rescan plugins in your DAW.
-Tidefield appears as an instrument. See [Tidefield in a DAW](#18-tidefield-in-a-daw).
+Tidefield appears as an instrument. See [Tidefield in a DAW](#22-tidefield-in-a-daw).
 
 ---
 
@@ -93,7 +97,7 @@ Hover over anything and the status bar at the bottom says what it does.
 | Terrain (centre) | the map you play on |
 | Performance (right) | Tide, Wander, Gravity, Glide, key, scale, wander style and the Medium |
 | Pads (under the terrain) | the gestures, the Shape pad and the take recorder |
-| Device tabs (bottom) | every source, the mixer, effects, master and MIDI |
+| Device tabs (bottom) | every source, modulation, the timeline, the mixer, effects, master and MIDI |
 | Status bar | help for whatever is under the mouse, and messages |
 
 **Controls.** Drag knobs and faders up and down; hold Shift for fine moves.
@@ -104,6 +108,15 @@ Double-click a control to reset it. Right-click any control for its menu:
 - **Release to the terrain**: hands a held control back (see
   [the live layer](#the-live-layer)).
 - **Reset to default**.
+- **Modulate with**: lets an LFO, a follower or your controller move this control (see
+  [Modulation](#10-modulation)).
+
+**Undo.** Cmd+Z undoes and Shift+Cmd+Z redoes. The session menu shows what will be
+undone. Control changes (one step per drag), scene captures, moves, renames and
+deletions, modulation routes, seasons, effect choices and timeline edits can all be
+undone. Performance moves (the terrain cursor, held gestures and the Shape pad) are
+left out on purpose, so undo never yanks the sound around mid-performance. Opening or
+starting a session clears the history.
 
 **Colours carry meaning.** The theme's highlight colour marks values and selections.
 Yellow means a control is held in the live layer. Pink means MIDI learn, and a small
@@ -120,7 +133,7 @@ controller in the direction of the arrow until it picks up.
 - **Keys**: play Bloom from the computer keyboard (the same as M).
 - **Sync, tempo and Tap**: see [Tempo sync](#tempo-sync).
 - **CPU**: the audio load. "lite 1" to "lite 5" means Tidefield is lightening its own
-  load to stay glitch-free (see [Troubleshooting](#20-troubleshooting)).
+  load to stay glitch-free (see [Troubleshooting](#24-troubleshooting)).
 - **Audio**: the sound card, sample rate and buffer size.
 
 ---
@@ -237,7 +250,7 @@ state underneath and its level as a line of water rising from the bottom.
 | Hold input | I | freezes the live input's sound into an endless spectral pad |
 | Loop | L | the tape looper: record, close the loop, overdub (Shift+L clears) |
 | Cycles | E | long note loops that never line up |
-| Take | G | records your moves and plays them back (see [Takes](#12-takes)) |
+| Take | G | records your moves and plays them back (see [Takes](#14-takes)) |
 | Catch | K | turns the last few seconds into a cloud |
 
 Swell's depth, rise and ebb times, Hush's depth and Freeze's settings live on the
@@ -321,6 +334,19 @@ Each note goes through a **Transform**:
 | Ghost | the attack removed; only a resonant tail, tuned to the key |
 | Constellation | the note scattered as a chord from the scale, arriving at random |
 | Tape | varispeed playback through its own worn medium |
+
+**Several sounds across the keyboard.** One sound stretched far from the note it was
+recorded at can sound thin. Bloom can hold up to eight sounds, each with its own root
+note, and plays every note from the sound whose root is nearest. Choose several files
+at once when loading into Bloom, or use **Add to Bloom's keyboard** in the Browser.
+The keyboard on the Bloom tab marks each sound's root.
+
+**Automatic tuning.** When you load your own sound into Bloom, Tidefield listens for
+its pitch and sets Sample Root to match, and the status bar names the note it found.
+Noisy or unpitched sounds are left alone.
+
+**MPE and pitch bend.** Pitch bend bends every Bloom note. With **MPE keyboard** on (on
+the MIDI tab), each note bends, presses and brightens on its own.
 
 Other controls: **Amount** (how strongly the transform acts), **Length**, **Attack**
 (Swell rises out of the sample by itself, and Ghost always fades in over at least
@@ -421,7 +447,37 @@ of that slow movement in or out. Seasons follow Tide.
 
 ---
 
-## 10. Mixer and effects
+## 10. Modulation
+
+Modulation lets one thing move another while you play: a slow LFO breathing the reverb
+send, the loudness of your voice opening the drone's filter, the mod wheel bending
+Bloom's pitch.
+
+**Making a route.** Right-click any knob and choose **Modulate with**, then a source.
+Or open the **Modulation** tab and click **Add a route**, choose a source, then the
+control it should move. Each route has a **Depth** knob: right of centre pushes the
+control up, left of centre pushes it down. A moving arc around a modulated knob shows
+where the modulation has taken it. Click the x on a row to remove a route. Up to 16
+routes can run at once, and they are saved with the session.
+
+| Source | What it follows |
+|---|---|
+| LFO 1 to 4 | a steady cycle; **Rate** from one cycle every 200 s to 20 per second, **Shape** Sine, Triangle, Ramp, Square or Steps |
+| Random 1 and 2 | a new random value at **Rate**; **Smooth** glides between them |
+| Input level, Input brightness | how loud and how bright the live input is |
+| Mix level | how loud everything you hear is |
+| Velocity, Note pitch | the last note played on Bloom |
+| Mod wheel, Pressure | from a MIDI keyboard |
+| Terrain X, Terrain Y | where the sound is on the terrain |
+
+The followers on the Modulation tab share **Attack**, **Release** and **Gain**, which
+set how quickly they react and how strongly. The meters on the tab show every source
+moving. Modulation adds to where a control is; it never changes the value you set, so
+removing a route returns the control exactly.
+
+---
+
+## 11. Mixer and effects
 
 ### Mixer
 
@@ -458,9 +514,27 @@ slot. Every slot has six controls and a **Mix**.
 The reverb bus starts with Cloud Reverb and the delay bus with Tape Delay. Effects can
 be changed while playing; the change crossfades.
 
+### Your own plugins
+
+In the standalone app any effect slot can also hold an Audio Unit or VST3 effect
+installed on your Mac. Open the effect type menu in a slot and choose **Find my
+plugins...** the first time. Tidefield looks through your plugins in the background;
+if one crashes while being examined, it is skipped from then on. The plugins appear
+under **Plugins**, grouped by maker.
+
+When a plugin is loaded, the slot's six knobs take over its first six automatable
+controls, showing the plugin's own values, so they can be MIDI learned, modulated and
+recorded like any other knob. **Open** shows the plugin's own window, and changes made
+there move the knobs too. The plugin's full state is saved with the session. If a
+session names a plugin this Mac does not have, the slot opens empty and the status bar
+says which plugin was missing.
+
+Plugins are not available when Tidefield itself runs inside a DAW; use the DAW's
+effects there. Offline renders from the timeline cannot include plugins and say so.
+
 ---
 
-## 11. Master, auto master and safety
+## 12. Master, auto master and safety
 
 ### Master
 
@@ -496,7 +570,44 @@ what it is doing at each moment.
 
 ---
 
-## 12. Takes
+## 13. Space: speakers and headphones
+
+The **Space** panel on the Master tab sets how the sound leaves the computer and where
+each source sits around the listener.
+
+**Output** has five modes:
+
+| Mode | What it does |
+|---|---|
+| Stereo | two speakers, as in every earlier version |
+| Headphones | places each source around your head instead of between your ears, using the small delay and shading a real head gives a sound from the side or behind |
+| Quad | four speakers: front left, front right, rear left, rear right |
+| 6 speakers, 8 speakers | a ring of speakers around the audience, numbered clockwise from front left |
+
+**Placing sources.** The circle shows every source as a coloured dot; up is in front of
+the listener. Drag a dot around the circle to move that source. Each source's position
+is its **Direction** control, so it can also be MIDI learned, modulated, captured in
+scenes (so travelling across the terrain can move sounds around the room) and
+recorded on the timeline. Right-click a dot for its menu.
+
+- **Spread** widens every source from a point into an arc across neighbouring speakers.
+- **Rotate** turns the whole field slowly around the room, up to 30 degrees a second
+  in either direction.
+
+**Speaker setup.** Choose your interface under **Audio** and enable as many outputs as
+you have speakers (up to eight). Connect them in the order the circle numbers them.
+If the interface has fewer outputs than the mode needs, Tidefield keeps playing in
+stereo and the panel says so.
+
+In the speaker modes, the reverb and delay returns spread evenly around the ring, and
+the master level, fades, Panic and the limiter apply to every speaker. Recorded on (the
+Medium), Auto master and the master effect slots shape the stereo mix only, and
+recordings and renders are always stereo. Headphones mode affects everything, including
+recordings. Switching mode dips the sound for a moment instead of clicking.
+
+---
+
+## 14. Takes
 
 A take records your moves (knobs, the terrain, notes) and plays them back on a loop,
 so a gesture can keep repeating while you play something else.
@@ -511,7 +622,58 @@ on or off, or clear the take. A take is saved with the session.
 
 ---
 
-## 13. Recording to disk
+## 15. The timeline
+
+A take loops a gesture. The **Timeline** tab records a whole performance instead:
+every note, every control you move and every action, from the sound you started with,
+so you can play it back exactly, tidy it up and render it.
+
+**Recording.**
+
+1. Set up the sound you want to start from.
+2. Open the Timeline tab and press **Record**.
+3. Play: fade in, move the terrain, play notes, turn knobs, change scenes.
+4. Press **Stop**.
+
+Each control you moved gets its own lane, drawn as a line of its value over time.
+Notes appear in a Notes lane and actions (fades, Catch, the looper) in an Actions lane.
+
+**Playing back.** **Play** restores the sound the performance started from and replays
+it from the start of the selection. Double-click anywhere in the lanes to play from
+that moment; controls catch up to where they would have been. **Stop** ends playback.
+You can keep playing over the top while it runs.
+
+**Editing.** Drag across the lanes to select a stretch of time. Click a lane's name to
+select that lane (click again to deselect it).
+
+- **Erase** removes the moves inside the selection, from the selected lane or from
+  every lane.
+- **Mute lane** silences a lane on playback and in renders without deleting it.
+  Right-clicking a lane name does the same.
+- **Smooth** softens a control lane's movement; press it again to smooth further.
+- **Trim** keeps only the selection, so the performance starts and ends there.
+- **Clear** throws the performance away.
+
+Every edit can be undone with Cmd+Z. The mouse wheel scrolls through the lanes.
+
+**Saving.** **Save** writes the performance and the sound it started from as a
+session. Opening that session brings the timeline back with it.
+
+**Rendering.** **Render** plays the performance offline, faster than real time, into
+WAV files in a folder you choose:
+
+- **Master**, or **Master and stems** (every source and both returns, sample-aligned).
+- **Seamless loop** with a 2 s or 8 s crossfade: the end is folded into the start so
+  the file loops without a seam, for gallery players and loop pedals.
+- **Seamless loop of the sound as it is now**, 1, 5 or 15 minutes long, which needs no
+  recorded performance at all.
+
+The button shows progress and cancels the render if pressed again. A render sounds the
+same every time, because Tidefield's randomness is seeded.
+
+---
+
+## 16. Recording to disk
 
 Press **Shift+R** or **Rec** to record what you hear, and again to stop. Each recording
 gets its own folder in `~/Music/Tidefield` containing `master.wav` as 32-bit float.
@@ -525,7 +687,7 @@ Right-click Rec for:
 
 ---
 
-## 14. Sessions, sounds and presets
+## 17. Sessions, sounds and presets
 
 ### Sessions
 
@@ -564,8 +726,16 @@ none of them is a recording of anyone else's instrument.
 Pitched sounds show their note in the Browser, and loading one into Bloom sets the
 Sample Root so it plays in tune.
 
-Click a sound and choose a cloud or Bloom to load it into. Under **Your sounds**, load a
-WAV, AIFF, FLAC, Ogg or MP3 file from disk the same way.
+Click a sound and choose a cloud or Bloom to load it into, or **Add to Bloom's
+keyboard** to give Bloom another sound (see [Bloom](#bloom)). Under **Your sounds**,
+load a WAV, AIFF, FLAC, Ogg or MP3 file from disk the same way.
+
+- **Search** at the top of the Browser filters by name or group as you type.
+- **Preview**: the small triangle on a row plays the sound once, so you can hear it
+  before it replaces anything. Preview goes through the master, so Panic and the
+  limiter still apply.
+- **Favourites**: right-click a sound and choose **Add to favourites**. Favourites
+  appear in their own group at the top and are kept between sessions.
 
 ### Presets
 
@@ -576,7 +746,7 @@ kind of device, and can be copied between machines.
 
 ---
 
-## 15. MIDI
+## 18. MIDI and remote control
 
 Tidefield works with any MIDI controller or keyboard. Enable devices on the **MIDI**
 tab.
@@ -605,9 +775,75 @@ The mappings list shows everything mapped. Click the x on a row to remove it. Ma
 belong to your setup, so they are kept between sessions, and are also saved in each
 session file.
 
+### Sync and remote control
+
+The **Sync and remote** panel on the MIDI tab connects Tidefield to other gear and
+software.
+
+- **Follow MIDI clock.** Set **Follow** (on the Cycles tab, under Tempo) to **MIDI
+  clock** and turn Sync on. Tidefield takes its tempo, start, stop and position from
+  the clock arriving on any enabled MIDI input.
+- **MIDI clock out.** Choose an output under **MIDI clock out** to send Tidefield's
+  tempo to drum machines, sequencers and delays.
+- **MPE keyboard.** Gives each note its own bend, pressure and brightness on Bloom.
+- **OSC.** Turn on **Receive on** to let phones, tablets, Max, TouchDesigner and other
+  programs play Tidefield over the network on the port shown (9000 by default). Turn on
+  **Send to** with a host and port to stream Tidefield's state out, for visuals.
+- **Ableton Link** appears here when Tidefield is built with Link (see below).
+
+OSC messages Tidefield understands:
+
+| Address | Arguments | Effect |
+|---|---|---|
+| `/tidefield/param/<id>` | value | sets a control by its id, such as `drone.cutoff`, in its own units |
+| `/tidefield/norm/<id>` | 0 to 1 | the same with the value scaled to the control's range |
+| `/tidefield/terrain` | x y (0 to 1) | moves the cursor |
+| `/tidefield/scene` | n | glides to scene n; `/tidefield/scene/jump` jumps |
+| `/tidefield/note` | note velocity | plays Bloom |
+| `/tidefield/fade`, `/panic`, `/catch`, `/loop`, `/capture`, `/release`, `/record` | | the same as the keys |
+| `/tidefield/swell`, `/hush`, `/slow` | 1 or 0 | holds or lets go of the gesture |
+
+Tidefield sends `/tidefield/cursor`, `/position`, `/level`, `/tide`, `/beat`,
+`/scenes` (the weight of each scene) and `/tidefield/mod/<source>` for every
+modulation source.
+
+**About Link.** Ableton Link is published under the GPL licence, so a Tidefield built
+with it must be distributed under the GPL too. The release builds leave it out. To
+build with Link, configure with `-DTIDEFIELD_WITH_LINK=ON`.
+
 ---
 
-## 16. The projector
+## 19. Installation mode
+
+For galleries, museums and anything that plays for days without anyone at the
+computer. The **Installation** panel is on the Master tab.
+
+1. Set up and save the session the installation should play.
+2. Press **Open this session at launch** while it is open.
+3. Turn on **Installation mode**.
+
+From then on, whenever Tidefield starts it opens that session and fades in by itself.
+Add Tidefield to your login items (System Settings, General, Login Items) and the
+installation survives power cuts and restarts.
+
+- **Daily** with two times (24-hour, such as 10:00 and 18:00) fades in at the first
+  time and out at the second every day. A window that crosses midnight, such as 20:00
+  to 02:00, works too. Equal times mean all day.
+- **Keep awake** stops the computer and its display from sleeping while installation
+  mode is on.
+- If the audio interface disappears, Tidefield keeps trying to reopen it every ten
+  seconds and fades back in when it returns.
+- If Panic is pressed or the safety guard trips, it recovers by itself after ten
+  seconds.
+- **Show log** opens `Installation log.txt` beside your recordings, which lists every
+  start, fade, lost device and recovery with the time.
+
+The panel's summary says what will happen next, for example when the next fade out is
+due. Installation mode is part of the app only, not the plugin.
+
+---
+
+## 20. The projector
 
 Cmd+P (or the session menu) opens the terrain alone in its own window, for an audience.
 Drag it to a second display or a projector and make it full screen. It shows the moving
@@ -616,7 +852,7 @@ main window.
 
 ---
 
-## 17. Appearance
+## 21. Appearance
 
 Choose a theme from the session menu under **Appearance**. The terrain and meters stay
 dark in every theme so the performance surface reads the same.
@@ -636,7 +872,7 @@ dark in every theme so the performance surface reads the same.
 
 ---
 
-## 18. Tidefield in a DAW
+## 22. Tidefield in a DAW
 
 Insert Tidefield on an instrument track. It behaves like the app, with a few
 differences.
@@ -647,10 +883,13 @@ differences.
 - With Sync on, the Cycles and delays follow the project's tempo and position.
 - The whole session, sounds included, is saved inside the DAW project.
 - Each instance is independent; you can run several.
+- Headphones mode works in a DAW; the speaker ring modes need the standalone app, since
+  the plugin has a stereo output.
+- Hosting other plugins and installation mode are part of the app only.
 
 ---
 
-## 19. Keyboard reference
+## 23. Keyboard reference
 
 | Key | Action |
 |---|---|
@@ -673,6 +912,7 @@ differences.
 | P | draw a path |
 | M | Keys on or off |
 | Tab, Shift+Tab | next or previous device tab |
+| Cmd+Z, Shift+Cmd+Z | undo, redo |
 | Cmd+N, Cmd+O | new session, open |
 | Cmd+S, Shift+Cmd+S | save, save as |
 | Cmd+P | projector window |
@@ -688,7 +928,7 @@ The other letter shortcuts are off until you press M again.
 
 ---
 
-## 20. Troubleshooting
+## 24. Troubleshooting
 
 **No sound.**
 
@@ -707,6 +947,14 @@ never breaks up. It steps back up by itself when there is headroom. To avoid it:
 - raise the buffer size under Audio;
 - lower cloud densities;
 - use fewer resonator modes.
+
+**I chose Quad (or a ring) but only two speakers play.** The output has fewer channels
+than the mode needs, and the Space panel says so. Under **Audio**, choose the
+interface and enable more output channels.
+
+**A plugin is missing from the effect menu.** Choose **Scan for new plugins** at the
+bottom of the menu. A plugin that crashed while being examined is skipped; the list of
+skipped plugins is in `PluginScanCrashes.txt` beside Tidefield's settings.
 
 **A knob does nothing when I turn my controller.** It is waiting to pick up: the pink
 arrow shows which way to turn until it meets the current value.

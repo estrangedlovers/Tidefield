@@ -99,8 +99,15 @@ void GranularCloud::spawnGrain() noexcept
     const int length = std::max(16, static_cast<int>(p.grainMs * 0.001f * static_cast<float>(spec.sampleRate)));
     const double span = ratio * length;
 
-    float pos = p.position + scanPosition + p.spray * 0.5f * rng.nextBipolar() + 0.02f * positionDrift.getValue();
-    pos -= std::floor(pos);
+    float centre = std::clamp(p.position, 0.0f, 1.0f) + scanPosition;
+    if (centre > 1.0f)
+        centre -= 1.0f;
+    float pos = centre + p.spray * 0.5f * rng.nextBipolar() + 0.02f * positionDrift.getValue();
+    if (pos < 0.0f)
+        pos = -pos;
+    if (pos > 1.0f)
+        pos = 2.0f - pos;
+    pos = std::clamp(pos, 0.0f, 1.0f);
     double start = static_cast<double>(pos) * bufferSize;
     const bool reversed = rng.chance(p.reverse);
     if (! reversed)

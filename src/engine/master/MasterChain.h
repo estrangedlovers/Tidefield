@@ -37,7 +37,7 @@ public:
     Events process(float* left, float* right, int numSamples, float levelStart, float levelEnd) noexcept;
 
     FadeState getFadeState() const noexcept { return fadeState; }
-    float getFadeGain() const noexcept { return fadeCurve(fadePosition); }
+    float getFadeGain() const noexcept { return fadeCurve(static_cast<float>(fadePosition)); }
     bool isPanicActive() const noexcept { return panicActive; }
     float getLimiterGain() const noexcept { return limiter.getCurrentGain(); }
     int getLatencySamples() const noexcept { return limiter.getLatencySamples(); }
@@ -53,8 +53,8 @@ private:
     dsp::Limiter limiter;
 
     float fadeSeconds = 8.0f;
-    float fadePosition = 0.0f;
-    float fadeIncrement = 0.0f;
+    double fadePosition = 0.0;
+    double fadeIncrement = 0.0;
     FadeState fadeState = FadeState::Silent;
 
     bool panicActive = false;

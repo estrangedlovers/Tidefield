@@ -1582,9 +1582,9 @@ void Engine::process(const float* const* inputs, int numInputs, float* const* ou
                 std::fill_n(stemR[k].data(), block, 0.0f);
             }
 
-        const float levelStart = dsp::dbToGain(params.current(P::MasterLevel));
-        const float busAStart = dsp::dbToGain(params.current(P::BusALevel));
-        const float busBStart = dsp::dbToGain(params.current(P::BusBLevel));
+        const float levelStart = faderGain(params.current(P::MasterLevel));
+        const float busAStart = faderGain(params.current(P::BusALevel));
+        const float busBStart = faderGain(params.current(P::BusBLevel));
 
         int offset = 0;
         while (offset < block)
@@ -1608,7 +1608,7 @@ void Engine::process(const float* const* inputs, int numInputs, float* const* ou
                 slot.process(bl.data(), br.data(), block, mix, mix, scratchDryL.data(), scratchDryR.data(), scratchAltL.data(),
                              scratchAltR.data());
             }
-            const float endGain = dsp::dbToGain(params.current(levelParam));
+            const float endGain = faderGain(params.current(levelParam));
             const float step = (endGain - startGain) / static_cast<float>(block);
             for (int i = 0; i < block; ++i)
             {
@@ -1654,7 +1654,7 @@ void Engine::process(const float* const* inputs, int numInputs, float* const* ou
         medium.process(masterL.data(), masterR.data(), block);
         autoMaster.process(masterL.data(), masterR.data(), block);
 
-        const float levelEnd = dsp::dbToGain(params.current(P::MasterLevel));
+        const float levelEnd = faderGain(params.current(P::MasterLevel));
         const auto ev = master.process(masterL.data(), masterR.data(), block, levelStart, levelEnd);
 
         if (ev.guardTripped)

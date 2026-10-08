@@ -248,7 +248,8 @@ Swell's depth, rise and ebb times, Hush's depth and Freeze's settings live on th
 ## 7. Sound sources
 
 Each tab along the bottom opens a source. Most tabs end with that source's **strip**:
-level, pan, reverb and delay sends, and **Effects** for its two insert slots.
+level, pan, width, reverb and delay sends, and **Effects** for its two insert slots.
+A level or send turned all the way down reads Off and is silent.
 
 ### Drone
 
@@ -258,7 +259,7 @@ A stack of up to six slowly drifting voices built on one root note.
 |---|---|---|
 | Root Note | C1 to C5 | the lowest note; the voices stack on it in the key |
 | Density | 1 to 6 | how many voices sound at once |
-| Shape | 0 to 100% | from a pure sine to a bright saw |
+| Shape | 0 to 100% | from a bright saw (left) to a pure sine (right) |
 | Detune | 0 to 50 cents | how far the voices spread from true pitch |
 | Brightness | 60 Hz to 12 kHz | the filter |
 | Resonance | 0 to 95% | the filter's peak |
@@ -286,7 +287,7 @@ the line is where the cloud is reading.
 | Detune | 0 to 100% | random pitch spread between grains |
 | Harmonize | 0 to 100% | some grains play at other notes of the chord |
 | Reverse | 0 to 100% | the share of grains played backwards |
-| Envelope | 0 to 100% | the shape of each grain, from soft to sharp |
+| Envelope | 0 to 100% | the shape of each grain: percussive at 0, soft at 50%, flat and full at 100% |
 | Stereo | 0 to 100% | how widely grains spread across the field |
 | Gravity | 0 to 100% | pulls grain pitches into the key |
 
@@ -300,7 +301,7 @@ them.
 | Root Note, Modes | the lowest note and how many resonances (1 to 24) |
 | Structure | from strings on the left to bars and bells on the right |
 | Decay | how long each mode rings, 0.1 to 60 s |
-| Brightness, Spread, Gravity | tone, stereo width and pull into the key |
+| Brightness, Spread, Gravity | tone, stereo width and pull into the key (bells at the far right of Structure keep their own tuning) |
 | Rain, Rain Colour | random strikes like drops on a resonant surface, and their tone |
 | Excite from: Input, Drone, Clouds, Bloom | lets other sources strike the resonators |
 
@@ -321,10 +322,12 @@ Each note goes through a **Transform**:
 | Constellation | the note scattered as a chord from the scale, arriving at random |
 | Tape | varispeed playback through its own worn medium |
 
-Other controls: **Amount** (how strongly the transform acts), **Length**, **Attack**,
-**Release**, **Pitch**, **Tone**, **Spread**, **Random** (variation between repeated
-notes so they never sound identical), **Position**, **Gravity** and **Sample Root**
-(the note the sound was recorded at, so it plays in tune).
+Other controls: **Amount** (how strongly the transform acts), **Length**, **Attack**
+(Swell rises out of the sample by itself, and Ghost always fades in over at least
+1.5 s), **Release**, **Pitch**, **Tone** (follows notes that are already sounding),
+**Spread**, **Random** (variation between repeated notes so they never sound
+identical), **Position** (the moment Freeze and Ghost take), **Gravity** and **Sample
+Root** (the note the sound was recorded at, so it plays in tune).
 
 ### Input
 
@@ -355,7 +358,7 @@ A tape loop that wears out, in the manner of William Basinski's Disintegration L
 |---|---|
 | Source | records the live input or the whole mix |
 | Erosion | how much each pass wears the tape |
-| Flakes | dropouts, like oxide falling off old tape |
+| Flakes | dropouts, like oxide falling off old tape (they come with Erosion; at 0 Erosion the tape stays whole) |
 | Overdub | how much of the old loop survives each overdub |
 
 ### Weather
@@ -427,6 +430,7 @@ The **Mixer** tab shows every source's strip side by side, plus the reverb and d
 
 - a level fader with a meter;
 - pan;
+- width (0 is mono, 100% as recorded, 200% wider);
 - a send to the reverb bus and a send to the delay bus.
 
 ### Effects

@@ -26,7 +26,8 @@ add_executable(tidefield_tests
     engine/GestureTests.cpp
     engine/ModulationTests.cpp
     engine/SyncTests.cpp
-    engine/MonkeyTests.cpp)
+    engine/MonkeyTests.cpp
+    engine/ControlAuditTests.cpp)
 
 target_include_directories(tidefield_tests PRIVATE ${CMAKE_CURRENT_SOURCE_DIR})
 target_link_libraries(tidefield_tests PRIVATE tidefield_engine Catch2::Catch2WithMain)

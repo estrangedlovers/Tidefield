@@ -178,8 +178,8 @@ void addFactoryPresets(io::PresetLibrary& library)
         return V { { "root", root }, { "density", density }, { "shape", shape }, { "detune", detune }, { "cutoff", cutoff }, { "resonance", res },
                    { "noise", noise }, { "evolve", evolve }, { "driftDepth", driftDepth }, { "driftRate", driftRate }, { "spread", spread }, { "gravity", gravity } };
     };
-    add("drone", "Low hum", drone(31, 3, 0.15f, 6, 380, 0.15f, 0.05f, 0.2f, 0.4f, 0.03f, 0.6f, 1.0f));
-    add("drone", "Bright organ", drone(43, 5, 0.6f, 4, 3200, 0.1f, 0.02f, 0.35f, 0.3f, 0.05f, 0.8f, 1.0f));
+    add("drone", "Low hum", drone(31, 3, 0.85f, 6, 380, 0.15f, 0.05f, 0.2f, 0.4f, 0.03f, 0.6f, 1.0f));
+    add("drone", "Bright organ", drone(43, 5, 0.25f, 4, 3200, 0.1f, 0.02f, 0.35f, 0.3f, 0.05f, 0.8f, 1.0f));
     add("drone", "Breathing reed", drone(38, 4, 0.45f, 12, 1300, 0.45f, 0.4f, 0.5f, 0.6f, 0.08f, 0.7f, 0.8f));
     add("drone", "Wide shimmer", drone(50, 6, 0.3f, 20, 6000, 0.25f, 0.1f, 0.7f, 0.7f, 0.12f, 1.0f, 0.9f));
 

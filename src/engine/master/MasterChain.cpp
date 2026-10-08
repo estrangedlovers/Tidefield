@@ -28,7 +28,7 @@ void MasterChain::setFadeSeconds(float seconds) noexcept
 
 void MasterChain::startFade(FadeState direction, float seconds) noexcept
 {
-    const float inc = 1.0f / static_cast<float>(std::max(0.01f, seconds) * fs);
+    const double inc = 1.0 / (static_cast<double>(std::max(0.01f, seconds)) * fs);
     fadeState = direction;
     fadeIncrement = direction == FadeState::FadingIn ? inc : -inc;
 }
@@ -59,7 +59,7 @@ void MasterChain::resumeFromPanic() noexcept
         return;
     panicActive = false;
     panicGain = 1.0f;
-    fadePosition = 0.0f;
+    fadePosition = 0.0;
     fadeState = FadeState::Silent;
     startFade(FadeState::FadingIn, fadeSeconds);
 }
@@ -80,7 +80,7 @@ MasterChain::Events MasterChain::process(float* left, float* right, int n, float
         events.guardTripped = true;
         if (! panicActive && fadeState != FadeState::Silent && fadeState != FadeState::FadingOut)
         {
-            fadePosition = 0.0f;
+            fadePosition = 0.0;
             startFade(FadeState::FadingIn, kGuardRecoverySeconds);
         }
     }
@@ -91,20 +91,20 @@ MasterChain::Events MasterChain::process(float* left, float* right, int n, float
         if (fadeState == FadeState::FadingIn || fadeState == FadeState::FadingOut)
         {
             fadePosition += fadeIncrement;
-            if (fadePosition >= 1.0f)
+            if (fadePosition >= 1.0 - 1.0e-9)
             {
-                fadePosition = 1.0f;
+                fadePosition = 1.0;
                 fadeState = FadeState::Open;
                 events.fadeInCompleted = true;
             }
-            else if (fadePosition <= 0.0f)
+            else if (fadePosition <= 1.0e-9)
             {
-                fadePosition = 0.0f;
+                fadePosition = 0.0;
                 fadeState = FadeState::Silent;
                 events.fadeOutCompleted = true;
             }
         }
-        const float g = (levelStart + levelStep * static_cast<float>(i + 1)) * fadeCurve(fadePosition);
+        const float g = (levelStart + levelStep * static_cast<float>(i + 1)) * fadeCurve(static_cast<float>(fadePosition));
         left[i] = dcL.process(left[i] * g);
         right[i] = dcR.process(right[i] * g);
     }
@@ -123,7 +123,7 @@ MasterChain::Events MasterChain::process(float* left, float* right, int n, float
         {
             panicSilentReported = true;
             events.panicReachedSilence = true;
-            fadePosition = 0.0f;
+            fadePosition = 0.0;
             fadeState = FadeState::Silent;
             reset();
         }

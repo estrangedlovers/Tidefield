@@ -20,6 +20,7 @@ juce::String helpFor(P p)
     static const std::map<P, const char*> help {
         { P::DroneRoot, "the drone's lowest note; the voices stack on it in the key" },
         { P::DroneCutoff, "opens the drone's filter" },
+        { P::DroneShape, "each voice's tone: a bright saw on the left, a pure sine on the right" },
         { P::DroneDensity, "how many voices sound at once" },
         { P::DroneEvolve, "how often voices move to new notes of the chord" },
         { P::DroneGravity, "how strongly voices are pulled into the key" },
@@ -27,12 +28,19 @@ juce::String helpFor(P p)
         { P::ResStructure, "from strings (left) to bars and bells (right)" },
         { P::ResRain, "random strikes, like drops on a resonant surface" },
         { P::ResDecay, "how long each mode rings" },
+        { P::ResGravity, "pulls the modes into the key; bells (Structure far right) keep their own tuning" },
         { P::BloomTransform, "what a held note turns into while it sustains" },
         { P::BloomAmount, "how strongly the transform acts" },
+        { P::BloomAttack, "how each note fades in; Swell rises out of the sample by itself, and Ghost always takes at least 1.5 s" },
+        { P::BloomPosition, "where in the sound Freeze and Ghost take their moment" },
+        { P::Cloud1Shape, "each grain's envelope: percussive on the left, soft in the middle, flat and full on the right" },
+        { P::Cloud2Shape, "each grain's envelope: percussive on the left, soft in the middle, flat and full on the right" },
+        { P::Cloud3Shape, "each grain's envelope: percussive on the left, soft in the middle, flat and full on the right" },
+        { P::Cloud4Shape, "each grain's envelope: percussive on the left, soft in the middle, flat and full on the right" },
         { P::InputArmed, "hear the live input through its strip" },
         { P::InputFreeze, "hold the input's sound forever as a spectral pad" },
         { P::LoopErosion, "how much each pass wears the tape" },
-        { P::LoopFlakes, "dropouts, like oxide falling off old tape" },
+        { P::LoopFlakes, "dropouts, like oxide falling off old tape; they come with Erosion" },
         { P::WeatherGust, "how much the wind and rain swell and lull" },
         { P::WeatherDistance, "from right here to far across a valley" },
         { P::FreezeDuck, "how far the rest of the mix steps back while frozen" },
@@ -1491,6 +1499,7 @@ void DeviceView::build()
         auto& d = device("Strip", tab);
         d.add(std::make_unique<FaderMeter>(model, info.level, s, "Level"), 64, 0);
         d.addKnob(info.pan, {}, {}, 56, 62);
+        d.addKnob(info.width, {}, "stereo width: 0 is mono, 100% as recorded, 200% wider", 56, 62);
         d.addKnob(info.sendA, "Reverb", "send to the reverb bus", 56, 62);
         d.addKnob(info.sendB, "Delay", "send to the delay bus", 56, 62);
         auto fx = std::make_unique<FlatButton>("Effects");
@@ -1539,6 +1548,7 @@ void DeviceView::build()
                 const auto& info = engine::kStrips[static_cast<std::size_t>(c + 1)];
                 s.add(std::make_unique<FaderMeter>(model, info.level, c + 1, "Level"), 64, 0);
                 s.addKnob(info.pan, {}, {}, 56, 62);
+                s.addKnob(info.width, {}, "stereo width: 0 is mono, 100% as recorded, 200% wider", 56, 62);
                 s.addKnob(info.sendA, "Reverb", {}, 56, 62);
                 s.addKnob(info.sendB, "Delay", {}, 56, 62);
             }
@@ -1672,6 +1682,7 @@ void DeviceView::build()
                 auto& d = device(info.name, sceneTint(s));
                 d.add(std::make_unique<FaderMeter>(model, info.level, s, "Level"), 58, 0);
                 d.addKnob(info.pan, {}, {}, 52, 62);
+                d.addKnob(info.width, {}, "stereo width: 0 is mono, 100% as recorded, 200% wider", 52, 62);
                 d.addKnob(info.sendA, "Reverb", {}, 52, 62);
                 d.addKnob(info.sendB, "Delay", {}, 52, 62);
             }

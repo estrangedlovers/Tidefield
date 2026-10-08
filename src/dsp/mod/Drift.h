@@ -20,7 +20,7 @@ public:
 
     float advance(float dtSeconds) noexcept
     {
-        phase += dtSeconds / segmentSeconds;
+        phase += dtSeconds * rateHz / segmentLength;
         if (phase >= 1.0f)
         {
             from = to;
@@ -37,12 +37,12 @@ private:
     void startSegment() noexcept
     {
         to = rng.nextBipolar();
-        segmentSeconds = std::max(0.02f, (0.5f + rng.nextFloat()) / rateHz);
+        segmentLength = 0.5f + rng.nextFloat();
     }
 
     Random rng;
     float rateHz = 0.1f;
-    float segmentSeconds = 10.0f;
+    float segmentLength = 1.0f;
     float phase = 0.0f;
     float from = 0.0f;
     float to = 0.0f;

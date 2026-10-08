@@ -78,6 +78,18 @@ float BloomSampler::quantizedNote(float note, float seed) const noexcept
     return harmony->quantize(note, seed, params.gravity);
 }
 
+float BloomSampler::toneCutoff(float tone) noexcept { return 400.0f * std::pow(45.0f, std::clamp(tone, 0.0f, 1.0f)); }
+
+void BloomSampler::applyTone(Voice& v, float cut) noexcept
+{
+    const float c = std::min(cut * v.toneScale, v.toneCap);
+    if (c == v.appliedCut)
+        return;
+    v.lpL.setCutoff(c);
+    v.lpR.setCutoff(c);
+    v.appliedCut = c;
+}
+
 void BloomSampler::noteOn(int note, float velocity) noexcept
 {
     if (buffer == nullptr || buffer->size() < 256 || velocity <= 0.0f)
@@ -190,9 +202,7 @@ void BloomSampler::startVoice(Voice& v, int note, float velocity) noexcept
     v.stage = Stage::Attack;
 
     const auto pans = equalPowerPan(v.pan);
-    const float cut = 400.0f * std::pow(45.0f, std::clamp(p.tone, 0.0f, 1.0f));
-    v.lpL.setCutoff(cut);
-    v.lpR.setCutoff(cut);
+    const float cut = toneCutoff(p.tone);
 
     auto grains = [&](double centre, double centreInc, float grainSeconds, float perSecond, float jitter, float pitchJitter) {
         v.grainsOn = true;
@@ -209,7 +219,9 @@ void BloomSampler::startVoice(Voice& v, int note, float velocity) noexcept
     {
         case Transform::Swell:
         {
-            const double swellSamples = std::min(size - 2.0, static_cast<double>(lerp(0.6f, 4.0f, amount) * fs) * v.ratio);
+            const double longest = std::min(size - 2.0, 4.0 * static_cast<double>(fs) * v.ratio);
+            const double shortest = std::min(0.6 * static_cast<double>(fs) * v.ratio, 0.5 * longest);
+            const double swellSamples = shortest + (longest - shortest) * static_cast<double>(amount);
             auto& t = v.taps[0];
             t.active = true;
             t.mip = -1;
@@ -240,8 +252,7 @@ void BloomSampler::startVoice(Voice& v, int note, float velocity) noexcept
             const double stretch = static_cast<double>(lerp(2.0f, 8.0f, amount));
             grains(start, v.ratio / stretch, 0.3f, 14.0f, 0.03f, 0.05f);
             v.attackStep = std::min(v.attackStep, 1.0f / (1.5f * fs));
-            v.lpL.setCutoff(cut * 0.4f);
-            v.lpR.setCutoff(cut * 0.4f);
+            v.toneScale = 0.4f;
             break;
         }
         case Transform::Constellation:
@@ -279,11 +290,11 @@ void BloomSampler::startVoice(Voice& v, int note, float velocity) noexcept
             t.gainL = pans.left;
             t.gainR = pans.right;
             v.wowPhase = v.rng.nextFloat();
-            v.lpL.setCutoff(std::min(cut, 9000.0f - 4000.0f * amount));
-            v.lpR.setCutoff(std::min(cut, 9000.0f - 4000.0f * amount));
+            v.toneCap = 9000.0f - 4000.0f * amount;
             break;
         }
     }
+    applyTone(v, cut);
 }
 
 void BloomSampler::spawnGrain(Voice& v) noexcept
@@ -446,9 +457,17 @@ void BloomSampler::process(float* left, float* right, int n, float timeScale) no
     std::fill_n(right, n, 0.0f);
     if (buffer == nullptr || buffer->size() < 256)
         return;
+    if (params.tone != toneFor)
+    {
+        toneFor = params.tone;
+        toneCut = toneCutoff(params.tone);
+    }
     for (auto& v : voices)
         if (v.active)
+        {
+            applyTone(v, toneCut);
             renderVoice(v, left, right, n, timeScale);
+        }
 }
 
 int BloomSampler::getActiveVoices() const noexcept

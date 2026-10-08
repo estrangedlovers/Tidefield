@@ -48,7 +48,7 @@ void WeatherBed::control(float dt) noexcept
     gustDrift.setRate(0.04f + 0.25f * p.gust);
     centreDrift.setRate(0.03f + 0.1f * p.gust);
     const float g = gustDrift.advance(dt);
-    gustEnv = std::clamp(0.55f + 0.6f * p.gust * g, 0.05f, 1.0f);
+    gustEnv = std::clamp(kMeanGust + 0.6f * p.gust * g, 0.05f, 1.0f);
     const float centre = 220.0f * std::pow(4.0f, 0.5f + 0.5f * centreDrift.advance(dt)) * (0.6f + 0.9f * tone) * (0.7f + 0.6f * gustEnv);
     windL.setCutoff(centre, 0.25f + 0.3f * gustEnv);
     windR.setCutoff(centre * 1.07f, 0.25f + 0.3f * gustEnv);
@@ -58,7 +58,8 @@ void WeatherBed::control(float dt) noexcept
 
     hissLpL.setCutoff(3500.0f + 7000.0f * tone);
     hissLpR.setCutoff(3500.0f + 7000.0f * tone);
-    dropRate = p.rain > 0.0f ? (3.0f + 160.0f * std::pow(p.rain, 1.5f)) / static_cast<float>(spec.sampleRate) : 0.0f;
+    rainGust = std::clamp(gustEnv / kMeanGust, 0.1f, 1.8f);
+    dropRate = p.rain > 0.0f ? rainGust * (3.0f + 160.0f * std::pow(p.rain, 1.5f)) / static_cast<float>(spec.sampleRate) : 0.0f;
 
     wavePhase += dt / wavePeriod;
     if (wavePhase >= 1.0f)
@@ -92,7 +93,7 @@ void WeatherBed::spawnDrop() noexcept
             d.phase = 0.0f;
             d.freq = rng.nextRange(1200.0f, 2600.0f + 2800.0f * tone) / fs;
             d.chirp = 1.0f + rng.nextRange(1.0e-5f, 6.0e-5f) * (48000.0f / fs);
-            d.amp = rng.nextRange(0.05f, 0.35f) * params.rain;
+            d.amp = rng.nextRange(0.05f, 0.35f) * params.rain * std::sqrt(rainGust);
             d.decay = std::exp(-1.0f / (rng.nextRange(0.004f, 0.018f) * fs));
             const float pan = rng.nextBipolar();
             d.gainL = std::sqrt(0.5f * (1.0f - pan));
@@ -129,7 +130,7 @@ void WeatherBed::process(float* left, float* right, int n, float timeScale) noex
 
         if (params.rain > 0.0f || dropRate > 0.0f)
         {
-            const float hiss = 0.12f * params.rain;
+            const float hiss = 0.12f * params.rain * rainGust;
             l += hiss * hissLpL.processLow(hissHpL.processHigh(rng.nextBipolar()));
             r += hiss * hissLpR.processLow(hissHpR.processHigh(rng.nextBipolar()));
             if (dropRate > 0.0f && rng.chance(dropRate))

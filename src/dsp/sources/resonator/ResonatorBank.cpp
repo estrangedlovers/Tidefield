@@ -45,6 +45,7 @@ void ResonatorBank::reset() noexcept
     samplesUntilControl = 0;
     ringingModes = 0;
     pendingStrike = 0.0f;
+    snapNextUpdate = true;
 }
 
 float ResonatorBank::modeTargetNote(int i) const noexcept
@@ -68,8 +69,9 @@ float ResonatorBank::modeTargetNote(int i) const noexcept
 
     const float s = std::clamp(params.structure, 0.0f, 1.0f);
     float note = s < 0.5f ? lerp(harmonic, chordal, s * 2.0f) : lerp(chordal, bell, (s - 0.5f) * 2.0f);
-    if (harmony != nullptr && params.gravity > 0.0f && s > 0.5f)
-        note = harmony->quantize(note, modes[static_cast<size_t>(i)].seed, params.gravity * (1.0f - (s - 0.5f) * 2.0f));
+    const float pull = s <= 0.5f ? 1.0f : 1.0f - (s - 0.5f) * 2.0f;
+    if (harmony != nullptr && params.gravity > 0.0f && pull > 0.0f)
+        note = harmony->quantize(note, modes[static_cast<size_t>(i)].seed, params.gravity * pull);
     return note;
 }
 

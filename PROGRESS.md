@@ -566,6 +566,32 @@ detection; screenshots of every page under Xvfb.
 trackpad, key handling inside Logic/Live/Bitwig, how the starter scenes and new
 sounds actually sound together, CPU of the plugin in a busy project.
 
+### Control audit
+
+`tests/engine/ControlAuditTests.cpp` (helpers in `ControlAudit.h`, tag `[audit]`)
+renders every parameter in the registry at its minimum, middle and maximum (every
+value for discrete ones) in a context where it should matter, checks the output is
+finite and under the ceiling, that it changes measurably in the expected direction
+(level, centroid, side, balance or a telemetry measure), and that neither half of the
+range is dead. Context-only controls get timing checks (fade length, key morph, glide,
+swell rise/ebb, catch length/source/target). Every effect type's six controls and Mix
+are swept, and every one of the 28 slots' seven parameters is checked for routing. A
+coverage test fails if a new parameter is not audited. `TF_AUDIT_REPORT=1` prints one
+`AUDIT|...` line per check. 75 test cases, about 45 s on 4 cores with `ctest -j8`.
+
+**Fixed by the audit**: `Drift` applied a new rate only after the current segment
+(drone Drift Rate, tape wow, gusts and Drift seasons ignored their rate for seconds
+to minutes); drone Shape's saw ran in antiphase to the sine, so the middle of the
+knob lost 8 dB (voice gain rebalanced to keep the default patch's level); cloud
+Position wrapped, so 100% played the start and 0% could jump to the end; resonator
+Gravity did nothing below Structure 50%; Gusts did not move the rain; Bloom Tone only
+applied at note-on (so Colour and Swell missed held notes); Bloom Swell's Amount
+saturated on samples shorter than 4 s; master and bus levels shown as Off still
+passed -60 dB; long fades ended early (float accumulation: 120 s took 117 s); Tape
+Delay's Tone and Age skipped the first echo; both delays clipped the right channel's
+spread time above 2.2 s. Docs/help: drone Shape direction, cloud Envelope, resonator
+Gravity, Bloom Attack/Position, Flakes; strip Width is now on every strip.
+
 ## How to run
 ```
 cmake --preset headless && cmake --build --preset headless

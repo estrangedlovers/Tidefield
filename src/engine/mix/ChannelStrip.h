@@ -7,6 +7,10 @@
 #include <utility>
 
 namespace tf::engine {
+inline constexpr float kFaderFloorDb = -59.9f;
+
+inline float faderGain(float db) noexcept { return db <= kFaderFloorDb ? 0.0f : dsp::dbToGain(db); }
+
 class ChannelStrip
 {
 public:
@@ -23,14 +27,14 @@ public:
     void update(const Settings& s) noexcept
     {
         previous = target;
-        const float level = s.levelDb <= -59.9f ? 0.0f : dsp::dbToGain(s.levelDb) * std::clamp(s.gate, 0.0f, 1.0f);
+        const float level = faderGain(s.levelDb) * std::clamp(s.gate, 0.0f, 1.0f);
         const auto pan = dsp::equalPowerPan(s.pan);
         target.mid = level;
         target.side = level * std::clamp(s.width, 0.0f, 2.0f);
         target.panL = pan.left;
         target.panR = pan.right;
-        target.sendA = s.sendADb <= -59.9f ? 0.0f : dsp::dbToGain(s.sendADb);
-        target.sendB = s.sendBDb <= -59.9f ? 0.0f : dsp::dbToGain(s.sendBDb);
+        target.sendA = faderGain(s.sendADb);
+        target.sendB = faderGain(s.sendBDb);
     }
 
     void settle() noexcept { previous = target; }

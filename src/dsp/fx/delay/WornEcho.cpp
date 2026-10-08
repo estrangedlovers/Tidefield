@@ -10,7 +10,7 @@
 namespace tf::dsp {
 namespace {
 const char* const kMediumChoices[] = { "Cassette", "Vinyl", "Sampler" };
-constexpr float kMaxSeconds = 2.2f;
+constexpr float kMaxSeconds = 3.2f;
 }
 
 using Curve = DisplayMap::Curve;

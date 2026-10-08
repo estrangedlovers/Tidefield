@@ -33,6 +33,7 @@ public:
 private:
     static constexpr int kControlInterval = 32;
     static constexpr int kMaxDrops = 12;
+    static constexpr float kMeanGust = 0.55f;
 
     struct Drop
     {
@@ -56,6 +57,7 @@ private:
     OnePole hissHpL, hissHpR, hissLpL, hissLpR;
     std::array<Drop, kMaxDrops> drops {};
     float dropRate = 0.0f;
+    float rainGust = 1.0f;
 
     OnePole surfL, surfR, washL, washR;
     float wavePhase = 0.0f, wavePeriod = 9.0f, waveAmp = 1.0f, wavePan = 0.0f, waveEnv = 0.0f;

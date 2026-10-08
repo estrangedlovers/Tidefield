@@ -67,6 +67,7 @@ void DroneGenerator::reset() noexcept
         v.level = 0.0f;
     }
     samplesUntilControl = 0;
+    snapPitch = true;
 }
 
 void DroneGenerator::updateControl(float dt) noexcept
@@ -164,7 +165,7 @@ float DroneGenerator::renderVoiceSample(Voice& v) noexcept
     {
         const double t = v.phase[o];
         const double dt = v.increment[o];
-        saw += static_cast<float>(2.0 * t - 1.0 - polyBlep(t, dt));
+        saw += static_cast<float>(1.0 - 2.0 * t + polyBlep(t, dt));
         sine += fastSin01(static_cast<float>(t));
         double next = t + dt;
         if (next >= 1.0)
@@ -177,7 +178,7 @@ float DroneGenerator::renderVoiceSample(Voice& v) noexcept
 
 void DroneGenerator::process(float* left, float* right, int numSamples, float timeScale) noexcept
 {
-    constexpr float kVoiceGain = 0.55f;
+    constexpr float kVoiceGain = 0.3f;
     int i = 0;
     while (i < numSamples)
     {

@@ -12,7 +12,7 @@ namespace tf::dsp {
 namespace {
 inline float saturate(float x) noexcept { return 1.2f * std::tanh(x * (1.0f / 1.2f)); }
 
-constexpr float kMaxDelaySeconds = 2.2f;
+constexpr float kMaxDelaySeconds = 3.2f;
 }
 
 using Curve = DisplayMap::Curve;
@@ -92,13 +92,11 @@ void TapeDelay::process(float* left, float* right, int n) noexcept
         const float dL = std::clamp(currentDelay + wow + flutter, 1.0f, maxDelay);
         const float dR = std::clamp(currentDelay * (1.0f + 0.5f * spread) - wow + flutter, 1.0f, maxDelay);
 
-        const float echoL = lineL.read(dL);
-        const float echoR = lineR.read(dR);
+        const float echoL = lowCutL.processHigh(toneL.processLow(lineL.read(dL)));
+        const float echoR = lowCutR.processHigh(toneR.processLow(lineR.read(dR)));
 
-        float fbL = lowCutL.processHigh(toneL.processLow(echoL));
-        float fbR = lowCutR.processHigh(toneR.processLow(echoR));
-        fbL = saturate(dcL.process(fbL) * drive) / drive;
-        fbR = saturate(dcR.process(fbR) * drive) / drive;
+        const float fbL = saturate(dcL.process(echoL) * drive) / drive;
+        const float fbR = saturate(dcR.process(echoR) * drive) / drive;
         const float cross = 0.5f * spread;
         const float inL = left[s];
         const float inR = right[s];

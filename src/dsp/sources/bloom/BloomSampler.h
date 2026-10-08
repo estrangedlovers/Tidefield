@@ -110,6 +110,7 @@ private:
         int grainsStartAt = 0;
         float wowPhase = 0.0f, flutterPhase = 0.0f, tapeSpeed = 1.0f;
         OnePole lpL, lpR;
+        float toneScale = 1.0f, toneCap = 1.0e9f, appliedCut = -1.0f;
         float level = 0.0f;
     };
 
@@ -118,6 +119,8 @@ private:
     void renderVoice(Voice& v, float* left, float* right, int n, float timeScale) noexcept;
     float window(float phase) const noexcept;
     float quantizedNote(float note, float seed) const noexcept;
+    static float toneCutoff(float tone) noexcept;
+    void applyTone(Voice& v, float cut) noexcept;
 
     ProcessSpec spec;
     Params params;
@@ -128,5 +131,6 @@ private:
     std::vector<float> hann;
     bool sustainPedal = false;
     int voiceLimit = kMaxVoices;
+    float toneFor = -1.0f, toneCut = 1000.0f;
 };
 }

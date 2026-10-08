@@ -115,6 +115,10 @@ public:
                 model.core.plugins->openEditor(slot);
         };
         openButton = add(std::move(open), 2 * metric::knobW, 24);
+        auto pick = std::make_unique<FlatButton>("Choose controls");
+        pick->setHelp(&model, "choose which of the plugin's parameters each of the six knobs controls");
+        pick->onClick = [this] { showControlMenu(); };
+        pickButton = add(std::move(pick), 2 * metric::knobW, 24);
         fillMenu();
         refresh();
     }
@@ -133,6 +137,52 @@ public:
 
 private:
     static constexpr int kScanId = 900, kPluginBase = 1000;
+
+    void showControlMenu()
+    {
+        auto* plugins = model.core.plugins.get();
+        if (plugins == nullptr || ! plugins->hasInstance(slot))
+            return;
+        const auto names = plugins->parameterNames(slot);
+        if (names.isEmpty())
+            return model.core.status("This plugin has no parameters a knob can control.", true);
+        constexpr int kPerKnob = 10000, kPerPage = 40;
+        juce::PopupMenu m;
+        m.addSectionHeader("Which parameter should each knob control?");
+        for (int k = 0; k < 6; ++k)
+        {
+            juce::PopupMenu sub;
+            const int current = plugins->chosenParameter(slot, k);
+            if (names.size() <= kPerPage)
+                for (int i = 0; i < names.size(); ++i)
+                    sub.addItem((k + 1) * kPerKnob + i, names[i], true, i == current);
+            else
+                for (int from = 0; from < names.size(); from += kPerPage)
+                {
+                    juce::PopupMenu page;
+                    for (int i = from; i < std::min(names.size(), from + kPerPage); ++i)
+                        page.addItem((k + 1) * kPerKnob + i, names[i], true, i == current);
+                    sub.addSubMenu(names[from] + " to " + names[std::min(names.size(), from + kPerPage) - 1], page);
+                }
+            const auto label = current >= 0 && current < names.size() ? names[current] : juce::String("nothing");
+            m.addSubMenu("Knob " + juce::String(k + 1) + ": " + label, sub);
+        }
+        showMenu(m, this, [this](int r) {
+            auto* host = model.core.plugins.get();
+            if (r < kPerKnob || host == nullptr)
+                return;
+            const int k = r / kPerKnob - 1, index = r % kPerKnob;
+            const auto p = static_cast<P>(engine::idx(engine::kFxSlots[static_cast<std::size_t>(slot)].firstParam) + static_cast<engine::ParamIndex>(k));
+            host->chooseParameter(slot, k, index);
+            const float value = host->parameterValue(slot, k);
+            if (value >= 0.0f)
+            {
+                model.engine.post(engine::ControlEvent::snapParam(engine::idx(p), value));
+                model.set(p, value, false);
+            }
+            refresh();
+        });
+    }
 
     void followPluginWindow()
     {
@@ -233,6 +283,11 @@ private:
         }
         knobs[6]->setVisible(info != nullptr);
         openButton->setVisible(isPlugin);
+        pickButton->setVisible(isPlugin);
+        if (isPlugin && model.core.plugins != nullptr)
+            for (int k = 0; k < 6; ++k)
+                if (const auto name = model.core.plugins->parameterName(slot, k); name.isNotEmpty())
+                    knobs[static_cast<std::size_t>(k)]->setLabel(name);
         const auto first = engine::idx(engine::kFxSlots[static_cast<std::size_t>(slot)].firstParam);
         std::vector<P> ps;
         for (engine::ParamIndex k = 0; k < 7; ++k)
@@ -247,6 +302,7 @@ private:
     int slot;
     juce::ComboBox* menu = nullptr;
     FlatButton* openButton = nullptr;
+    FlatButton* pickButton = nullptr;
     std::array<Knob*, 7> knobs {};
     std::string shownType = "\x01";
     std::vector<juce::PluginDescription> pluginList;

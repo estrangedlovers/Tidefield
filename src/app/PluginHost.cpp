@@ -7,12 +7,14 @@ namespace {
 constexpr const char* kKnownKey = "knownPlugins";
 constexpr int kMaxControls = 6;
 
+constexpr const char* kChoicePrefix = "map=";
+
 std::vector<juce::AudioProcessorParameter*> controllableParameters(juce::AudioPluginInstance& instance)
 {
     std::vector<juce::AudioProcessorParameter*> out;
     const auto* bypass = instance.getBypassParameter();
     for (auto* p : instance.getParameters())
-        if (p != bypass && p->isAutomatable() && ! p->isMetaParameter() && static_cast<int>(out.size()) < kMaxControls)
+        if (p != bypass && p->isAutomatable() && ! p->isMetaParameter())
             out.push_back(p);
     return out;
 }
@@ -108,15 +110,25 @@ dsp::ProcessorPtr PluginHost::create(int slot, std::string_view typeId, const st
         status(d->name + " could not be opened: " + (error.isNotEmpty() ? error : juce::String("unknown error")), true);
         return nullptr;
     }
-    if (! state.empty())
+    std::string choices, pluginState = state;
+    if (pluginState.rfind(kChoicePrefix, 0) == 0)
+    {
+        const auto end = pluginState.find(';');
+        const auto from = std::char_traits<char>::length(kChoicePrefix);
+        choices = pluginState.substr(from, end == std::string::npos ? std::string::npos : end - from);
+        pluginState = end == std::string::npos ? std::string() : pluginState.substr(end + 1);
+    }
+    if (! pluginState.empty())
     {
         juce::MemoryBlock block;
-        if (block.fromBase64Encoding(state))
+        if (block.fromBase64Encoding(pluginState))
             instance->setStateInformation(block.getData(), static_cast<int>(block.getSize()));
     }
 
     auto& holder = infoFor(std::string(typeId), *d);
-    const auto params = controllableParameters(*instance);
+    auto params = controllableParameters(*instance);
+    if (params.size() > static_cast<std::size_t>(kMaxControls))
+        params.resize(static_cast<std::size_t>(kMaxControls));
     for (std::size_t k = 0; k < static_cast<std::size_t>(kMaxControls); ++k)
     {
         auto& control = holder.info.controls[k];
@@ -137,6 +149,8 @@ dsp::ProcessorPtr PluginHost::create(int slot, std::string_view typeId, const st
     if (registry->editorOwner[static_cast<std::size_t>(slot)] != nullptr)
         closeEditor(slot);
     auto effect = std::make_unique<HostedPluginEffect>(registry, slot, std::move(instance), holder.info);
+    if (! choices.empty())
+        effect->applyChoices(choices);
     effect->prepare(spec);
     registry->live[static_cast<std::size_t>(slot)] = effect.get();
     return effect;
@@ -151,7 +165,7 @@ std::string PluginHost::captureState(int slot) const
         return {};
     juce::MemoryBlock block;
     fx->getInstance().getStateInformation(block);
-    return block.toBase64Encoding().toStdString();
+    return std::string(kChoicePrefix) + fx->describeChoices() + ";" + block.toBase64Encoding().toStdString();
 }
 
 std::vector<juce::PluginDescription> PluginHost::effects() const
@@ -297,10 +311,9 @@ juce::String PluginHost::parameterText(int slot, int control, float normalised) 
 {
     if (! hasInstance(slot))
         return {};
-    const auto& mapped = registry->live[static_cast<std::size_t>(slot)]->getMapped();
-    if (control < 0 || control >= static_cast<int>(mapped.size()))
+    auto* p = registry->live[static_cast<std::size_t>(slot)]->mappedAt(control);
+    if (p == nullptr)
         return {};
-    auto* p = mapped[static_cast<std::size_t>(control)];
     const auto label = p->getLabel();
     return p->getText(normalised, 16) + (label.isNotEmpty() ? " " + label : juce::String());
 }
@@ -309,8 +322,36 @@ float PluginHost::parameterValue(int slot, int control) const
 {
     if (! hasInstance(slot))
         return -1.0f;
-    const auto& mapped = registry->live[static_cast<std::size_t>(slot)]->getMapped();
-    return control >= 0 && control < static_cast<int>(mapped.size()) ? mapped[static_cast<std::size_t>(control)]->getValue() : -1.0f;
+    auto* p = registry->live[static_cast<std::size_t>(slot)]->mappedAt(control);
+    return p != nullptr ? p->getValue() : -1.0f;
+}
+
+juce::String PluginHost::parameterName(int slot, int control) const
+{
+    if (! hasInstance(slot))
+        return {};
+    auto* p = registry->live[static_cast<std::size_t>(slot)]->mappedAt(control);
+    return p != nullptr ? p->getName(20) : juce::String();
+}
+
+juce::StringArray PluginHost::parameterNames(int slot) const
+{
+    juce::StringArray names;
+    if (hasInstance(slot))
+        for (auto* p : registry->live[static_cast<std::size_t>(slot)]->getAll())
+            names.add(p->getName(40));
+    return names;
+}
+
+int PluginHost::chosenParameter(int slot, int control) const
+{
+    return hasInstance(slot) ? registry->live[static_cast<std::size_t>(slot)]->chosen(control) : -1;
+}
+
+void PluginHost::chooseParameter(int slot, int control, int index)
+{
+    if (hasInstance(slot))
+        registry->live[static_cast<std::size_t>(slot)]->choose(control, index);
 }
 
 void PluginHost::status(const juce::String& message, bool warning) const
@@ -323,8 +364,48 @@ HostedPluginEffect::HostedPluginEffect(std::weak_ptr<PluginHost::Registry> r, in
                                        const dsp::ProcessorInfo& info)
     : registry(std::move(r)), slot(s), instance(std::move(i)), infoRef(info)
 {
-    mapped = controllableParameters(*instance);
+    all = controllableParameters(*instance);
+    for (int k = 0; k < kMaxControls; ++k)
+    {
+        choice[static_cast<std::size_t>(k)].store(k < static_cast<int>(all.size()) ? k : -1);
+        applied[static_cast<std::size_t>(k)] = choice[static_cast<std::size_t>(k)].load();
+    }
     sent.fill(-1.0f);
+}
+
+juce::AudioProcessorParameter* HostedPluginEffect::mappedAt(int control) const noexcept
+{
+    const int index = chosen(control);
+    return index >= 0 && index < static_cast<int>(all.size()) ? all[static_cast<std::size_t>(index)] : nullptr;
+}
+
+int HostedPluginEffect::chosen(int control) const noexcept
+{
+    return control >= 0 && control < kMaxControls ? choice[static_cast<std::size_t>(control)].load(std::memory_order_acquire) : -1;
+}
+
+void HostedPluginEffect::choose(int control, int index) noexcept
+{
+    if (control >= 0 && control < kMaxControls && index >= -1 && index < static_cast<int>(all.size()))
+        choice[static_cast<std::size_t>(control)].store(index, std::memory_order_release);
+}
+
+std::string HostedPluginEffect::describeChoices() const
+{
+    std::string text;
+    for (int k = 0; k < kMaxControls; ++k)
+        text += (k > 0 ? "," : "") + std::to_string(chosen(k));
+    return text;
+}
+
+void HostedPluginEffect::applyChoices(const std::string& text) noexcept
+{
+    const auto parts = juce::StringArray::fromTokens(juce::String(text), ",", "");
+    for (int k = 0; k < kMaxControls && k < parts.size(); ++k)
+        if (parts[k].trim().containsOnly("-0123456789") && parts[k].isNotEmpty())
+            choose(k, parts[k].getIntValue());
+    for (int k = 0; k < kMaxControls; ++k)
+        applied[static_cast<std::size_t>(k)] = chosen(k);
 }
 
 HostedPluginEffect::~HostedPluginEffect()
@@ -374,12 +455,23 @@ void HostedPluginEffect::reset() noexcept { instance->reset(); }
 
 void HostedPluginEffect::setControls(const std::array<float, 6>& c, const dsp::ModContext&) noexcept
 {
-    for (std::size_t k = 0; k < mapped.size() && k < c.size(); ++k)
+    for (std::size_t k = 0; k < c.size(); ++k)
+    {
+        const int index = choice[k].load(std::memory_order_acquire);
+        if (index < 0 || index >= static_cast<int>(all.size()))
+            continue;
+        if (index != applied[k])
+        {
+            applied[k] = index;
+            sent[k] = c[k];
+            continue;
+        }
         if (std::abs(c[k] - sent[k]) > 1.0e-4f)
         {
             sent[k] = c[k];
-            mapped[k]->setValue(std::clamp(c[k], 0.0f, 1.0f));
+            all[static_cast<std::size_t>(index)]->setValue(std::clamp(c[k], 0.0f, 1.0f));
         }
+    }
 }
 
 void HostedPluginEffect::process(float* left, float* right, int numSamples) noexcept

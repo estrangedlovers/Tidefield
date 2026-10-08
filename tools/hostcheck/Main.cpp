@@ -95,6 +95,8 @@ int main(int argc, char** argv)
 
         engine.post(engine::ControlEvent::setParam(first, 0.5f));
         renderRms(engine, fx, 1.0);
+        host.chooseParameter(slot, 1, 0);
+        check(host.chosenParameter(slot, 1) == 0 && host.parameterName(slot, 1) == "Gain", "a second knob can be pointed at a chosen parameter");
         const auto state = fx.getState(slot);
         check(! state.empty(), "the plugin's state can be captured");
 
@@ -110,6 +112,7 @@ int main(int argc, char** argv)
             restored = host.hasInstance(1);
         }
         check(restored, "a new instance opens from the saved state");
+        check(host.chosenParameter(1, 1) == 0, "the chosen parameters come back with the state");
 
         fx.setType(slot, "");
         renderRms(engine, fx, 0.5);

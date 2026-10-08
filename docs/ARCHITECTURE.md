@@ -334,7 +334,56 @@ a `SnapshotChannel`, and travelled by `Wander::Style::Path` at one lap per 1 / r
 seconds of Tide time, starting from the point nearest the sound. Sessions store the
 stroke as drawn.
 
-## 15. Extension points for later features
+## 15. Version 1.3 systems
+
+**Drone.** `DroneGenerator` keeps six voices of three detuned oscillators. Each
+oscillator sample comes from `waveSample(wave, phase, increment, modPhase)`: Classic
+(polyBLEP saw to sine), Pulse (two polyBLEP edges, DC removed), Fold (a sine fed back
+through a sine), Organ (up to six harmonics with a Shape-controlled slope, skipping any
+above 0.45 of the sample rate) and FM (a modulator phase per oscillator at FM Ratio).
+Wave changes crossfade both waves for 80 ms. Chords are tables of six starting
+intervals and a pool for Evolve; a chord change revoices each upper voice through the
+same fade-out, swap, fade-in path Evolve uses, timed by Revoice Time. Vibrato and
+tremolo run at control rate on wall time (not Tide), with small per-voice phase
+offsets so the voices move together instead of cancelling. Drive is a `TanhAdaa` on the
+summed output, blended in by amount and level-matched against a 0.12 reference so the
+knob changes colour, not loudness. Every new control's default reproduces 1.2 exactly.
+
+**Modulation.** `ModMatrix` sources (LFOs, randoms, followers, MIDI expression, the
+terrain) are computed once per control tick; routes arrive as a `SnapshotChannel` of
+`ModRouteSet` and add to `ParamState` through `addModulation`, never touching targets,
+so removing a route returns the control exactly.
+
+**Plugin hosting.** `FxManager` takes effects from an `ExternalEffects` provider, so
+the engine stays free of JUCE. `PluginHost` (app only) scans with a crash file, creates
+`HostedPluginEffect` instances off the audio thread and hands them over through
+`FxSlot`. Each of the six knobs points at an index into the plugin's automatable
+parameters, held in an atomic; the audio thread skips one block after a change so a
+remap never sends a stale value. Slot state is `map=a,b,c,d,e,f;` followed by the
+plugin's own state in base64.
+
+**Timeline.** The engine pushes every non-score control event into `performanceOut`
+while recording, timestamped from the start of the take. The app keeps the events in
+an `io::Performance` with the session it started from. Playback applies that session,
+catches controls up to the chosen point and publishes a `GestureTake` with `startAt`
+through `performanceChannel`. `renderPerformance` replays the same events into a fresh
+engine offline, through `RecordTap`, for the master, stems or a crossfaded loop.
+
+**Space.** After the strips, `spatialiseChunk` either renders each strip's left and
+right as two virtual sources through `BinauralSource` (interaural delay by Woodworth's
+formula, a far-ear shading filter and rear darkening) into the stereo master, or pans
+them pairwise across a ring of 4, 6 or 8 speakers (`ringGains`, equal power). Returns
+spread across the ring evenly. `MasterChain::process` carries the ring channels through
+the same fade and level, delays them by the limiter's lookahead and applies the stereo
+limiter's per-sample gain, so every speaker shares one protection. Mode changes dip the
+master level for 40 ms and switch at the silent point. A ring mode with too few device
+outputs plays stereo.
+
+**Installation mode.** A one-second message-thread timer in the app: schedule
+transitions, keep-awake, reopening a lost device every ten seconds, resuming ten
+seconds after a panic, and a plain-text log. None of it touches the audio thread.
+
+## 16. Extension points for later features
 
 | Later feature | Where it plugs in |
 |---|---|
@@ -342,7 +391,7 @@ stroke as drawn.
 | Multichannel output | master bus channel count + a panner interface on strips |
 | OSC control | another `ControlEvent` producer with its own SPSC queue |
 
-## 16. Phase plan
+## 17. Phase plan
 
 1. Skeleton, device settings, safety chain, drone, render harness. **(done)**
 2. Scene system and terrain interpolation (placeholder UI). **(done)**

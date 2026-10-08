@@ -431,6 +431,48 @@ CI; every macOS CI run green on Apple Silicon.
 whether the auto master's target shape suits your material, how the new gestures
 feel, CPU on the M1 Pro under real load, and the app on your interface and controller.
 
+### 1.3.0: a deeper instrument
+
+Built in this round, each with tests:
+- **Modulation**: 15 sources (4 LFOs, 2 randoms, input level and brightness, mix
+  level, velocity, note pitch, mod wheel, pressure, terrain X/Y), up to 16 routes, a
+  Modulation tab, Modulate with on every knob, depth arcs.
+- **Plugin hosting** (app only): AU/VST3 effects in any slot, scanned with a crash
+  file, state saved per slot, and Choose controls to point each knob at any plugin
+  parameter. `tidefield_hostcheck` drives a test plugin, remaps a knob and reloads.
+- **Sync and remote**: MIDI clock in and out, OSC in and out, MPE, Link behind
+  `TIDEFIELD_WITH_LINK` (off by default because Link is GPL).
+- **Undo and redo** for controls, scenes, routes, seasons, effects and timeline edits.
+- **Bloom**: up to eight sounds across the keyboard, YIN pitch detection on load, a
+  preview voice; Browser search, preview and favourites.
+- **Timeline**: record a performance, replay from any point, erase, mute, smooth, trim,
+  save as a session, render offline to master, stems or a seamless loop.
+- **Installation mode**: launch session, auto fade-in, daily schedule, keep awake,
+  device and panic recovery, log.
+- **Space**: binaural headphones and 4/6/8-speaker rings, a Direction per source,
+  Spread and Rotate; ring channels share the limiter (and feed its detector).
+- **Drone**: 15 new controls (waves, chords, sub, FM ratio, tilt, filter type, key
+  track, vibrato, tremolo, glide, revoice time, drive, breath tone), defaults identical
+  to 1.2, 15 presets, `scores/drone_deep.json`.
+- **Effects**: eight new built-in types (see below); 44 effect presets.
+- **Content**: 90 factory sounds, 149 factory presets (105 instrument, 44 effect).
+  Presets now reset any control they do not name, so they sound the same every time.
+
+Debugging pass: an independent review of the new audio code found no crash, NaN or
+audio-thread issues; its six audible or edge findings were fixed (ring speakers could
+run past the limiter's detector, drone filter-type clicks, chord changes missed by
+voices mid-fade, sample-rate-dependent breath tone, FM aliasing at high ratios,
+binaural clicks on snapped direction jumps, lo-fi sample-rate reduction at 96 kHz,
+filter resonance peaks). An AddressSanitizer build runs all 288 tests with no memory
+errors; under ASan and parallel load the "faster than real time" render check can
+miss its timing, and it passes alone.
+
+Verified on Linux: 288/288 ctest, every score `--strict`, the app's `--self-test` and
+`--ui-test` under Xvfb, `tidefield_plugincheck`, `tidefield_hostcheck`. Not verified:
+the macOS build of this round (CI builds it), hosting real third-party plugins, speaker
+rings on real multichannel hardware, Link against Ableton Live, and listening on
+speakers.
+
 ### Factory sounds expansion (after 1.2.0)
 
 - 41 new original sounds in `make_samples.py` (`expansion()`), 59 in all, in five

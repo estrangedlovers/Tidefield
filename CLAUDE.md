@@ -51,7 +51,8 @@ own JUCE modules, so JUCE module code is never linked twice.
   audio thread through `SnapshotChannel`, `FxSlot` or `SpscQueue`. Audio going the
   other way (recording) goes through `engine/record/RecordTap`.
 - Factory sounds: generate in `tools/scripts/make_samples.py` (library section),
-  list in `src/app/FactoryContent.cpp`. Starter scenes live there too.
+  list in `src/app/FactoryContent.cpp`. Starter scenes and factory presets live there
+  too (the self-test checks every preset value names a parameter).
 - Your own JUCE effects (shimmer, fuzz): `src/fx_juce/UserEffects.cpp` (instructions
   inside); they become FX types like the built-in ones.
 - A performance gesture that moves many parameters at once: add offsets in
@@ -88,8 +89,13 @@ Native JUCE drawing in C++, one typeface (Inter, embedded), palette and metrics 
   live/learn/pickup colours for free. A device page is a list of parameters in
   `DeviceView::build` (`gui/Pages.cpp`); `Device::add(P)` picks the right control.
 - Anything animated implements `Animated::tick()` (called once per display frame);
-  repaint only when what you draw changed. Never block or allocate per frame in a
-  way that grows.
+  repaint only when what you draw changes visibly (compare against a threshold, not
+  exact floats: smoothed values creep for seconds). Never allocate per frame in a
+  way that grows. Menus and async callbacks go through `showMenu`/`later`
+  (`gui/Style.h`), which check that their component still exists.
+- `Tidefield --null-audio` runs the engine without a sound device, so the interface
+  animates under Xvfb (screenshots, CPU measurement). Build with
+  `-DJUCE_ENABLE_REPAINT_DEBUGGING=1` to see what repaints.
 - Keys live in `MainView::keyPressed`; standalone every key is consumed (no macOS
   beep), in a plugin leave Space and unused keys to the DAW.
 - Check the look under Xvfb on Linux: build with `-DTIDEFIELD_BUILD_APP=ON`, run the

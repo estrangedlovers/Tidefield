@@ -2,7 +2,7 @@
 
 Read `CLAUDE.md` (rules) and `docs/ARCHITECTURE.md` (design) first.
 
-## Status: 1.1.0, native interface, factory library, path wander and AU/VST3 plugin
+## Status: 1.2.0, tempo sync, gestures, projector window, device presets; debugged and optimised
 
 ### Phase 1: skeleton, device settings, safety chain, drone, render harness
 
@@ -430,6 +430,57 @@ CI; every macOS CI run green on Apple Silicon.
 **Untested (needs the Mac and ears)**: everything audible: balance between sources,
 whether the auto master's target shape suits your material, how the new gestures
 feel, CPU on the M1 Pro under real load, and the app on your interface and controller.
+
+### 1.2.0: tempo sync, gestures, projector, presets; a debugger's and optimiser's pass
+
+**Built**
+- **Tempo sync**: Tempo Sync and Tempo parameters, the DAW's tempo and song position
+  in the plugin, beat-locked loops (prime numbers of beats), delays snapped to note
+  lengths with the division shown on the knob; a transport-style tempo field with a
+  beat dot and Tap.
+- **Gestures**: record your moves (G), play them back looped or once; saved in
+  sessions and plugin state.
+- **Projector window** (Cmd+P): the terrain alone, full screen on another display.
+- **Device presets**: a Presets menu on every device and effect; 29 factory presets.
+
+**Found and fixed** (three independent code reviews, sanitizers, random-input runs)
+- Gestures: loading a session or recording again mid-recording let the abandoned
+  take overwrite the new one (generations now); a full queue could lose a take's end
+  (re-sent); notes held by a take could hang after Stop (released); a take recorded
+  across a sample-rate change was labelled with the wrong rate; Play could race the
+  take's publish (Play waits for its version).
+- Synced loops lined up at extreme Pace (periods shared factors) and fired stray
+  notes when Pace changed while playing.
+- Hostile files: a season with period 0 produced NaN; damaged zips could crash;
+  "NaN" values reached parameters; an unknown effect type left the old effect
+  loaded; huge or bogus audio headers could allocate gigabytes; a failed save could
+  lose the previous file; two preset names could share one file.
+- Plugin: menus, dialogs and timers could call into a closed editor; a knob destroyed
+  mid-drag froze; a pad held while the window closed latched; the plugin stole
+  keyboard focus from the DAW; state requests from other threads blocked on the
+  message thread (now a snapshot); a restore queued from another thread could
+  outlive the plugin; background loads ran on detached threads (now a pool the core
+  waits for).
+- The window opened larger than a 13-inch laptop screen; the performance panel lost
+  a control at the minimum size.
+- Correction: the 1.1.0 entry's "every score strict at 48 kHz" was run locally with a
+  stale render binary. CI's four strict scores were real; all eight now pass with
+  the current build.
+
+**Optimised**
+- The idle interface: from 9 % of a core to 2 % (meters re-armed their peak hold
+  every frame in silence); with the engine running silent, from 74 % to 7 % (ripples
+  for inaudible strikes, knobs repainting for invisible changes).
+- Playing: from 74 % to 47 % of a core in Linux software rendering (glows drawn once
+  into a quarter-resolution layer from a cached falloff image, a rectangular clip);
+  CoreGraphics on the Mac should be well below that, measure there.
+- Granular clouds: bounds and channel checks hoisted out of the per-sample loop,
+  12 % fewer instructions, bit-identical output. Stress score 60 s in 12 s.
+
+**Verified**: 143 ctest tests (also under ASan and UBSan); all eight scores strict;
+the app's self-test and `--ui-test` (also under ASan with leak detection and the
+engine running); 1000 random clicks, drags and keys under ASan with the engine
+running; `tidefield_plugincheck` on the VST3.
 
 ### 1.1.0: native interface, factory library, path wander, plugin
 

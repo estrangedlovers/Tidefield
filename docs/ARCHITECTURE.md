@@ -294,6 +294,29 @@ rows into a Bloom keyboard. In a plugin, Space and unused keys go to the DAW.
 The older web protocol (`src/io/UiProtocol`) remains for tools: `tidefield_render
 --dump-schema` writes the parameter schema for external controllers.
 
+**Tempo.** `sync.on` and `sync.bpm`; in a plugin the host's tempo and song position
+(`Engine::setHostTransport`, called before each block) replace the Tempo parameter.
+While synced, each incommensurate loop repeats every prime number of whole beats
+(consecutive primes from about 23, halved or doubled by Pace), fires on the beat and
+follows the song position; a period change or a jump in the song re-anchors without
+firing. `ModContext::beatSeconds` lets delays snap their time to note lengths
+(`dsp/core/TempoSync.h`).
+
+**Gestures.** While recording, `Engine::applyEvent` stamps every performer event
+(UI and MIDI sources; never terrain, scores or playback) with its sample time and
+the recording's generation, and pushes it to `gestureOut` (SPSC, audio thread to
+message thread). The end marker carries the length and the sample rate and is
+re-sent until the queue takes it; keys still held get note-offs at the end.
+`GestureManager` collects a take, drops anything from an abandoned generation, and
+publishes the take through a `SnapshotChannel`; Play carries the version it expects
+and starts once that version is acquired. Playback replays events at control rate
+(source `Score`), rescaled across sample rates, and releases its own held notes when
+it stops, wraps or is replaced. Takes are saved in sessions in seconds.
+
+**Presets.** `io::PresetLibrary`: JSON files per kind in `~/Music/Tidefield/Presets`,
+keys are parameter IDs without the device prefix (a cloud preset fits any cloud;
+effect presets have kind `fx:<type>`), plus factory presets registered by the app.
+
 **Path wander.** A loop drawn on the terrain (`PathManager`, message thread) is
 smoothed and resampled to 128 evenly spaced points (`TerrainPath`), published through
 a `SnapshotChannel`, and travelled by `Wander::Style::Path` at one lap per 1 / rate
@@ -304,13 +327,9 @@ stroke as drawn.
 
 | Later feature | Where it plugs in |
 |---|---|
-| Gesture recording | record/replay the `ControlEvent` stream with sample times |
-| Sample import | worker decode path shared with Catch and Bloom |
-| OSC | another `ControlEvent` producer with its own SPSC queue |
 | Ableton Link | a `TideClock` implementation |
-| Projector visuals window | a second `TerrainView` in its own window, same `Model` |
 | Multichannel output | master bus channel count + a panner interface on strips |
-| Host tempo sync | `AudioPlayHead` in the plugin -> Tide and loop rates |
+| OSC control | another `ControlEvent` producer with its own SPSC queue |
 
 ## 16. Phase plan
 
@@ -324,3 +343,4 @@ stroke as drawn.
 7. Recording to disk, CPU guardrails, polish. **(done)**
 8. Ambient feature pack: the approved items from section 10. **(done)**
 9. Native interface, factory library, path wander, AU/VST3 plugin (1.1). **(done)**
+10. Tempo sync, gestures, projector window, device presets (1.2). **(done)**

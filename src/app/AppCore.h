@@ -2,6 +2,7 @@
 
 #include "Host.h"
 #include "MidiInputs.h"
+#include "PerformanceController.h"
 #include "PluginHost.h"
 #include "Remote.h"
 #include "Undo.h"
@@ -46,6 +47,7 @@ public:
     io::Recorder recorder;
     std::unique_ptr<MidiClockOut> clockOut;
     std::unique_ptr<OscRemote> osc;
+    PerformanceController performance { *this };
 
     const engine::TelemetryFrame& latest() const noexcept { return lastFrame; }
 

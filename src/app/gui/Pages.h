@@ -72,7 +72,7 @@ public:
     explicit DeviceView(Model& m);
     ~DeviceView() override;
 
-    enum Page { Drone, Clouds, Resonator, Bloom, Input, Looper, Weather, Gestures, Loops, Seasons, Modulation, Mixer, Effects, Master, Midi, NumPages };
+    enum Page { Drone, Clouds, Resonator, Bloom, Input, Looper, Weather, Gestures, Loops, Seasons, Modulation, Timeline, Mixer, Effects, Master, Midi, NumPages };
     static juce::String pageName(int p);
 
     void show(int page);

@@ -18,7 +18,13 @@ AppCore::AppCore(Host& h)
     const auto& registry = engine.getRegistry();
     for (engine::ParamIndex i = 0; i < engine::kNumParams; ++i)
         lastFrame.paramTargets[i] = registry.spec(i).defaultValue;
-    session.onApplied = [this](const io::SessionData& s) { seedTargets(s); };
+    session.onApplied = [this](const io::SessionData& s) {
+        seedTargets(s);
+        if (auto p = io::performanceFromSession(s, engine.getRegistry()))
+            performance.load(std::move(*p));
+        else
+            performance.load({});
+    };
     if (h.getDeviceManager() != nullptr)
         midiInputs = std::make_unique<MidiInputs>(engine, h.getSettings());
     fxjuce::registerUserEffects();
@@ -78,6 +84,7 @@ AppCore::AppCore(Host& h)
 AppCore::~AppCore()
 {
     stopTimer();
+    performance.cancelRender();
     osc.reset();
     clockOut.reset();
     fx.setExternal(nullptr);
@@ -315,6 +322,7 @@ void AppCore::timerCallback()
         if (onTelemetry)
             onTelemetry(lastFrame);
     }
+    performance.tick();
 
     if (recorder.getStatus().state == io::Recorder::State::Recording && engine.getSampleRate() != recordingRate)
     {

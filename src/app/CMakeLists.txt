@@ -26,6 +26,7 @@ juce_add_binary_data(TidefieldBinaryData SOURCES
 add_library(tidefield_app_core INTERFACE)
 target_sources(tidefield_app_core INTERFACE
     ${CMAKE_CURRENT_SOURCE_DIR}/AppCore.cpp
+    ${CMAKE_CURRENT_SOURCE_DIR}/PerformanceController.cpp
     ${CMAKE_CURRENT_SOURCE_DIR}/FactoryContent.cpp
     ${CMAKE_CURRENT_SOURCE_DIR}/MidiInputs.cpp
     ${CMAKE_CURRENT_SOURCE_DIR}/PluginHost.cpp
@@ -38,6 +39,7 @@ target_sources(tidefield_app_core INTERFACE
     ${CMAKE_CURRENT_SOURCE_DIR}/gui/Pages.cpp
     ${CMAKE_CURRENT_SOURCE_DIR}/gui/Style.cpp
     ${CMAKE_CURRENT_SOURCE_DIR}/gui/TerrainView.cpp
+    ${CMAKE_CURRENT_SOURCE_DIR}/gui/Timeline.cpp
     ${CMAKE_CURRENT_SOURCE_DIR}/gui/Widgets.cpp)
 target_link_libraries(tidefield_app_core INTERFACE tidefield_fx_juce tidefield_engine tidefield_io TidefieldBinaryData juce::juce_osc)
 

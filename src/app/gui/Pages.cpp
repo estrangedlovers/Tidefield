@@ -1,4 +1,5 @@
 #include "Pages.h"
+#include "Timeline.h"
 
 #include "../LinkSync.h"
 #include "../PluginHost.h"
@@ -1378,7 +1379,7 @@ DeviceView::~DeviceView()
 
 juce::String DeviceView::pageName(int p)
 {
-    static const char* names[] = { "Drone", "Clouds", "Resonator", "Bloom", "Input", "Looper", "Weather", "Gestures", "Cycles", "Seasons", "Modulation", "Mixer", "Effects", "Master", "MIDI" };
+    static const char* names[] = { "Drone", "Clouds", "Resonator", "Bloom", "Input", "Looper", "Weather", "Gestures", "Cycles", "Seasons", "Modulation", "Timeline", "Mixer", "Effects", "Master", "MIDI" };
     return names[juce::jlimit(0, NumPages - 1, p)];
 }
 
@@ -1672,6 +1673,12 @@ void DeviceView::build()
             f.add(std::make_unique<ModMeter>(model, engine::ModSource::InputBrightness, true), 2 * metric::knobW, 34);
             f.add(std::make_unique<ModMeter>(model, engine::ModSource::MixLevel, true), 2 * metric::knobW, 34);
             params(f, { P::ModFollowAttack, P::ModFollowRelease, P::ModFollowGain });
+            break;
+        }
+        case Timeline:
+        {
+            auto& d = device("Performance", colour::live());
+            d.add(std::make_unique<TimelineView>(model), 1300, 0);
             break;
         }
         case Mixer:

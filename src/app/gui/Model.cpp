@@ -233,7 +233,8 @@ juce::String Model::longName(engine::ParamIndex i) const
             if (const auto* info = core.fx.getInfo(s); info != nullptr && info->controls[static_cast<std::size_t>(i - first)].name[0] != 0)
                 control = info->controls[static_cast<std::size_t>(i - first)].name;
     }
-    return groupName(i) + " " + control;
+    const auto group = groupName(i);
+    return control.startsWithIgnoreCase(group) ? control : group + " " + control;
 }
 
 void Model::addParamMenus(juce::PopupMenu& menu, const std::function<bool(engine::ParamIndex)>& include, int idOffset) const

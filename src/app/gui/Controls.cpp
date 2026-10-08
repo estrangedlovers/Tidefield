@@ -221,7 +221,7 @@ void Toggle::paint(juce::Graphics& g)
     auto r = getLocalBounds().toFloat().reduced(0.5f);
     g.setColour(on ? onColour : (isMouseOver() ? colour::lift(colour::panelHi(), 0.08f) : colour::panelHi()));
     g.fillRoundedRectangle(r, metric::radius);
-    g.setColour(on ? colour::well() : colour::text());
+    g.setColour((on ? colour::well() : colour::text()).withMultipliedAlpha(isEnabled() ? 1.0f : 0.45f));
     g.setFont(font(12.0f, 600));
     g.drawText(text, r.reduced(6.0f, 0.0f), juce::Justification::centred, true);
 }
@@ -434,7 +434,7 @@ void FlatButton::paintButton(juce::Graphics& g, bool over, bool down)
         bg = colour::lift(bg, 0.07f);
     g.setColour(isEnabled() ? bg : bg.withAlpha(0.4f));
     g.fillRoundedRectangle(r, metric::radius);
-    g.setColour(on ? colour::well() : colour::text());
+    g.setColour((on ? colour::well() : colour::text()).withMultipliedAlpha(isEnabled() ? 1.0f : 0.45f));
     g.setFont(font(12.0f, 600));
     g.drawText(getButtonText(), r.reduced(6.0f, 0.0f), juce::Justification::centred, true);
 }

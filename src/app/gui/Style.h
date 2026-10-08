@@ -52,6 +52,10 @@ inline constexpr int knobW = 58, knobH = 70;
 /** Inter, embedded (one family, three weights). */
 juce::Font font(float size, int weight = 400);
 inline juce::Font caps(float size = 10.5f) { return font(size, 600).withExtraKerningFactor(0.06f); }
+/** Quicksand Medium, embedded, for the lowercase wordmark only. */
+juce::Font brandFont(float size);
+/** The mark and the lowercase name, left-aligned and vertically centred in r. */
+void drawWordmark(juce::Graphics& g, juce::Rectangle<float> r, float markSize, juce::Colour textColour);
 
 /** A flat panel with an optional title bar, the basic container everywhere. */
 void drawPanel(juce::Graphics& g, juce::Rectangle<float> r, const juce::String& title = {}, juce::Colour titleColour = colour::textDim);

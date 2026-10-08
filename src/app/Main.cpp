@@ -32,6 +32,8 @@ int runSelfTest()
 
     const auto inter = gui::font(14.0f, 600);
     check(inter.getTypefaceName().containsIgnoreCase("Inter"), "embedded typeface loads: " + inter.getTypefaceName());
+    const auto brand = gui::brandFont(14.0f);
+    check(brand.getTypefaceName().containsIgnoreCase("Quicksand"), "wordmark typeface loads: " + brand.getTypefaceName());
 
     for (const auto& sound : factorySounds())
     {

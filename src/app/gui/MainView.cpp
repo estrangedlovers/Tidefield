@@ -429,18 +429,8 @@ public:
         g.setColour(colour::line);
         g.fillRect(getLocalBounds().removeFromBottom(1));
 
-        // Wordmark: a small tide glyph and the name.
-        auto mark = getLocalBounds().reduced(12, 0).removeFromLeft(110).toFloat();
-        juce::Path wave;
-        const float cy = mark.getCentreY();
-        wave.startNewSubPath(mark.getX(), cy);
-        for (int i = 1; i <= 16; ++i)
-            wave.lineTo(mark.getX() + static_cast<float>(i), cy + 3.5f * std::sin(static_cast<float>(i) * 0.785f));
-        g.setColour(colour::tide);
-        g.strokePath(wave, juce::PathStrokeType(2.0f, juce::PathStrokeType::curved, juce::PathStrokeType::rounded));
-        g.setColour(colour::text);
-        g.setFont(font(15.0f, 600).withExtraKerningFactor(0.02f));
-        g.drawText("Tidefield", mark.withTrimmedLeft(24.0f), juce::Justification::centredLeft);
+        // The mark and the lowercase name, as on the icon.
+        drawWordmark(g, getLocalBounds().reduced(12, 0).removeFromLeft(110).toFloat(), 18.0f, colour::text);
 
         // Device and load.
         const auto& f = model.frame();

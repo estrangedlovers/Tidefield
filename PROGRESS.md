@@ -431,6 +431,18 @@ CI; every macOS CI run green on Apple Silicon.
 whether the auto master's target shape suits your material, how the new gestures
 feel, CPU on the M1 Pro under real load, and the app on your interface and controller.
 
+### Brand mark (after 1.2.0)
+
+- The logo is drawn in code: `src/app/gui/Logo.h` defines the layered-tide tile as
+  four cubic tide lines over five colours (juce_graphics only). The header draws the
+  mark and the lowercase wordmark in Quicksand Medium (OFL, embedded, used for the
+  wordmark only; Inter stays the interface face).
+- `tools/icon` (built with the app) regenerates `resources/icon/icon_1024.png` (macOS
+  icon grid: 824 px tile, 1024 canvas, drop shadow) and `logo.png` from the same
+  paths. The app and plugin pick the icon up through `ICON_BIG`.
+- Verified: self-test checks the wordmark typeface; header screenshot under Xvfb.
+  Not yet seen: the icon in the macOS Dock and Finder at small sizes.
+
 ### 1.2.0: tempo sync, gestures, projector, presets; a debugger's and optimiser's pass
 
 **Built**

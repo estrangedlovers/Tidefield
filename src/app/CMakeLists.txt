@@ -13,8 +13,9 @@ juce_add_gui_app(Tidefield
     # it failing at launch.
     PLIST_TO_MERGE "<plist><dict><key>LSMinimumSystemVersion</key><string>${CMAKE_OSX_DEPLOYMENT_TARGET}</string></dict></plist>")
 
-# Built-in sounds (synthesized by tools/scripts/make_samples.py) and the Inter
-# typeface (SIL Open Font License, resources/fonts/Inter-LICENSE.txt), compiled in.
+# Built-in sounds (synthesized by tools/scripts/make_samples.py), the Inter
+# typeface and Quicksand for the wordmark (both SIL Open Font License, licences in
+# resources/fonts), compiled in.
 file(GLOB _library_samples CONFIGURE_DEPENDS ${CMAKE_SOURCE_DIR}/resources/samples/library/*.wav)
 juce_add_binary_data(TidefieldBinaryData SOURCES
     ${CMAKE_SOURCE_DIR}/resources/samples/glass.wav
@@ -24,7 +25,8 @@ juce_add_binary_data(TidefieldBinaryData SOURCES
     ${_library_samples}
     ${CMAKE_SOURCE_DIR}/resources/fonts/Inter-Regular.ttf
     ${CMAKE_SOURCE_DIR}/resources/fonts/Inter-Medium.ttf
-    ${CMAKE_SOURCE_DIR}/resources/fonts/Inter-SemiBold.ttf)
+    ${CMAKE_SOURCE_DIR}/resources/fonts/Inter-SemiBold.ttf
+    ${CMAKE_SOURCE_DIR}/resources/fonts/Quicksand-Medium.ttf)
 
 # Everything above the engine that the app and the plugin share: the app core, the
 # factory content and the native interface. An INTERFACE library like tidefield_io,
@@ -107,3 +109,6 @@ if(TIDEFIELD_BUILD_PLUGIN)
 
     add_subdirectory(${CMAKE_SOURCE_DIR}/tools/plugincheck ${CMAKE_BINARY_DIR}/tools/plugincheck)
 endif()
+
+# Regenerates resources/icon from gui/Logo.h (not part of the build of the app).
+add_subdirectory(${CMAKE_SOURCE_DIR}/tools/icon ${CMAKE_BINARY_DIR}/tools/icon)

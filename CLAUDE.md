@@ -83,7 +83,9 @@ pass `-DTIDEFIELD_BUILD_APP=ON` (needs ALSA/X11 headers) to compile-check it.
 ## Interface (src/app/gui)
 
 Native JUCE drawing in C++, one typeface (Inter, embedded), palette and metrics in
-`gui/Style.h`. Shared by the app and the plugin (`tidefield_app_core`).
+`gui/Style.h`. The logo lives in `gui/Logo.h` (Quicksand for the wordmark only);
+after changing it, regenerate the icons with `tidefield_icon resources/icon
+resources/fonts/Quicksand-Medium.ttf`. Shared by the app and the plugin (`tidefield_app_core`).
 - Controls bind to a parameter through `Model` (`gui/Model.h`): `Knob`, `Fader`,
   `Toggle`, `Choice`, `Pad`. They get MIDI learn, release, reset, hover help and the
   live/learn/pickup colours for free. A device page is a list of parameters in

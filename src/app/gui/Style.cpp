@@ -1,5 +1,7 @@
 #include "Style.h"
 
+#include "Logo.h"
+
 #include <BinaryData.h>
 
 namespace tf::app::gui {
@@ -11,6 +13,22 @@ juce::Font font(float size, int weight)
     static const auto semibold = juce::Typeface::createSystemTypefaceFor(BinaryData::InterSemiBold_ttf, BinaryData::InterSemiBold_ttfSize);
     const auto& face = weight >= 600 ? semibold : (weight >= 500 ? medium : regular);
     return juce::Font(juce::FontOptions(face).withHeight(size));
+}
+
+juce::Font brandFont(float size)
+{
+    static const auto face = juce::Typeface::createSystemTypefaceFor(BinaryData::QuicksandMedium_ttf, BinaryData::QuicksandMedium_ttfSize);
+    return juce::Font(juce::FontOptions(face).withHeight(size));
+}
+
+void drawWordmark(juce::Graphics& g, juce::Rectangle<float> r, float markSize, juce::Colour textColour)
+{
+    logo::drawMark(g, r.removeFromLeft(markSize).withSizeKeepingCentre(markSize, markSize));
+    r.removeFromLeft(markSize * 0.42f);
+    g.setColour(textColour);
+    // Quicksand sits low in its box; nudge it up so the x-height centres on the mark.
+    g.setFont(brandFont(markSize * 1.02f));
+    g.drawText("tidefield", r.translated(0.0f, -markSize * 0.06f), juce::Justification::centredLeft, false);
 }
 
 void drawPanel(juce::Graphics& g, juce::Rectangle<float> r, const juce::String& title, juce::Colour titleColour)

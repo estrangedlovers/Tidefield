@@ -1,5 +1,7 @@
 # Tidefield
 
+<img src="resources/icon/logo.png" alt="tidefield" width="240">
+
 A desktop instrument for performing ambient music live. There are no tracks and no
 timeline. A small ecosystem of sound sources drifts on its own, and you steer the
 whole of it: where it sits on the terrain, how fast time moves, which key it settles

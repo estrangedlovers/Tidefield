@@ -343,6 +343,7 @@ public:
             menu.addItem(4, "Save as...");
             menu.addSeparator();
             menu.addItem(5, "Projector window (Cmd+P)", true, view.isProjectorOpen());
+            menu.addItem(6, "Settings...  (Cmd+,)");
             menu.addSeparator();
             menu.addItem(8, "Undo " + model.core.undo.getUndoDescription() + "  (Cmd+Z)", model.core.undo.canUndo());
             menu.addItem(9, "Redo " + model.core.undo.getRedoDescription() + "  (Shift+Cmd+Z)", model.core.undo.canRedo());
@@ -362,6 +363,7 @@ public:
                 else if (r == 3) s.save();
                 else if (r == 4) s.saveAs();
                 else if (r == 5) view.toggleProjector();
+                else if (r == 6) view.openSettings();
                 else if (r == 8) model.core.undo.undo();
                 else if (r == 9) model.core.undo.redo();
                 else if (r >= kThemeMenuBase && r < kThemeMenuBase + static_cast<int>(kThemes.size()))
@@ -377,11 +379,10 @@ public:
         panic.onClick = [this] { model.engine.command(model.frame().panicActive ? engine::Command::ResumeFromPanic : engine::Command::Panic); };
         keys.setHelp(&model, "play Bloom from the computer keyboard: A W S E D F T G Y H U J K, Z/X octave, C/V velocity (M)");
         keys.onClick = [this] { view.noteMode = ! view.noteMode; };
-        audio.setHelp(&model, "audio device, sample rate and buffer size");
-        audio.onClick = [this] { view.showAudioSettings(); };
+        audio.setHelp(&model, "theme, zoom, audio device, MIDI and sync, plug-in folders, files, recording and rendering (Cmd+,)");
+        audio.onClick = [this] { view.openSettings(); };
         for (auto* c : std::initializer_list<juce::Component*> { &sessionButton, &fade, &panic, &keys, &audio, &meter, &rec, &autoMaster, &tempo })
             addAndMakeVisible(c);
-        audio.setVisible(model.core.host.getDeviceManager() != nullptr);
     }
     ~TopBar() override { model.remove(this); }
 
@@ -422,7 +423,7 @@ public:
         r.removeFromLeft(14);
         tempo.setBounds(r.removeFromLeft(156));
 
-        audio.setBounds(r.removeFromRight(58));
+        audio.setBounds(r.removeFromRight(72));
         r.removeFromRight(8);
         meter.setBounds(r.removeFromRight(150).reduced(0, 4));
         r.removeFromRight(10);
@@ -460,7 +461,7 @@ private:
     Model& model;
     MainView& view;
     FlatButton sessionButton { "Untitled" }, fade { "Fade in", colour::good() }, panic { "Panic", colour::warn() }, keys { "Keys", colour::tide() },
-        audio { "Audio" };
+        audio { "Settings" };
     Meter meter;
     RecordButton rec;
     Toggle autoMaster;
@@ -1079,7 +1080,10 @@ MainView::MainView(AppCore& c) : core(c), model(c)
 
     buildInterface();
 
-    model.onHover = [this](const juce::String& h) { status->setHelp(h); };
+    model.onHover = [this](const juce::String& h) {
+        if (hoverHelpEnabled(core))
+            status->setHelp(h);
+    };
     core.onStatus = [this](const juce::String& m, bool warning) { status->showMessage(m, warning); };
     core.onSessionChanged = [this] {
         if (auto* w = findParentComponentOfClass<juce::DocumentWindow>())
@@ -1098,6 +1102,7 @@ MainView::MainView(AppCore& c) : core(c), model(c)
 
 MainView::~MainView()
 {
+    closeSettings();
     stopTimer();
     projector.reset();
     vblank.reset();
@@ -1328,7 +1333,9 @@ bool MainView::keyPressed(const juce::KeyPress& key)
         else if (code == 'N')
             core.session.newSession();
         else if (code == ',')
-            showAudioSettings();
+            openSettings();
+        else if (code == '=' || code == '+' || code == '-' || code == '0')
+            setInterfaceScale(core, code == '0' ? 1.0f : interfaceScale(core) + (code == '-' ? -0.1f : 0.1f));
         else if (code == 'P')
             toggleProjector();
         else
@@ -1534,19 +1541,19 @@ void MainView::loadFactory(int soundIndex, int slot)
     });
 }
 
-void MainView::showAudioSettings()
+bool MainView::performKey(const juce::KeyPress& key)
 {
-    auto* devices = core.host.getDeviceManager();
-    if (devices == nullptr)
-        return;
-    auto selector = std::make_unique<juce::AudioDeviceSelectorComponent>(*devices, 0, 2, 2, 8, false, false, false, false);
-    selector->setSize(540, 440);
-    juce::DialogWindow::LaunchOptions options;
-    options.content.setOwned(selector.release());
-    options.dialogTitle = "Audio Settings";
-    options.dialogBackgroundColour = colour::panel();
-    options.useNativeTitleBar = true;
-    options.resizable = false;
-    options.launchAsync();
+    const bool notes = noteMode;
+    const bool togglesNotes = juce::CharacterFunctions::toUpperCase(static_cast<juce::juce_wchar>(key.getKeyCode())) == 'M';
+    if (! togglesNotes)
+        noteMode = false;
+    const bool handled = keyPressed(key);
+    if (! togglesNotes)
+        noteMode = notes;
+    return handled;
 }
+
+void MainView::showAudioSettings() { openSettings(SettingsTab::Audio); }
+
+void MainView::openSettings(SettingsTab tab) { gui::openSettings(*this, model, tab); }
 }

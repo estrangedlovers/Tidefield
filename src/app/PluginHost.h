@@ -37,7 +37,19 @@ public:
     int getListVersion() const noexcept { return listVersion; }
 
     void startScan();
+    void clearAndRescan();
     int scanNow(const juce::FileSearchPath& paths);
+
+    juce::StringArray formatNames() const;
+    bool isFormatEnabled(const juce::String& format) const;
+    void setFormatEnabled(const juce::String& format, bool enabled);
+    bool usesSystemFolders() const;
+    void setUseSystemFolders(bool use);
+    juce::StringArray getCustomFolders() const;
+    void setCustomFolders(const juce::StringArray& folders);
+    juce::StringArray skippedPlugins() const;
+    void retrySkipped();
+    int numEffects() const { return static_cast<int>(effects().size()); }
     bool isScanning() const noexcept { return scanner != nullptr || ! formatsToScan.empty(); }
     float scanProgress() const noexcept { return progress; }
 

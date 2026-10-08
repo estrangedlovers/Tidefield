@@ -5,6 +5,9 @@
 namespace tf::app {
 namespace {
 constexpr const char* kKnownKey = "knownPlugins";
+constexpr const char* kFoldersKey = "pluginFolders";
+constexpr const char* kSystemFoldersKey = "pluginSystemFolders";
+constexpr const char* kFormatKeyPrefix = "pluginFormat.";
 constexpr int kMaxControls = 6;
 
 constexpr const char* kChoicePrefix = "map=";
@@ -172,7 +175,7 @@ std::vector<juce::PluginDescription> PluginHost::effects() const
 {
     std::vector<juce::PluginDescription> out;
     for (const auto& d : known.getTypes())
-        if (! d.isInstrument)
+        if (! d.isInstrument && isFormatEnabled(d.pluginFormatName))
             out.push_back(d);
     std::sort(out.begin(), out.end(), [](const auto& a, const auto& b) {
         const int m = a.manufacturerName.compareIgnoreCase(b.manufacturerName);
@@ -190,15 +193,76 @@ void PluginHost::startScan()
         return;
     formatsToScan.clear();
     for (auto* f : formats.getFormats())
-        formatsToScan.push_back(f);
+        if (isFormatEnabled(f->getName()))
+            formatsToScan.push_back(f);
     if (formatsToScan.empty())
     {
-        status("This build cannot host plugins.", true);
+        status(formats.getNumFormats() == 0 ? "This build cannot host plugins." : "Every plugin format is turned off in Settings.", true);
         return;
     }
     progress = 0.0f;
     status("Looking for plugins...");
     beginNextFormat();
+}
+
+void PluginHost::clearAndRescan()
+{
+    if (isScanning())
+        return;
+    known.clear();
+    ++listVersion;
+    startScan();
+}
+
+juce::StringArray PluginHost::formatNames() const
+{
+    juce::StringArray names;
+    for (auto* f : formats.getFormats())
+        names.add(f->getName());
+    return names;
+}
+
+bool PluginHost::isFormatEnabled(const juce::String& format) const { return settings.getBoolValue(kFormatKeyPrefix + format, true); }
+
+void PluginHost::setFormatEnabled(const juce::String& format, bool enabled)
+{
+    settings.setValue(kFormatKeyPrefix + format, enabled);
+    settings.saveIfNeeded();
+    ++listVersion;
+    if (onListChanged)
+        onListChanged();
+}
+
+bool PluginHost::usesSystemFolders() const { return settings.getBoolValue(kSystemFoldersKey, true); }
+
+void PluginHost::setUseSystemFolders(bool use)
+{
+    settings.setValue(kSystemFoldersKey, use);
+    settings.saveIfNeeded();
+}
+
+juce::StringArray PluginHost::getCustomFolders() const
+{
+    auto folders = juce::StringArray::fromLines(settings.getValue(kFoldersKey));
+    folders.removeEmptyStrings();
+    return folders;
+}
+
+void PluginHost::setCustomFolders(const juce::StringArray& folders)
+{
+    settings.setValue(kFoldersKey, folders.joinIntoString("\n"));
+    settings.saveIfNeeded();
+}
+
+juce::StringArray PluginHost::skippedPlugins() const { return known.getBlacklistedFiles(); }
+
+void PluginHost::retrySkipped()
+{
+    known.clearBlacklistedFiles();
+    crashFile.deleteFile();
+    if (auto xml = known.createXml())
+        settings.setValue(kKnownKey, xml.get());
+    startScan();
 }
 
 int PluginHost::scanNow(const juce::FileSearchPath& paths)
@@ -224,7 +288,14 @@ void PluginHost::beginNextFormat()
         return finishScan();
     auto* format = formatsToScan.front();
     formatsToScan.erase(formatsToScan.begin());
-    scanner = std::make_unique<juce::PluginDirectoryScanner>(known, *format, format->getDefaultLocationsToSearch(), true, crashFile, false);
+    juce::FileSearchPath paths;
+    if (usesSystemFolders())
+        paths = format->getDefaultLocationsToSearch();
+    if (format->canScanForPlugins() && format->getDefaultLocationsToSearch().getNumPaths() > 0)
+        for (const auto& folder : getCustomFolders())
+            if (juce::File::isAbsolutePath(folder) && juce::File(folder).isDirectory())
+                paths.addIfNotAlreadyThere(juce::File(folder));
+    scanner = std::make_unique<juce::PluginDirectoryScanner>(known, *format, paths, true, crashFile, false);
     startTimer(15);
 }
 

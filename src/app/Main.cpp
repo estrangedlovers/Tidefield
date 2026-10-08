@@ -1,4 +1,5 @@
 #include "AppCore.h"
+#include "gui/Settings.h"
 #include "AudioHost.h"
 #include "FactoryContent.h"
 #include "gui/MainView.h"
@@ -169,6 +170,205 @@ public:
     void closeButtonPressed() override { juce::JUCEApplication::getInstance()->systemRequestedQuit(); }
 };
 
+class AppMenu final : public juce::MenuBarModel
+{
+public:
+    AppMenu(AppCore& c, std::function<gui::MainView*()> v) : core(c), view(std::move(v)) {}
+
+    enum Id
+    {
+        about = 1, settings, newSession, open, save, saveAs, savePerformance, renderPerformance, renderLoop, record, showRecordings, clearRecent,
+        undo, redo, capture, release, projector, zoomIn, zoomOut, zoomReset, fullScreen, fade, panic, keys, take, catchNow, freeze, loop,
+        cycles, path, manual, shortcuts, recentBase = 1000, pageBase = 2000, themeBase = 3000, sceneBase = 4000
+    };
+
+    juce::StringArray getMenuBarNames() override { return { "File", "Edit", "View", "Play", "Help" }; }
+
+    juce::PopupMenu getMenuForIndex(int index, const juce::String&) override
+    {
+        juce::PopupMenu m;
+        auto key = [](juce::PopupMenu& menu, int id, const juce::String& text, const juce::String& shortcut, bool enabled = true, bool ticked = false) {
+            juce::PopupMenu::Item item(text);
+            item.itemID = id;
+            item.isEnabled = enabled;
+            item.isTicked = ticked;
+            item.shortcutKeyDescription = shortcut;
+            menu.addItem(item);
+        };
+        auto* v = view();
+        if (index == 0)
+        {
+            key(m, newSession, "New Session", juce::String::fromUTF8("\xe2\x8c\x98N"));
+            key(m, open, "Open...", juce::String::fromUTF8("\xe2\x8c\x98O"));
+            juce::PopupMenu recent;
+            const auto list = core.recentSessions();
+            for (int i = 0; i < list.size(); ++i)
+                recent.addItem(recentBase + i, juce::File(list[i]).getFileNameWithoutExtension(), juce::File(list[i]).existsAsFile());
+            if (! list.isEmpty())
+            {
+                recent.addSeparator();
+                recent.addItem(clearRecent, "Clear Menu");
+            }
+            m.addSubMenu("Open Recent", recent, ! list.isEmpty());
+            m.addSeparator();
+            key(m, save, "Save", juce::String::fromUTF8("\xe2\x8c\x98S"));
+            key(m, saveAs, "Save As...", juce::String::fromUTF8("\xe2\x87\xa7\xe2\x8c\x98S"));
+            m.addSeparator();
+            const bool hasPerformance = ! core.performance.get().empty();
+            m.addItem(savePerformance, "Save Performance...", hasPerformance);
+            m.addItem(renderPerformance, "Render Performance...", hasPerformance && ! core.performance.isRendering());
+            m.addItem(renderLoop, "Render a 5-Minute Loop of the Sound...", ! core.performance.isRendering());
+            m.addSeparator();
+            const bool recording = core.recorder.getStatus().state == io::Recorder::State::Recording;
+            key(m, record, recording ? "Stop Recording" : "Start Recording", juce::String::fromUTF8("\xe2\x87\xa7R"));
+            m.addItem(showRecordings, "Show Recordings");
+        }
+        else if (index == 1)
+        {
+            key(m, undo, core.undo.canUndo() ? "Undo " + core.undo.getUndoDescription() : juce::String("Undo"), juce::String::fromUTF8("\xe2\x8c\x98Z"),
+                core.undo.canUndo());
+            key(m, redo, core.undo.canRedo() ? "Redo " + core.undo.getRedoDescription() : juce::String("Redo"),
+                juce::String::fromUTF8("\xe2\x87\xa7\xe2\x8c\x98Z"), core.undo.canRedo());
+            m.addSeparator();
+            key(m, capture, "Capture Scene at Cursor", "C");
+            key(m, release, "Release Held Controls", "R");
+        }
+        else if (index == 2)
+        {
+            juce::PopupMenu pages;
+            for (int p = 0; p < gui::DeviceView::NumPages; ++p)
+                pages.addItem(pageBase + p, gui::DeviceView::pageName(p), true, v != nullptr && v->getPage() == p);
+            m.addSubMenu("Device Tab", pages);
+            juce::PopupMenu themes;
+            for (bool light : { false, true })
+            {
+                themes.addSectionHeader(light ? "Light" : "Dark");
+                for (std::size_t i = 0; i < gui::kThemes.size(); ++i)
+                    if (gui::themeIsLight(gui::kThemes[i]) == light)
+                        themes.addItem(themeBase + static_cast<int>(i), gui::themeName(gui::kThemes[i]), true, gui::theme() == gui::kThemes[i]);
+            }
+            m.addSubMenu("Theme", themes);
+            m.addSeparator();
+            key(m, zoomIn, "Zoom In", juce::String::fromUTF8("\xe2\x8c\x98+"));
+            key(m, zoomOut, "Zoom Out", juce::String::fromUTF8("\xe2\x8c\x98-"));
+            key(m, zoomReset, "Actual Size", juce::String::fromUTF8("\xe2\x8c\x98""0"));
+            m.addSeparator();
+            key(m, projector, "Projector Window", juce::String::fromUTF8("\xe2\x8c\x98P"), v != nullptr, v != nullptr && v->isProjectorOpen());
+            m.addItem(fullScreen, "Full Screen");
+        }
+        else if (index == 3)
+        {
+            const auto& f = core.latest();
+            key(m, fade, f.fadeState == engine::FadeState::Silent || f.fadeState == engine::FadeState::FadingOut ? "Fade In" : "Fade Out", "Space");
+            key(m, panic, f.panicActive ? "Resume from Panic" : "Panic", "Esc");
+            m.addSeparator();
+            juce::PopupMenu scenes;
+            const auto& list = core.scenes.getScenes();
+            for (std::size_t i = 0; i < list.size(); ++i)
+                scenes.addItem(sceneBase + static_cast<int>(i), juce::String(list[i].name) + (i < 9 ? "    " + juce::String(static_cast<int>(i) + 1) : juce::String()));
+            m.addSubMenu("Glide to Scene", scenes, ! list.empty());
+            m.addSeparator();
+            key(m, keys, "Computer Keyboard Plays Bloom", "M", true, v != nullptr && v->noteMode);
+            key(m, take, "Take: Record, Stop, Play", "G");
+            key(m, catchNow, "Catch the Last Seconds", "K");
+            key(m, freeze, "Freeze All", "F");
+            key(m, loop, "Tape Loop: Record, Close, Overdub", "L");
+            key(m, cycles, "Cycles On or Off", "E");
+            key(m, path, "Draw a Path", "P");
+        }
+        else if (index == 4)
+        {
+            m.addItem(manual, "Tidefield Manual");
+            m.addItem(shortcuts, "Keyboard Shortcuts");
+            m.addSeparator();
+            m.addItem(about, "About Tidefield");
+        }
+        return m;
+    }
+
+    void menuItemSelected(int id, int) override
+    {
+        auto* v = view();
+        auto press = [v](int code, juce::ModifierKeys mods = {}) {
+            if (v != nullptr)
+                v->performKey(juce::KeyPress(code, mods, 0));
+        };
+        auto& s = core.session;
+        if (id >= themeBase && id < themeBase + static_cast<int>(gui::kThemes.size()))
+            return gui::MainView::switchTheme(core, gui::kThemes[static_cast<std::size_t>(id - themeBase)]);
+        if (id >= pageBase && id < pageBase + static_cast<int>(gui::DeviceView::NumPages))
+            return v != nullptr ? v->showPage(id - pageBase) : void();
+        if (id >= sceneBase && id < sceneBase + 1000)
+            return v != nullptr ? v->glideTo(id - sceneBase) : void();
+        if (id >= recentBase && id < recentBase + 100)
+        {
+            const auto list = core.recentSessions();
+            if (id - recentBase < list.size())
+                s.openFile(juce::File(list[id - recentBase]));
+            return;
+        }
+        switch (id)
+        {
+            case about: if (v != nullptr) v->openSettings(gui::SettingsTab::About); break;
+            case settings: if (v != nullptr) v->openSettings(); break;
+            case newSession: s.newSession(); break;
+            case open: s.open(); break;
+            case save: s.save(); break;
+            case saveAs: s.saveAs(); break;
+            case savePerformance: core.performance.save(); break;
+            case renderPerformance: core.performance.render(core.getRecordStems(), 0.0); break;
+            case renderLoop: core.performance.renderSoundAsLoop(300.0, 8.0); break;
+            case record: core.toggleRecording(); break;
+            case showRecordings:
+                core.getRecordingsFolder().createDirectory();
+                core.getRecordingsFolder().revealToUser();
+                break;
+            case clearRecent: core.clearRecentSessions(); break;
+            case undo: core.undo.undo(); break;
+            case redo: core.undo.redo(); break;
+            case capture: press('c'); break;
+            case release: press('r'); break;
+            case zoomIn: gui::setInterfaceScale(core, gui::interfaceScale(core) + 0.1f); break;
+            case zoomOut: gui::setInterfaceScale(core, gui::interfaceScale(core) - 0.1f); break;
+            case zoomReset: gui::setInterfaceScale(core, 1.0f); break;
+            case projector: if (v != nullptr) v->toggleProjector(); break;
+            case fullScreen:
+                if (v != nullptr)
+                    if (auto* w = dynamic_cast<juce::ResizableWindow*>(v->getTopLevelComponent()))
+                        w->setFullScreen(! w->isFullScreen());
+                break;
+            case fade: press(juce::KeyPress::spaceKey); break;
+            case panic: press(juce::KeyPress::escapeKey); break;
+            case keys: press('m'); break;
+            case take: press('g'); break;
+            case catchNow: press('k'); break;
+            case freeze: press('f'); break;
+            case loop: press('l'); break;
+            case cycles: press('e'); break;
+            case path: press('p'); break;
+            case manual: juce::URL("https://github.com/estrangedlovers/Tidefield/blob/main/docs/MANUAL.md").launchInDefaultBrowser(); break;
+            case shortcuts: juce::URL("https://github.com/estrangedlovers/Tidefield/blob/main/docs/MANUAL.md#23-keyboard-reference").launchInDefaultBrowser(); break;
+            default: break;
+        }
+    }
+
+    juce::PopupMenu appleMenu()
+    {
+        juce::PopupMenu m;
+        m.addItem(about, "About Tidefield");
+        m.addSeparator();
+        juce::PopupMenu::Item item("Settings...");
+        item.itemID = settings;
+        item.shortcutKeyDescription = juce::String::fromUTF8("\xe2\x8c\x98,");
+        m.addItem(item);
+        return m;
+    }
+
+private:
+    AppCore& core;
+    std::function<gui::MainView*()> view;
+};
+
 class TidefieldApplication final : public juce::JUCEApplication
 {
 public:
@@ -195,8 +395,16 @@ public:
         host = std::make_unique<AudioHost>(*settings.getUserSettings(), commandLine.contains("--null-audio"));
         core = std::make_unique<AppCore>(*host);
 
+        gui::setInterfaceScale(*core, gui::interfaceScale(*core));
         auto* view = new gui::MainView(*core);
         window = std::make_unique<MainWindow>(getApplicationName() + " - " + core->session.getName(), view);
+        menu = std::make_unique<AppMenu>(*core, [this]() -> gui::MainView* {
+            return window != nullptr ? dynamic_cast<gui::MainView*>(window->getContentComponent()) : nullptr;
+        });
+#if JUCE_MAC
+        appleMenu = menu->appleMenu();
+        juce::MenuBarModel::setMacMainMenu(menu.get(), &appleMenu);
+#endif
 
         if (const auto page = commandLine.fromFirstOccurrenceOf("--page=", false, false).upToFirstOccurrenceOf(" ", false, false); page.isNotEmpty())
             juce::Timer::callAfterDelay(300, [this, page] {
@@ -205,8 +413,19 @@ public:
                         if (gui::DeviceView::pageName(p).equalsIgnoreCase(page))
                             v->showPage(p);
             });
+        if (const auto tab = commandLine.fromFirstOccurrenceOf("--settings=", false, false).upToFirstOccurrenceOf(" ", false, false); tab.isNotEmpty())
+            juce::Timer::callAfterDelay(400, [this, tab] {
+                if (auto* v = window != nullptr ? dynamic_cast<gui::MainView*>(window->getContentComponent()) : nullptr)
+                    v->openSettings(static_cast<gui::SettingsTab>(juce::jlimit(0, static_cast<int>(gui::SettingsTab::Count) - 1, tab.getIntValue())));
+            });
         if (commandLine.contains("--ui-test"))
         {
+            for (int t = 0; t < static_cast<int>(gui::SettingsTab::Count); ++t)
+                juce::Timer::callAfterDelay(300 + t * 60, [this, t] {
+                    if (auto* v = window != nullptr ? dynamic_cast<gui::MainView*>(window->getContentComponent()) : nullptr)
+                        v->openSettings(static_cast<gui::SettingsTab>(t));
+                });
+            juce::Timer::callAfterDelay(300 + static_cast<int>(gui::SettingsTab::Count) * 60 + 40, [] { gui::closeSettings(); });
             juce::Timer::callAfterDelay(500, [this] {
                 if (window != nullptr)
                     if (auto* v = dynamic_cast<gui::MainView*>(window->getContentComponent()))
@@ -232,7 +451,7 @@ public:
                 if (auto* v = window != nullptr ? dynamic_cast<gui::MainView*>(window->getContentComponent()) : nullptr)
                     if (v->isProjectorOpen())
                         v->toggleProjector();
-                std::cout << "UI test passed: every page shown, every theme, projector opened and closed" << std::endl;
+                std::cout << "UI test passed: every page and settings tab shown, every theme, projector opened and closed" << std::endl;
                 systemRequestedQuit();
             });
         }
@@ -240,6 +459,10 @@ public:
 
     void shutdown() override
     {
+#if JUCE_MAC
+        juce::MenuBarModel::setMacMainMenu(nullptr);
+#endif
+        menu.reset();
         window.reset();
         core.reset();
         host.reset();
@@ -253,6 +476,8 @@ private:
     std::unique_ptr<AudioHost> host;
     std::unique_ptr<AppCore> core;
     std::unique_ptr<MainWindow> window;
+    std::unique_ptr<AppMenu> menu;
+    juce::PopupMenu appleMenu;
 };
 }
 

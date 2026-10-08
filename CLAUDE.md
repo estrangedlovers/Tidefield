@@ -86,8 +86,8 @@ Native JUCE drawing in C++, one typeface (Inter, embedded), palette and metrics 
 `gui/Style.h`. The logo lives in `gui/Logo.h` (Quicksand for the wordmark only);
 after changing it, regenerate the icons with `tidefield_icon resources/icon
 resources/fonts/Quicksand-Medium.ttf`.
-- Ten themes, six dark and four light (`kThemeInfo` in `gui/Style.cpp`, switched from the
-  session menu's Appearance). A new theme is one `Palette` and one row there; a light
+- Sixteen themes, ten dark and six light (`kThemeInfo` in `gui/Style.cpp`, switched from
+  Settings > Look and Feel, View > Theme or the session menu's Appearance). A new theme is one `Palette` and one row there; a light
   one names the dark palette its displays use. Panel colours come from `colour::`; anything drawn inside a dark display (the
   terrain, meters, waveforms, faders, readouts) uses `display::`, which stays the same in
   both themes. Hover and press states use `colour::lift`, never `brighter()` directly.
@@ -104,6 +104,9 @@ resources/fonts/Quicksand-Medium.ttf`.
 - `Tidefield --null-audio` runs the engine without a sound device, so the interface
   animates under Xvfb (screenshots, CPU measurement). Build with
   `-DJUCE_ENABLE_REPAINT_DEBUGGING=1` to see what repaints.
+- Preferences live in `gui/Settings.cpp`: one tab per area, each a `FormPage` of labelled
+  rows. The macOS menu bar is `AppMenu` in `Main.cpp`; its Play items call
+  `MainView::performKey` so menu and keyboard share one path.
 - Keys live in `MainView::keyPressed`; standalone every key is consumed (no macOS
   beep), in a plugin leave Space and unused keys to the DAW.
 - Check the look under Xvfb on Linux: build with `-DTIDEFIELD_BUILD_APP=ON`, run the

@@ -82,6 +82,14 @@ public:
     void setRecordingsFolder(const juce::File& folder);
     juce::File getLastRecording() const { return recorder.getStatus().folder; }
 
+    juce::StringArray recentSessions() const;
+    void rememberSession(const juce::File& file);
+    void clearRecentSessions();
+    bool getOpenLastSession() const;
+    void setOpenLastSession(bool open);
+    double getRenderSampleRate() const;
+    void setRenderSampleRate(double rate);
+
 private:
     void timerCallback() override;
     void loadRigMidi();

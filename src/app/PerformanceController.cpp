@@ -277,7 +277,7 @@ void PerformanceController::startRender(std::shared_ptr<const io::Performance> c
         io::RenderOptions options;
         options.folder = folder;
         options.stems = stems;
-        options.sampleRate = copy->sampleRate;
+        options.sampleRate = core.getRenderSampleRate();
         options.loopCrossfadeSeconds = loopCrossfadeSeconds;
         options.cancel = &cancel;
         options.onProgress = [this](float p) { progress.store(p); };

@@ -58,6 +58,8 @@ AppCore::AppCore(Host& h)
     };
     session.onSessionChanged = [this] {
         undo.clearUndoHistory();
+        if (session.getFile() != juce::File())
+            rememberSession(session.getFile());
         if (onSessionChanged)
             onSessionChanged();
     };
@@ -79,6 +81,9 @@ AppCore::AppCore(Host& h)
         };
         installation = std::make_unique<Installation>(*this);
         installation->launch();
+        if (! installation->isEnabled() && getOpenLastSession())
+            if (const auto recent = recentSessions(); ! recent.isEmpty() && juce::File(recent[0]).existsAsFile())
+                session.openFile(juce::File(recent[0]));
     }
     startTimerHz(30);
 }
@@ -106,6 +111,50 @@ juce::File AppCore::getRecordingsFolder() const
 void AppCore::setRecordingsFolder(const juce::File& folder)
 {
     host.getSettings().setValue("recordingsFolder", folder.getFullPathName());
+    host.getSettings().saveIfNeeded();
+}
+
+juce::StringArray AppCore::recentSessions() const
+{
+    auto list = juce::StringArray::fromLines(host.getSettings().getValue("recentSessions"));
+    list.removeEmptyStrings();
+    return list;
+}
+
+void AppCore::rememberSession(const juce::File& file)
+{
+    auto list = recentSessions();
+    list.removeString(file.getFullPathName());
+    list.insert(0, file.getFullPathName());
+    while (list.size() > 12)
+        list.remove(list.size() - 1);
+    host.getSettings().setValue("recentSessions", list.joinIntoString("\n"));
+    host.getSettings().saveIfNeeded();
+}
+
+void AppCore::clearRecentSessions()
+{
+    host.getSettings().setValue("recentSessions", juce::String());
+    host.getSettings().saveIfNeeded();
+}
+
+bool AppCore::getOpenLastSession() const { return host.getSettings().getBoolValue("openLastSession", false); }
+
+void AppCore::setOpenLastSession(bool open)
+{
+    host.getSettings().setValue("openLastSession", open);
+    host.getSettings().saveIfNeeded();
+}
+
+double AppCore::getRenderSampleRate() const
+{
+    const double rate = host.getSettings().getDoubleValue("renderSampleRate", 48000.0);
+    return rate == 44100.0 || rate == 48000.0 || rate == 96000.0 ? rate : 48000.0;
+}
+
+void AppCore::setRenderSampleRate(double rate)
+{
+    host.getSettings().setValue("renderSampleRate", rate);
     host.getSettings().saveIfNeeded();
 }
 

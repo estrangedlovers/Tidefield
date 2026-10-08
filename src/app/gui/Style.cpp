@@ -92,6 +92,56 @@ const Palette kDaylight {
     true,
 };
 
+const Palette kMidnight {
+    C(0xff141a2b), C(0xff1c2438), C(0xff28324b), C(0xff212a40), C(0xff0b101c), C(0xff1d2840), C(0xff10172a), C(0xff0b101c),
+    C(0xffeef1f8), C(0xffb3bccf), C(0xff7a86a0), C(0xffeef1f8), C(0xff95a1bb),
+    C(0xffe6c068), C(0xff7fa8ff), C(0xfff3dd8a), C(0xffff8fc8), C(0xffff6b6b), C(0xff8ddc9a),
+    { { C(0xffe6c068), C(0xff7fa8ff), C(0xffb39cff), C(0xfff0a85a), C(0xff6fd0f0),
+        C(0xffff8fc8), C(0xff8ddc9a), C(0xffff8a70), C(0xffb8d8ff), C(0xffd2b48c) } },
+};
+
+const Palette kMoss {
+    C(0xff1f2a24), C(0xff28352e), C(0xff35453c), C(0xff2e3c34), C(0xff111814), C(0xff22302a), C(0xff19221d), C(0xff111814),
+    C(0xffeef2ec), C(0xffbccab9), C(0xff86978a), C(0xffeef2ec), C(0xffa0b2a4),
+    C(0xffc9d66b), C(0xff7cc9b0), C(0xffeed98a), C(0xffe59ac4), C(0xffe8735f), C(0xff9fd77f),
+    { { C(0xffc9d66b), C(0xff7cc9b0), C(0xffa9a2e0), C(0xffe8c46a), C(0xff7fb6d9),
+        C(0xffe59ac4), C(0xff9fd77f), C(0xffe8936a), C(0xffb0e3d0), C(0xffc4aa82) } },
+};
+
+const Palette kDusk {
+    C(0xff2a2030), C(0xff35293c), C(0xff44364c), C(0xff3c2f43), C(0xff160f1a), C(0xff2d2033), C(0xff20172a), C(0xff160f1a),
+    C(0xfff7eef4), C(0xffd1bfcc), C(0xff9c879a), C(0xfff7eef4), C(0xffb7a2b4),
+    C(0xffff8a6b), C(0xff9fb6ff), C(0xffffd27a), C(0xffd99bff), C(0xffff5f6d), C(0xffa9de8c),
+    { { C(0xffff8a6b), C(0xff9fb6ff), C(0xffd99bff), C(0xffffd27a), C(0xff7fd0e8),
+        C(0xffff9ec4), C(0xffa9de8c), C(0xffff7a59), C(0xffc4e0ff), C(0xffd8b08f) } },
+};
+
+const Palette kMono {
+    C(0xff000000), C(0xff0d0d0d), C(0xff262626), C(0xff141414), C(0xff000000), C(0xff333333), C(0xff2a2a2a), C(0xff000000),
+    C(0xffffffff), C(0xffdddddd), C(0xffaaaaaa), C(0xffffffff), C(0xffcccccc),
+    C(0xffffd400), C(0xff00e5ff), C(0xffffff66), C(0xffff66ff), C(0xffff3b30), C(0xff4cd964),
+    { { C(0xffffd400), C(0xff00e5ff), C(0xffc28cff), C(0xffff9500), C(0xff5ac8fa),
+        C(0xffff66ff), C(0xff4cd964), C(0xffff3b30), C(0xffffffff), C(0xffd0b080) } },
+};
+
+const Palette kLinen {
+    C(0xffece6dc), C(0xfff7f3ec), C(0xffe7e0d4), C(0xfff0ebe2), C(0xff241c18), C(0xff362b25), C(0xffd2c9bb), C(0xffd6cdbf),
+    C(0xff2e241c), C(0xff5e5044), C(0xff8c7d70), C(0xfff3ebe2), C(0xffb1a294),
+    C(0xffb5562f), C(0xff2f7f78), C(0xffad8420), C(0xffa84f7a), C(0xffb8392d), C(0xff5c8239),
+    { { C(0xffb5562f), C(0xff2f7f78), C(0xff7a5fa8), C(0xffad8420), C(0xff3f72a3),
+        C(0xffa84f7a), C(0xff5c8239), C(0xff9c4a2e), C(0xff2f8b98), C(0xff86654a) } },
+    true,
+};
+
+const Palette kFrost {
+    C(0xffdde4ee), C(0xffeef2f8), C(0xffd5deea), C(0xffe5ebf3), C(0xff0b101c), C(0xff1d2840), C(0xffc3cddb), C(0xffc6d0de),
+    C(0xff17233a), C(0xff44526d), C(0xff75829a), C(0xffeef1f8), C(0xff95a1bb),
+    C(0xff2d5fc4), C(0xff1d8a8a), C(0xffa98410), C(0xffa3479a), C(0xffc4313d), C(0xff3f8a44),
+    { { C(0xff2d5fc4), C(0xff1d8a8a), C(0xff6a4fc0), C(0xffa98410), C(0xff2a7fb8),
+        C(0xffa3479a), C(0xff3f8a44), C(0xffb84a32), C(0xff2a95a8), C(0xff7f6748) } },
+    true,
+};
+
 struct ThemeInfo
 {
     Theme theme;
@@ -108,10 +158,16 @@ const std::array<ThemeInfo, kThemes.size()> kThemeInfo { {
     { Theme::ember, "ember", "Ember", kEmber, kEmber },
     { Theme::graphite, "graphite", "Graphite", kGraphite, kGraphite },
     { Theme::heather, "heather", "Heather", kHeather, kHeather },
+    { Theme::midnight, "midnight", "Midnight", kMidnight, kMidnight },
+    { Theme::moss, "moss", "Moss", kMoss, kMoss },
+    { Theme::dusk, "dusk", "Dusk", kDusk, kDusk },
+    { Theme::mono, "mono", "High contrast", kMono, kMono },
     { Theme::paper, "paper", "Paper", kPaper, kSlate },
     { Theme::dune, "dune", "Dune", kDune, kEmber },
     { Theme::seaGlass, "seaGlass", "Sea glass", kSeaGlass, kNightSwim },
     { Theme::daylight, "daylight", "Daylight", kDaylight, kGraphite },
+    { Theme::linen, "linen", "Linen", kLinen, kEmber },
+    { Theme::frost, "frost", "Frost", kFrost, kMidnight },
 } };
 
 const ThemeInfo& info(Theme t)

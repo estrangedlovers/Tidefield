@@ -2125,4 +2125,12 @@ void DeviceView::build()
     layoutRow();
     viewport.setViewPosition(0, 0);
 }
+std::unique_ptr<juce::Component> createRemoteView(Model& model) { return std::make_unique<RemoteView>(model); }
+
+std::unique_ptr<juce::Component> createInstallationView(Model& model)
+{
+    return model.core.installation != nullptr ? std::make_unique<InstallationView>(model) : nullptr;
+}
+
+std::unique_ptr<juce::Component> createSpaceView(Model& model) { return std::make_unique<SpaceView>(model); }
 }

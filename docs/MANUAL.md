@@ -33,7 +33,7 @@ VST3 plugin.
 18. [MIDI and remote control](#18-midi-and-remote-control)
 19. [Installation mode](#19-installation-mode)
 20. [The projector](#20-the-projector)
-21. [Appearance](#21-appearance)
+21. [Settings and appearance](#21-settings-and-appearance)
 22. [Tidefield in a DAW](#22-tidefield-in-a-daw)
 23. [Keyboard reference](#23-keyboard-reference)
 24. [Troubleshooting](#24-troubleshooting)
@@ -54,7 +54,7 @@ xattr -cr /Applications/Tidefield.app
 ```
 
 Allow microphone access when asked if you want to play an instrument or voice through
-the live input. Then click **Audio** in the top right (or press Cmd+,) and choose your
+the live input. Then click **Settings** in the top right (or press Cmd+,), open **Audio** and choose your
 audio interface, sample rate and buffer size. A buffer of 256 samples is a good start.
 
 **The plugins.** `Tidefield-Plugins-macOS-arm64.zip` holds an Audio Unit and a VST3.
@@ -125,7 +125,7 @@ controller in the direction of the arrow until it picks up.
 
 **The top bar.**
 
-- **Session name**: New, Open, Save, Save as, the projector window and Appearance.
+- **Session name**: New, Open, Save, Save as, the projector window, Settings and Appearance.
 - **Fade in / Fade out**: the same as Space.
 - **Panic**: silence now. See [Safety](#safety).
 - **Rec**: record to disk. Right-click for stems and the recordings folder.
@@ -134,7 +134,7 @@ controller in the direction of the arrow until it picks up.
 - **Sync, tempo and Tap**: see [Tempo sync](#tempo-sync).
 - **CPU**: the audio load. "lite 1" to "lite 5" means Tidefield is lightening its own
   load to stay glitch-free (see [Troubleshooting](#24-troubleshooting)).
-- **Audio**: the sound card, sample rate and buffer size.
+- **Settings**: every preference, in tabs (see [Settings](#21-settings-and-appearance)).
 
 ---
 
@@ -642,7 +642,7 @@ recorded on the timeline. Right-click a dot for its menu.
 - **Rotate** turns the whole field slowly around the room, up to 30 degrees a second
   in either direction.
 
-**Speaker setup.** Choose your interface under **Audio** and enable as many outputs as
+**Speaker setup.** Choose your interface in **Settings**, **Audio**, and enable as many outputs as
 you have speakers (up to eight). Connect them in the order the circle numbers them.
 If the interface has fewer outputs than the mode needs, Tidefield keeps playing in
 stereo and the panel says so.
@@ -904,10 +904,38 @@ main window.
 
 ---
 
-## 21. Appearance
+## 21. Settings and appearance
 
-Choose a theme from the session menu under **Appearance**. The terrain and meters stay
-dark in every theme so the performance surface reads the same.
+Click **Settings** in the top right, press **Cmd+,**, or choose **Tidefield > Settings**
+in the menu bar. The window has a tab for each area:
+
+| Tab | What is there |
+|---|---|
+| Look and Feel | the theme (click a tile), zoom from 80% to 150%, and whether the status bar explains what is under the mouse |
+| Audio | the interface, sample rate, buffer size and which inputs and outputs are on (up to eight outputs for the speaker ring), with the output and CPU load |
+| MIDI, Sync and Remote | which MIDI inputs Tidefield listens to, whether the tempo follows MIDI clock, MIDI clock out, MPE, OSC and Ableton Link (when built in) |
+| Plug-ins | which formats to use (VST3, Audio Units), whether to scan the standard folders, extra folders to scan, Rescan, Rescan everything, and plug-ins that crashed while being scanned, with Retry |
+| Files and Startup | the recordings folder, the presets folder, whether Tidefield opens the starter session or the last session, the recent list, and installation mode |
+| Record and Render | whether recordings include stems, and the sample rate for timeline renders and loops |
+| About | the version, the manual and the settings file |
+
+Settings are kept between launches.
+
+### The menu bar
+
+On macOS the menu bar at the top of the screen works like any other app's:
+
+- **Tidefield**: About and Settings.
+- **File**: new, open, Open Recent, save, save as, save or render the timeline's performance, render a five-minute loop of the sound, start or stop recording, show recordings.
+- **Edit**: undo and redo (naming what they will undo), capture a scene, release held controls.
+- **View**: jump to any device tab, pick a theme, zoom, the projector window and full screen.
+- **Play**: fade, panic, glide to any scene, the computer keyboard, take, Catch, Freeze all, the tape loop, Cycles and path drawing.
+- **Help**: the manual and the keyboard shortcuts.
+
+### Themes
+
+Sixteen themes, ten dark and six light. The terrain and meters stay dark in every
+theme so the performance surface reads the same.
 
 | Theme | Character |
 |---|---|
@@ -917,10 +945,16 @@ dark in every theme so the performance surface reads the same.
 | Ember | warm charcoal with little blue light, for late sets |
 | Graphite | plain studio grey |
 | Heather | dusky violet |
+| Midnight | deep navy with gold |
+| Moss | dark forest green with lichen highlights |
+| Dusk | plum with coral |
+| High contrast | pure black and white with bright highlights, for low vision or bright rooms |
 | Paper | soft light grey-green |
 | Dune | warm sand |
 | Sea glass | pale aqua |
-| Daylight | high contrast, for playing outdoors |
+| Daylight | high contrast light, for playing outdoors |
+| Linen | warm off-white |
+| Frost | cool blue-white |
 
 ---
 
@@ -929,7 +963,7 @@ dark in every theme so the performance surface reads the same.
 Insert Tidefield on an instrument track. It behaves like the app, with a few
 differences.
 
-- The DAW owns the audio device, so there is no Audio button. Space and the keys
+- The DAW owns the audio device, so Settings has no audio device to choose. Space and the keys
   Tidefield does not use go to the DAW.
 - MIDI on the track plays Bloom and drives your mappings.
 - With Sync on, the Cycles and delays follow the project's tempo and position.
@@ -968,7 +1002,8 @@ differences.
 | Cmd+N, Cmd+O | new session, open |
 | Cmd+S, Shift+Cmd+S | save, save as |
 | Cmd+P | projector window |
-| Cmd+, | audio settings |
+| Cmd+, | Settings |
+| Cmd+plus, Cmd+minus, Cmd+0 | zoom in, zoom out, actual size |
 
 **With Keys on (M)**:
 
@@ -1001,7 +1036,7 @@ never breaks up. It steps back up by itself when there is headroom. To avoid it:
 - use fewer resonator modes.
 
 **I chose Quad (or a ring) but only two speakers play.** The output has fewer channels
-than the mode needs, and the Space panel says so. Under **Audio**, choose the
+than the mode needs, and the Space panel says so. In **Settings**, **Audio**, choose the
 interface and enable more output channels.
 
 **A plugin is missing from the effect menu.** Choose **Scan for new plugins** at the

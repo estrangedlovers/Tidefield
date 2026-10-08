@@ -16,7 +16,7 @@ into, and the gestures you make on top.
    it and choose Open, then Open again. If macOS still refuses, run
    `xattr -cr /Applications/Tidefield.app` in Terminal once.
 3. Allow microphone access if you want to play an instrument through the live input.
-4. Choose your audio interface with **Audio** (top right).
+4. Choose your audio interface in **Settings** (top right, or Cmd+,), under Audio.
 
 macOS 12 or later.
 

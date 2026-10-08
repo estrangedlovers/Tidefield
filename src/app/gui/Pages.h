@@ -101,4 +101,7 @@ private:
     juce::Component row;
     std::vector<std::unique_ptr<Device>> devices;
 };
+std::unique_ptr<juce::Component> createRemoteView(Model& model);
+std::unique_ptr<juce::Component> createInstallationView(Model& model);
+std::unique_ptr<juce::Component> createSpaceView(Model& model);
 }

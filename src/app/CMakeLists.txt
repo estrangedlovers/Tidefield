@@ -38,10 +38,12 @@ target_sources(tidefield_app_core INTERFACE
     ${CMAKE_CURRENT_SOURCE_DIR}/gui/MainView.cpp
     ${CMAKE_CURRENT_SOURCE_DIR}/gui/Model.cpp
     ${CMAKE_CURRENT_SOURCE_DIR}/gui/Pages.cpp
+    ${CMAKE_CURRENT_SOURCE_DIR}/gui/Settings.cpp
     ${CMAKE_CURRENT_SOURCE_DIR}/gui/Style.cpp
     ${CMAKE_CURRENT_SOURCE_DIR}/gui/TerrainView.cpp
     ${CMAKE_CURRENT_SOURCE_DIR}/gui/Timeline.cpp
     ${CMAKE_CURRENT_SOURCE_DIR}/gui/Widgets.cpp)
+target_compile_definitions(tidefield_app_core INTERFACE TIDEFIELD_VERSION="${PROJECT_VERSION}")
 target_link_libraries(tidefield_app_core INTERFACE tidefield_fx_juce tidefield_engine tidefield_io TidefieldBinaryData juce::juce_osc)
 
 target_sources(Tidefield PRIVATE

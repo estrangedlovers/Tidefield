@@ -1,6 +1,7 @@
 #pragma once
 
 #include "Pages.h"
+#include "Settings.h"
 #include "TerrainView.h"
 
 #include <memory>
@@ -28,7 +29,11 @@ public:
     void chooseSample(int slot);
     void loadFactory(int soundIndex, int slot);
     void showAudioSettings();
+    void openSettings(SettingsTab tab = SettingsTab::Look);
     void showPage(int page) { devices->show(page); }
+    int getPage() const { return devices->getPage(); }
+    bool performKey(const juce::KeyPress& key);
+    void glideTo(int scene) { glideToScene(scene, false); }
     void toggleProjector();
     bool isProjectorOpen() const noexcept { return projector != nullptr; }
     static void switchTheme(AppCore& core, Theme t);

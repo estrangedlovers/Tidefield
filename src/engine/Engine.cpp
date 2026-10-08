@@ -964,6 +964,21 @@ void Engine::updateSources(float t) noexcept
     d.evolve = params.current(P::DroneEvolve);
     d.spread = params.current(P::DroneSpread);
     d.gravity = params.current(P::DroneGravity) * globalGravity;
+    d.wave = toInt(params.current(P::DroneWave));
+    d.chord = toInt(params.current(P::DroneChord));
+    d.sub = params.current(P::DroneSub);
+    d.fmRatio = params.current(P::DroneFmRatio);
+    d.tilt = params.current(P::DroneTilt);
+    d.filterType = toInt(params.current(P::DroneFilterType));
+    d.keyTrack = params.current(P::DroneKeyTrack);
+    d.vibrato = params.current(P::DroneVibrato);
+    d.vibratoRate = params.current(P::DroneVibratoRate);
+    d.tremolo = params.current(P::DroneTremolo);
+    d.tremoloRate = params.current(P::DroneTremoloRate);
+    d.glideSeconds = params.current(P::DroneGlide);
+    d.revoiceSeconds = params.current(P::DroneRevoice);
+    d.drive = params.current(P::DroneDrive);
+    d.breathTone = params.current(P::DroneBreathTone);
     drone.setParams(d);
 
     for (int k = 0; k < kNumClouds; ++k)

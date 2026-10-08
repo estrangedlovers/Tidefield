@@ -6,6 +6,7 @@
 #include <engine/mod/ModRouteManager.h>
 
 #include <catch2/catch_approx.hpp>
+#include <set>
 #include <catch2/catch_template_test_macros.hpp>
 
 using namespace tf::audit;
@@ -363,6 +364,69 @@ std::vector<Check> masterChecks()
     return v;
 }
 
+float levelWobble(const Rig& r, double from, double to)
+{
+    const std::size_t win = r.at(0.02);
+    std::vector<double> levels;
+    for (std::size_t i = r.at(from); i + win <= std::min(r.out.size(), r.at(to)); i += win)
+    {
+        double e = 0.0;
+        for (std::size_t k = i; k < i + win; ++k)
+            e += static_cast<double>(r.out.l[k]) * r.out.l[k] + static_cast<double>(r.out.r[k]) * r.out.r[k];
+        levels.push_back(10.0 * std::log10(std::max(1.0e-12, e / static_cast<double>(win))));
+    }
+    double mean = 0.0, var = 0.0;
+    for (double v : levels)
+        mean += v;
+    mean /= static_cast<double>(std::max<std::size_t>(1, levels.size()));
+    for (double v : levels)
+        var += (v - mean) * (v - mean);
+    return static_cast<float>(std::sqrt(var / static_cast<double>(std::max<std::size_t>(1, levels.size()))));
+}
+
+float pitchWobble(const Rig& r, double from, double to)
+{
+    const std::size_t win = r.at(0.05);
+    std::vector<double> periods;
+    for (std::size_t i = r.at(from); i + win <= std::min(r.out.size(), r.at(to)); i += win)
+    {
+        double first = -1.0, last = -1.0;
+        int crossings = 0;
+        for (std::size_t k = i + 1; k < i + win; ++k)
+            if (r.out.l[k - 1] < 0.0f && r.out.l[k] >= 0.0f)
+            {
+                const double frac = static_cast<double>(-r.out.l[k - 1]) / static_cast<double>(r.out.l[k] - r.out.l[k - 1]);
+                const double t = static_cast<double>(k - 1) + frac;
+                if (first < 0.0)
+                    first = t;
+                last = t;
+                ++crossings;
+            }
+        if (crossings > 2)
+            periods.push_back((last - first) / static_cast<double>(crossings - 1));
+    }
+    double mean = 0.0, var = 0.0;
+    for (double v : periods)
+        mean += v;
+    mean /= static_cast<double>(std::max<std::size_t>(1, periods.size()));
+    for (double v : periods)
+        var += (v - mean) * (v - mean);
+    return mean > 0.0 ? static_cast<float>(1200.0 * std::sqrt(var / static_cast<double>(std::max<std::size_t>(1, periods.size()))) / mean) : 0.0f;
+}
+
+Setup pureDrone()
+{
+    return [](Rig& r) {
+        r.snap(P::DroneDensity, 1.0f);
+        r.snap(P::DroneDetune, 0.0f);
+        r.snap(P::DroneShape, 1.0f);
+        r.snap(P::DroneDriftDepth, 0.0f);
+        r.snap(P::DroneNoise, 0.0f);
+        r.snap(P::DroneCutoff, 12000.0f);
+        r.snap(P::DroneEvolve, 0.0f);
+    };
+}
+
 std::vector<Check> droneChecks()
 {
     const std::string ctx = "drone solo";
@@ -414,6 +478,65 @@ std::vector<Check> droneChecks()
             return off;
         };
         c->minDelta = 1.0f;
+    }
+    add(P::DroneWave, Metric::Any, 0, [](Rig& r) { r.snap(P::DroneShape, 0.5f); });
+    add(P::DroneSub, Metric::Centroid, -1)->minDelta = 3.0f;
+    add(P::DroneFmRatio, Metric::Centroid, 1, [](Rig& r) {
+        r.snap(P::DroneWave, 4.0f);
+        r.snap(P::DroneShape, 1.0f);
+        r.snap(P::DroneCutoff, 12000.0f);
+    });
+    add(P::DroneTilt, Metric::Centroid, -1, [](Rig& r) {
+        r.snap(P::DroneDensity, 6.0f);
+        r.snap(P::DroneCutoff, 12000.0f);
+    });
+    add(P::DroneFilterType, Metric::Centroid, 1);
+    add(P::DroneKeyTrack, Metric::Centroid, 1, [](Rig& r) { r.snap(P::DroneDensity, 6.0f); });
+    {
+        auto* c = add(P::DroneDrive, Metric::Custom, 1, [](Rig& r) {
+            pureDrone()(r);
+            r.snap(P::DroneDensity, 3.0f);
+        });
+        c->context = "drone solo, pure sines, upper bands against the whole";
+        c->measure = [](Rig&, const Features& f) {
+            float upper = kFloorDb;
+            for (std::size_t b = 5; b < f.bandDb.size(); ++b)
+                upper = std::max(upper, f.bandDb[b]);
+            return upper - f.rmsDb;
+        };
+        c->minDelta = 6.0f;
+    }
+    add(P::DroneBreathTone, Metric::Centroid, 1, [](Rig& r) {
+        r.snap(P::DroneNoise, 1.0f);
+        r.snap(P::DroneCutoff, 12000.0f);
+    });
+    {
+        auto* c = add(P::DroneTremolo, Metric::Custom, 1, [](Rig& r) { r.snap(P::DroneTremoloRate, 4.0f); });
+        c->measure = [](Rig& r, const Features&) { return levelWobble(r, 1.0, 2.5); };
+        c->minDelta = 1.5f;
+    }
+    {
+        auto* c = add(P::DroneTremoloRate, Metric::Custom, 1, [](Rig& r) { r.snap(P::DroneTremolo, 1.0f); });
+        c->measure = [](Rig& r, const Features&) { return levelWobble(r, 1.0, 2.5); };
+        c->minDelta = 1.0f;
+        c->checkHalves = false;
+    }
+    {
+        auto* c = add(P::DroneVibrato, Metric::Custom, 1, [](Rig& r) {
+            pureDrone()(r);
+            r.snap(P::DroneVibratoRate, 3.0f);
+        });
+        c->measure = [](Rig& r, const Features&) { return pitchWobble(r, 1.0, 2.5); };
+        c->minDelta = 5.0f;
+    }
+    {
+        auto* c = add(P::DroneVibratoRate, Metric::Custom, 1, [](Rig& r) {
+            pureDrone()(r);
+            r.snap(P::DroneVibrato, 1.0f);
+        });
+        c->measure = [](Rig& r, const Features&) { return pitchWobble(r, 1.0, 2.5); };
+        c->minDelta = 5.0f;
+        c->checkHalves = false;
     }
     return v;
 }
@@ -1696,7 +1819,7 @@ TEST_CASE("Control audit: every parameter is covered", "[audit]")
         for (P p : covered(g))
             seen.insert(idx(p));
     for (P p : { P::MasterFadeSecs, P::HarmonyMorph, P::TerrainGlide, P::SwellAttack, P::SwellRelease, P::CatchSeconds, P::CatchSource, P::CatchTarget,
-                 P::ModFollowAttack, P::ModFollowRelease, P::ModFollowGain, P::SyncSource, P::SpaceMode, P::SpaceSpread, P::SpaceRotate })
+                 P::ModFollowAttack, P::ModFollowRelease, P::ModFollowGain, P::SyncSource, P::SpaceMode, P::SpaceSpread, P::SpaceRotate, P::DroneChord, P::DroneGlide, P::DroneRevoice })
         seen.insert(idx(p));
     for (const auto& s : kStrips)
         seen.insert(idx(s.azimuth));
@@ -2029,4 +2152,81 @@ TEST_CASE("Control audit: Follow decides whether MIDI clock sets the tempo", "[a
     CHECK(bpm[0] == Approx(spec(P::SyncBpm).defaultValue).margin(0.01f));
     CHECK(bpm[1] == Approx(150.0f).margin(1.0f));
     report("sync.source", "150 BPM clock", "ok | " + fmt(bpm[0]) + " vs " + fmt(bpm[1]) + " BPM");
+}
+
+TEST_CASE("Control audit: drone chord revoices into its notes", "[audit]")
+{
+    for (int chord = 0; chord < tf::dsp::DroneGenerator::kNumChords; ++chord)
+    {
+        Rig r;
+        r.solo({ StripId::Drone });
+        r.snap(P::DroneDensity, 6.0f);
+        r.snap(P::DroneGravity, 0.0f);
+        r.snap(P::DroneEvolve, 0.0f);
+        r.snap(P::DroneRevoice, 0.5f);
+        r.run(0.5);
+        r.snap(P::DroneChord, static_cast<float>(chord));
+        r.run(2.5);
+        std::set<int> heard;
+        for (float i : r.last().droneVoiceInterval)
+            heard.insert(static_cast<int>(std::lround(i * 100.0f)));
+        INFO("chord " << tf::dsp::DroneGenerator::chordName(chord));
+        CHECK(heard.size() >= 3);
+        CHECK(std::isfinite(analyse(r.out, r.at(0.5), r.out.size()).rmsDb));
+    }
+    Rig a, b;
+    for (auto* r : { &a, &b })
+    {
+        r->solo({ StripId::Drone });
+        r->snap(P::DroneEvolve, 0.0f);
+        r->snap(P::DroneRevoice, 0.5f);
+        r->snap(P::DroneGravity, 0.0f);
+    }
+    a.snap(P::DroneChord, 3.0f);
+    b.snap(P::DroneChord, 4.0f);
+    a.run(3.0);
+    b.run(3.0);
+    CHECK(a.last().droneVoiceInterval[2] == 15.0f);
+    CHECK(b.last().droneVoiceInterval[2] == 16.0f);
+    report("drone.chord", "minor and major put the third voice on 15 and 16 semitones", "ok");
+}
+
+TEST_CASE("Control audit: drone glide sets how fast the root moves", "[audit]")
+{
+    std::vector<float> lag;
+    for (float glide : { 0.05f, 2.0f, 20.0f })
+    {
+        Rig r;
+        r.solo({ StripId::Drone });
+        r.snap(P::DroneGlide, glide);
+        r.snap(P::DroneGravity, 0.0f);
+        r.run(0.5);
+        r.snap(P::DroneRoot, 50.0f);
+        r.run(1.0);
+        lag.push_back(50.0f - r.last().droneVoiceNote[0]);
+    }
+    INFO(lag[0] << " " << lag[1] << " " << lag[2]);
+    CHECK(lag[0] < 0.5f);
+    CHECK(lag[1] > lag[0] + 1.0f);
+    CHECK(lag[2] > lag[1] + 1.0f);
+    report("drone.glide", "semitones still to travel 1 s after a 12 st jump", "ok | " + fmt(lag[0]) + " / " + fmt(lag[1]) + " / " + fmt(lag[2]));
+}
+
+TEST_CASE("Control audit: drone revoice time sets the crossfade between notes", "[audit]")
+{
+    std::vector<float> settled;
+    for (float seconds : { 0.5f, 6.0f })
+    {
+        Rig r;
+        r.solo({ StripId::Drone });
+        r.snap(P::DroneEvolve, 0.0f);
+        r.snap(P::DroneRevoice, seconds);
+        r.run(0.5);
+        r.snap(P::DroneChord, 4.0f);
+        r.run(2.0);
+        settled.push_back(r.last().droneVoiceInterval[2]);
+    }
+    CHECK(settled[0] == 16.0f);
+    CHECK(settled[1] == 7.0f);
+    report("drone.revoice", "a chord change lands within 2 s at 0.5 s, not yet at 6 s", "ok");
 }

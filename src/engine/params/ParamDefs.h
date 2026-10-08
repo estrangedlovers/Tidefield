@@ -111,6 +111,21 @@ inline constexpr unsigned kDiscrete = 1u << 4;
     X(DroneEvolve,      "drone.evolve",       "Evolve",            0.0f,   1.0f,    0.3f, Linear,  Exponential,    0.5f,  "",   TF_TB_ML) \
     X(DroneSpread,      "drone.spread",       "Spread",            0.0f,   1.0f,    0.7f, Linear,  Exponential,    0.3f,  "",   TF_TB_ML) \
     X(DroneGravity,     "drone.gravity",      "Gravity",           0.0f,   1.0f,    1.0f, Linear,  Exponential,    0.3f,  "",   TF_TB_ML) \
+    X(DroneWave,        "drone.wave",         "Wave",              0.0f,   4.0f,    0.0f, Linear,  Linear,         0.0f,  "",   TF_TB_ML | kDiscrete) \
+    X(DroneChord,       "drone.chord",        "Chord",             0.0f,   7.0f,    0.0f, Linear,  Linear,         0.0f,  "",   TF_TB_ML | kDiscrete) \
+    X(DroneSub,         "drone.sub",          "Sub",               0.0f,   1.0f,    0.0f, Linear,  Exponential,    0.2f,  "",   TF_TB_ML) \
+    X(DroneFmRatio,     "drone.fmRatio",      "FM Ratio",          0.5f,   8.0f,    2.0f, Log,     LogExponential, 0.3f,  "x",  TF_TB_ML) \
+    X(DroneTilt,        "drone.tilt",         "Tilt",              0.0f,   1.0f,    0.0f, Linear,  Exponential,    0.3f,  "",   TF_TB_ML) \
+    X(DroneFilterType,  "drone.filterType",   "Filter",            0.0f,   2.0f,    0.0f, Linear,  Linear,         0.0f,  "",   TF_TB_ML | kDiscrete) \
+    X(DroneKeyTrack,    "drone.keyTrack",     "Key Track",         0.0f,   1.0f,    0.0f, Linear,  Exponential,    0.3f,  "",   TF_TB_ML) \
+    X(DroneVibrato,     "drone.vibrato",      "Vibrato",           0.0f,   1.0f,    0.0f, Linear,  Exponential,    0.2f,  "",   TF_TB_ML) \
+    X(DroneVibratoRate, "drone.vibratoRate",  "Vibrato Rate",      0.05f,  9.0f,    4.5f, Log,     LogExponential, 0.2f,  "Hz", TF_TB_ML) \
+    X(DroneTremolo,     "drone.tremolo",      "Tremolo",           0.0f,   1.0f,    0.0f, Linear,  Exponential,    0.2f,  "",   TF_TB_ML) \
+    X(DroneTremoloRate, "drone.tremoloRate",  "Tremolo Rate",      0.02f,  9.0f,    0.2f, Log,     LogExponential, 0.2f,  "Hz", TF_TB_ML) \
+    X(DroneGlide,       "drone.glide",        "Glide",             0.05f, 30.0f,    1.2f, Log,     LogExponential, 0.2f,  "s",  TF_TB_ML) \
+    X(DroneRevoice,     "drone.revoice",      "Revoice Time",      0.5f,  30.0f,    4.0f, Log,     LogExponential, 0.2f,  "s",  TF_TB_ML) \
+    X(DroneDrive,       "drone.drive",        "Drive",             0.0f,   1.0f,    0.0f, Linear,  Exponential,    0.2f,  "",   TF_TB_ML) \
+    X(DroneBreathTone,  "drone.breathTone",   "Breath Tone",       0.0f,   1.0f,    1.0f, Linear,  Exponential,    0.2f,  "",   TF_TB_ML) \
     TF_STRIP(X, Drone,     "drone",     0.0f,  -14.0f, -60.0f, 0.0f) \
     TF_CLOUD(X, Cloud1, "cloud1") \
     TF_CLOUD(X, Cloud2, "cloud2") \

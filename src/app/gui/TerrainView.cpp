@@ -65,22 +65,24 @@ void showSceneMenu(Model& model, int scene, juce::Component* owner)
             w->addButton("Cancel", 0, juce::KeyPress(juce::KeyPress::escapeKey));
             w->enterModalState(true, juce::ModalCallbackFunction::create([&model, scene, w, safeOwner](int ok) {
                                    if (ok == 1 && safeOwner != nullptr && scene < model.core.scenes.size())
-                                       model.core.scenes.renameScene(scene, w->getTextEditorContents("name").toStdString());
+                                       model.core.editScenes("Rename scene", [&model, scene, w] {
+                                           model.core.scenes.renameScene(scene, w->getTextEditorContents("name").toStdString());
+                                       });
                                }),
                                true);
         }
         else if (r == 3)
-        {
-            const auto& f = model.frame();
-            for (engine::ParamIndex i = 0; i < engine::kNumParams; ++i)
-                if ((model.registry.spec(i).flags & engine::ParamFlag::kTerrainBound) != 0)
-                    sm.setSceneValue(scene, i, f.paramTargets[i]);
-            sm.releaseLiveLayer();
-        }
+            model.core.editScenes("Update scene", [&model, &sm, scene] {
+                const auto& f = model.frame();
+                for (engine::ParamIndex i = 0; i < engine::kNumParams; ++i)
+                    if ((model.registry.spec(i).flags & engine::ParamFlag::kTerrainBound) != 0)
+                        sm.setSceneValue(scene, i, f.paramTargets[i]);
+                sm.releaseLiveLayer();
+            });
         else if (r == 4)
-            sm.commitLiveLayer(scene, model.frame());
+            model.core.editScenes("Fold into scene", [&model, &sm, scene] { sm.commitLiveLayer(scene, model.frame()); });
         else if (r == 5)
-            sm.removeScene(scene);
+            model.core.editScenes("Delete scene", [&sm, scene] { sm.removeScene(scene); });
     });
 }
 
@@ -498,6 +500,7 @@ void TerrainView::mouseDown(const juce::MouseEvent& e)
         drag = Drag::Scene;
         dragScene = scene;
         sceneMoved = false;
+        dragSceneStart = model.core.scenes.getScenes()[static_cast<std::size_t>(scene)].position;
         return;
     }
     drag = Drag::Cursor;
@@ -537,6 +540,12 @@ void TerrainView::mouseUp(const juce::MouseEvent& e)
         model.endTouch(engine::P::TerrainX);
         model.endTouch(engine::P::TerrainY);
     }
+    else if (drag == Drag::Scene && sceneMoved && dragScene >= 0 && dragScene < model.core.scenes.size())
+    {
+        const auto end = model.core.scenes.getScenes()[static_cast<std::size_t>(dragScene)].position;
+        model.core.scenes.moveScene(dragScene, dragSceneStart);
+        model.core.editScenes("Move scene", [this, end] { model.core.scenes.moveScene(dragScene, end); });
+    }
     else if (drag == Drag::Scene && ! sceneMoved && dragScene >= 0 && dragScene < model.core.scenes.size())
     {
         const auto p = model.core.scenes.getScenes()[static_cast<std::size_t>(dragScene)].position;
@@ -572,7 +581,9 @@ void TerrainView::mouseDoubleClick(const juce::MouseEvent& e)
         return onDoubleClick();
     if (drawMode || sceneAt(e.position) >= 0)
         return;
-    if (model.core.scenes.captureScene({}, toTerrain(e.position), model.frame()) < 0)
+    int captured = -1;
+    model.core.editScenes("Capture scene", [&] { captured = model.core.scenes.captureScene({}, toTerrain(e.position), model.frame()); });
+    if (captured < 0)
         model.core.status("The terrain is full (32 scenes). Remove one to capture another.", true);
 }
 

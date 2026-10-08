@@ -342,6 +342,9 @@ public:
             menu.addItem(4, "Save as...");
             menu.addSeparator();
             menu.addItem(5, "Projector window (Cmd+P)", true, view.isProjectorOpen());
+            menu.addSeparator();
+            menu.addItem(8, "Undo " + model.core.undo.getUndoDescription() + "  (Cmd+Z)", model.core.undo.canUndo());
+            menu.addItem(9, "Redo " + model.core.undo.getRedoDescription() + "  (Shift+Cmd+Z)", model.core.undo.canRedo());
             juce::PopupMenu appearance;
             for (bool light : { false, true })
             {
@@ -358,6 +361,8 @@ public:
                 else if (r == 3) s.save();
                 else if (r == 4) s.saveAs();
                 else if (r == 5) view.toggleProjector();
+                else if (r == 8) model.core.undo.undo();
+                else if (r == 9) model.core.undo.redo();
                 else if (r >= kThemeMenuBase && r < kThemeMenuBase + static_cast<int>(kThemes.size()))
                     MainView::switchTheme(model.core, kThemes[static_cast<std::size_t>(r - kThemeMenuBase)]);
             });
@@ -1187,7 +1192,9 @@ bool MainView::keyPressed(const juce::KeyPress& key)
 
     if (mods.isCommandDown())
     {
-        if (code == 'S')
+        if (code == 'Z')
+            mods.isShiftDown() ? core.undo.redo() : core.undo.undo();
+        else if (code == 'S')
             mods.isShiftDown() ? core.session.saveAs() : core.session.save();
         else if (code == 'O')
             core.session.open();

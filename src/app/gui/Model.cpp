@@ -13,6 +13,7 @@ constexpr int kHoldFrames = 12;
 Model::Model(AppCore& c) : core(c), engine(c.engine), registry(c.engine.getRegistry())
 {
     touching.assign(engine::kNumParams, 0);
+    freshTouch.assign(engine::kNumParams, 0);
     local.resize(engine::kNumParams);
     for (engine::ParamIndex i = 0; i < engine::kNumParams; ++i)
         local[i] = registry.spec(i).defaultValue;
@@ -40,13 +41,13 @@ void Model::jumpTerrain(engine::Point2 to)
         savedGlide = value(P::TerrainGlide);
     jumpPending = true;
     const int token = ++jumpToken;
-    set(P::TerrainGlide, 0.05f);
+    set(P::TerrainGlide, 0.05f, false);
     set(P::TerrainX, to.x);
     set(P::TerrainY, to.y);
     juce::Timer::callAfterDelay(150, [this, weak = std::weak_ptr<bool>(alive), token] {
         if (weak.expired() || token != jumpToken)
             return;
-        set(P::TerrainGlide, savedGlide);
+        set(P::TerrainGlide, savedGlide, false);
         jumpPending = false;
     });
 }
@@ -65,10 +66,18 @@ bool Model::isLearning(P p) const
     return core.midi.isLearning() && lp && *lp == engine::idx(p);
 }
 
-void Model::set(P p, float v)
+void Model::set(P p, float v, bool undoable)
 {
     const auto i = engine::idx(p);
     const float clamped = spec(p).clamp(v);
+    if (undoable)
+    {
+        const std::string_view id = spec(p).id;
+        const bool performance = id == "terrain.x" || id == "terrain.y" || id.ends_with(".hold") || id.starts_with("perform.");
+        if (! performance)
+            core.recordParamChange(i, value(p), clamped, touching[i] != 0 && freshTouch[i] == 0);
+        freshTouch[i] = 0;
+    }
     local[i] = clamped;
     setHere[i] = 1;
     holdFrames[i] = kHoldFrames;
@@ -252,7 +261,9 @@ void Model::addParamMenus(juce::PopupMenu& menu, const std::function<bool(engine
 
 void Model::modulate(engine::ModSource source, engine::ParamIndex param, float depth)
 {
-    if (core.mod.add(source, param, depth) < 0)
+    int added = -1;
+    core.editRoutes("Modulation", [&] { added = core.mod.add(source, param, depth); });
+    if (added < 0)
     {
         core.status(core.mod.freeSlot() < 0 ? "All 16 modulation routes are in use. Remove one on the Modulation tab." : "That control cannot be modulated.",
                     true);
@@ -292,7 +303,7 @@ void Model::showParamMenu(P p, juce::Component* owner)
         if (r >= 1000 && r < 1000 + engine::kNumModSources)
             return modulate(static_cast<engine::ModSource>(r - 1000), i);
         if (r >= 2000 && r < 2000 + engine::kMaxModRoutes)
-            return core.mod.remove(r - 2000);
+            return core.editRoutes("Modulation", [this, r] { core.mod.remove(r - 2000); });
         if (r == 1)
             isLearning(p) ? core.midi.cancelLearn() : core.midi.learnParam(i);
         else if (r == 2)

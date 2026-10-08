@@ -51,6 +51,7 @@ AppCore::AppCore(Host& h)
         });
     };
     session.onSessionChanged = [this] {
+        undo.clearUndoHistory();
         if (onSessionChanged)
             onSessionChanged();
     };
@@ -148,7 +149,9 @@ void AppCore::status(const juce::String& message, bool warning)
 
 void AppCore::captureSceneAtCursor()
 {
-    if (scenes.captureScene({}, lastFrame.cursor, lastFrame) < 0)
+    int captured = -1;
+    editScenes("Capture scene", [&] { captured = scenes.captureScene({}, lastFrame.cursor, lastFrame); });
+    if (captured < 0)
         status("The terrain is full (32 scenes). Remove one to capture another.", true);
 }
 
@@ -182,6 +185,86 @@ void AppCore::saveRigMidi()
 {
     host.getSettings().setValue("midiMapping", juce::JSON::toString(io::midiToJson(midi, engine.getRegistry()), true));
     host.getSettings().saveIfNeeded();
+}
+
+namespace {
+struct SceneState
+{
+    std::vector<engine::Scene> scenes;
+    std::vector<engine::ParamIndex> pins;
+};
+
+bool sameScenes(const std::vector<engine::Scene>& a, const std::vector<engine::Scene>& b)
+{
+    if (a.size() != b.size())
+        return false;
+    for (std::size_t i = 0; i < a.size(); ++i)
+        if (a[i].name != b[i].name || a[i].position.x != b[i].position.x || a[i].position.y != b[i].position.y || a[i].values != b[i].values)
+            return false;
+    return true;
+}
+}
+
+void AppCore::recordParamChange(engine::ParamIndex param, float from, float to, bool continuing)
+{
+    if (undoing || from == to || param >= engine::kNumParams)
+        return;
+    const auto now = juce::Time::getMillisecondCounterHiRes();
+    if (! (continuing || (param == lastUndoParam && now - lastUndoTime < 700.0)))
+        undo.beginNewTransaction(juce::String(engine.getRegistry().spec(param).name));
+    lastUndoParam = param;
+    lastUndoTime = now;
+    undo.perform(new ParamAction(static_cast<int>(param), from, to, [this](int p, float v) {
+        engine.post(engine::ControlEvent::setParam(static_cast<engine::ParamIndex>(p), v));
+    }));
+}
+
+void AppCore::editScenes(const juce::String& name, const std::function<void()>& change)
+{
+    SceneState before { scenes.getScenes(), scenes.getPins() };
+    change();
+    SceneState after { scenes.getScenes(), scenes.getPins() };
+    if (sameScenes(before.scenes, after.scenes) && before.pins == after.pins)
+        return;
+    undo.beginNewTransaction(name);
+    lastUndoParam = engine::kNumParams;
+    undo.perform(new SnapshotAction<SceneState>(std::move(before), std::move(after), [this](const SceneState& s) { scenes.replaceAll(s.scenes, s.pins); }));
+}
+
+void AppCore::editRoutes(const juce::String& name, const std::function<void()>& change)
+{
+    auto before = mod.getRoutes();
+    change();
+    auto after = mod.getRoutes();
+    undo.beginNewTransaction(name);
+    lastUndoParam = engine::kNumParams;
+    undo.perform(new SnapshotAction<std::vector<engine::ModRouteManager::Route>>(std::move(before), std::move(after),
+                                                                                [this](const auto& r) { mod.replaceAll(r); }));
+}
+
+void AppCore::editSeasons(const juce::String& name, const std::function<void()>& change)
+{
+    auto before = seasons.getSeasons();
+    change();
+    auto after = seasons.getSeasons();
+    undo.beginNewTransaction(name);
+    lastUndoParam = engine::kNumParams;
+    undo.perform(new SnapshotAction<std::vector<engine::Season>>(std::move(before), std::move(after), [this](const auto& s) { seasons.replaceAll(s); }));
+}
+
+void AppCore::setEffect(int slot, const std::string& type)
+{
+    struct FxState
+    {
+        std::string type, state;
+    };
+    FxState before { fx.getType(slot), fx.getState(slot) };
+    fx.setType(slot, type);
+    undo.beginNewTransaction("Effect");
+    lastUndoParam = engine::kNumParams;
+    undo.perform(new SnapshotAction<FxState>(std::move(before), FxState { type, {} }, [this, slot](const FxState& s) {
+        fx.setType(slot, s.type, false, s.state);
+    }));
 }
 
 void AppCore::timerCallback()

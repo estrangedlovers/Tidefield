@@ -43,8 +43,12 @@ public:
     bool isLearning(P p) const;
     const engine::ParamSpec& spec(P p) const noexcept { return registry.spec(engine::idx(p)); }
 
-    void set(P p, float v);
-    void beginTouch(P p) { touching[engine::idx(p)] = 1; }
+    void set(P p, float v, bool undoable = true);
+    void beginTouch(P p)
+    {
+        touching[engine::idx(p)] = 1;
+        freshTouch[engine::idx(p)] = 1;
+    }
     void endTouch(P p) { touching[engine::idx(p)] = 0; }
     void release(P p);
     void resetToDefault(P p) { set(p, spec(p).defaultValue); }
@@ -71,7 +75,7 @@ public:
 
 private:
     std::vector<Animated*> animated;
-    std::vector<std::uint8_t> touching;
+    std::vector<std::uint8_t> touching, freshTouch;
     std::vector<float> local;
     std::vector<int> holdFrames;
     std::vector<std::uint8_t> setHere;

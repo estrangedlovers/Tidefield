@@ -4,6 +4,7 @@
 #include "MidiInputs.h"
 #include "PluginHost.h"
 #include "Remote.h"
+#include "Undo.h"
 #include "SessionController.h"
 
 #include <engine/capture/CatchManager.h>
@@ -60,6 +61,14 @@ public:
 
     void seedTargets(const io::SessionData& session);
 
+    juce::UndoManager undo { 0, 300 };
+    void recordParamChange(engine::ParamIndex param, float from, float to, bool continuing);
+    void editScenes(const juce::String& name, const std::function<void()>& change);
+    void editRoutes(const juce::String& name, const std::function<void()>& change);
+    void editSeasons(const juce::String& name, const std::function<void()>& change);
+    void setEffect(int slot, const std::string& type);
+    bool isUndoing() const noexcept { return undoing; }
+
     void startRecording();
     void stopRecording();
     void toggleRecording();
@@ -79,6 +88,9 @@ private:
     std::shared_ptr<bool> alive = std::make_shared<bool>(true);
     int lastGuardLevel = 0;
     float lastTempoTarget = -1.0f;
+    bool undoing = false;
+    engine::ParamIndex lastUndoParam = engine::kNumParams;
+    double lastUndoTime = 0.0;
 
 public:
     juce::ThreadPool workers { juce::ThreadPoolOptions {}.withNumberOfThreads(2).withThreadName("Tidefield worker") };

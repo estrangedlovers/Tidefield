@@ -119,7 +119,7 @@ private:
             const auto p = static_cast<P>(first + static_cast<engine::ParamIndex>(k));
             if (pluginValue >= 0.0f && std::abs(pluginValue - model.value(p)) > 0.01f && std::abs(model.modulation(p)) < 1.0e-4f
                 && ! knobs[static_cast<std::size_t>(k)]->isMouseButtonDown())
-                model.set(p, pluginValue);
+                model.set(p, pluginValue, false);
         }
     }
 
@@ -166,7 +166,7 @@ private:
             type = PluginHost::typeIdFor(pluginList[static_cast<std::size_t>(id - kPluginBase)]);
         else if (id >= 2 && id < kScanId)
             type = dsp::ProcessorFactory::instance().entries()[static_cast<std::size_t>(id - 2)].info->typeId;
-        model.core.fx.setType(slot, type);
+        model.core.setEffect(slot, type);
     }
 
     void refresh()
@@ -474,7 +474,7 @@ public:
         const float x = e.position.x - 6.0f;
         const float editX = 4.0f + 6.0f + 150.0f + 48.0f + 58.0f + 60.0f + 110.0f;
         if (x >= editX + 36.0f && x < editX + 86.0f)
-            model.core.seasons.remove(rowIndex);
+            model.core.editSeasons("Season", [this, rowIndex] { model.core.seasons.remove(rowIndex); });
         else
             showEditMenu(rowIndex);
     }
@@ -511,7 +511,9 @@ private:
                 s = model.core.seasons.getSeasons()[static_cast<std::size_t>(index)];
             s.param = static_cast<engine::ParamIndex>(r - 1);
             const int at = index >= 0 ? index : static_cast<int>(model.core.seasons.getSeasons().size());
-            if (! model.core.seasons.set(at, s))
+            bool ok = false;
+            model.core.editSeasons("Season", [&] { ok = model.core.seasons.set(at, s); });
+            if (! ok)
                 model.core.status("All 8 seasons are in use.", true);
         });
     }
@@ -541,7 +543,7 @@ private:
             if (r == 1)
                 return showParamMenu(index);
             if (r == 2)
-                return model.core.seasons.remove(index);
+                return model.core.editSeasons("Season", [this, index] { model.core.seasons.remove(index); });
             if (r >= 100 && r < 400)
                 s.depth = static_cast<float>(r - 200) / 100.0f;
             else if (r >= 400 && r < 409)
@@ -550,7 +552,7 @@ private:
                 s.shape = static_cast<engine::Season::Shape>(r - 500);
             else
                 return;
-            model.core.seasons.set(index, s);
+            model.core.editSeasons("Season", [this, index, s] { model.core.seasons.set(index, s); });
         });
     }
 
@@ -698,7 +700,7 @@ public:
     {
         const int k = rowAt(e.getPosition());
         if (k >= 0)
-            later(this, [this, k] { model.core.mod.remove(k); });
+            later(this, [this, k] { model.core.editRoutes("Modulation", [this, k] { model.core.mod.remove(k); }); });
     }
 
 private:

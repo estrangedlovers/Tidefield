@@ -68,6 +68,7 @@ private:
 
     enum class Drag { None, Cursor, Scene, Path } drag = Drag::None;
     int dragScene = -1, hoverScene = -1;
+    engine::Point2 dragSceneStart {};
     bool sceneMoved = false;
     bool drawMode = false;
     const bool presentation;

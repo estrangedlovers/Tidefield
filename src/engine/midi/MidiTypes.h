@@ -13,6 +13,7 @@ struct RawMidi
     std::uint8_t data1 = 0;
     std::uint8_t data2 = 0;
     std::uint8_t port = 0;
+    double time = 0.0;
 
     int channel() const noexcept { return status & 0x0f; }
     int type() const noexcept { return status & 0xf0; }
@@ -54,6 +55,7 @@ struct MidiMap
 
     int noteChannel = -1;
     bool notesToDrone = false;
+    bool mpe = false;
     std::uint64_t version = 0;
 
     void rebuildLookup()

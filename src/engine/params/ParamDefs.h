@@ -215,7 +215,8 @@ inline constexpr unsigned kDiscrete = 1u << 4;
     X(ModRoute13Depth, "mod.route13.depth", "Depth", -1.0f, 1.0f, 0.0f, Linear, Linear, 0.05f, "", TF_TB_ML) \
     X(ModRoute14Depth, "mod.route14.depth", "Depth", -1.0f, 1.0f, 0.0f, Linear, Linear, 0.05f, "", TF_TB_ML) \
     X(ModRoute15Depth, "mod.route15.depth", "Depth", -1.0f, 1.0f, 0.0f, Linear, Linear, 0.05f, "", TF_TB_ML) \
-    X(ModRoute16Depth, "mod.route16.depth", "Depth", -1.0f, 1.0f, 0.0f, Linear, Linear, 0.05f, "", TF_TB_ML)
+    X(ModRoute16Depth, "mod.route16.depth", "Depth", -1.0f, 1.0f, 0.0f, Linear, Linear, 0.05f, "", TF_TB_ML) \
+    X(SyncSource,       "sync.source",        "Follow",            0.0f,   1.0f,    0.0f, Linear,  Linear,         0.0f,  "",   kDiscrete)
 
 enum class P : ParamIndex
 {

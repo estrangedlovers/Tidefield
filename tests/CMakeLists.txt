@@ -24,6 +24,7 @@ add_executable(tidefield_tests
     engine/TempoTests.cpp
     engine/GestureTests.cpp
     engine/ModulationTests.cpp
+    engine/SyncTests.cpp
     engine/MonkeyTests.cpp)
 
 target_include_directories(tidefield_tests PRIVATE ${CMAKE_CURRENT_SOURCE_DIR})

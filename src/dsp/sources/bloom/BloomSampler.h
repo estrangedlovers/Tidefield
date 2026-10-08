@@ -52,7 +52,11 @@ public:
     void setHarmony(const HarmonicGravity* h) noexcept { harmony = h; }
     void setBuffer(const SampleBuffer* b) noexcept;
 
-    void noteOn(int note, float velocity) noexcept;
+    static constexpr int kChannels = 16;
+
+    void noteOn(int note, float velocity, int channel = -1) noexcept;
+    void setGlobalBend(float semitones) noexcept { globalBend = semitones; }
+    void setChannelExpression(int channel, float bendSemitones, float pressure, float timbre) noexcept;
     void noteOff(int note) noexcept;
     void setSustain(bool down) noexcept;
     void releaseAll(float seconds = 0.02f) noexcept;
@@ -111,11 +115,13 @@ private:
         float wowPhase = 0.0f, flutterPhase = 0.0f, tapeSpeed = 1.0f;
         OnePole lpL, lpR;
         float level = 0.0f;
+        int channel = -1;
+        float bendNow = 0.0f, pressureNow = 0.0f;
     };
 
     void startVoice(Voice& v, int note, float velocity) noexcept;
     void spawnGrain(Voice& v) noexcept;
-    void renderVoice(Voice& v, float* left, float* right, int n, float timeScale) noexcept;
+    void renderVoice(Voice& v, float* left, float* right, int n, float timeScale, double pitchRatio, float expressionGain) noexcept;
     float window(float phase) const noexcept;
     float quantizedNote(float note, float seed) const noexcept;
 
@@ -128,5 +134,8 @@ private:
     std::vector<float> hann;
     bool sustainPedal = false;
     int voiceLimit = kMaxVoices;
+    float globalBend = 0.0f;
+    std::array<float, kChannels> channelBend {}, channelPressure {};
+    std::array<float, kChannels> channelTimbre { 0.5f, 0.5f, 0.5f, 0.5f, 0.5f, 0.5f, 0.5f, 0.5f, 0.5f, 0.5f, 0.5f, 0.5f, 0.5f, 0.5f, 0.5f, 0.5f };
 };
 }

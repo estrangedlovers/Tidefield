@@ -414,8 +414,51 @@ void Engine::applyMidiBinding(std::size_t index, const MidiBinding& b, int value
     }
 }
 
+void Engine::handleClock(const RawMidi& m) noexcept
+{
+    if (params.current(P::SyncSource) < 0.5f)
+        return;
+    switch (m.status)
+    {
+        case 0xf8:
+        {
+            if (lastClockTime > 0.0 && m.time > lastClockTime)
+            {
+                const double interval = m.time - lastClockTime;
+                if (interval > 60.0 / (400.0 * 24.0) && interval < 60.0 / (20.0 * 24.0))
+                    clockInterval = clockInterval <= 0.0 ? interval : clockInterval + (interval - clockInterval) * 0.08;
+            }
+            lastClockTime = m.time;
+            if (clockRunning)
+                ++clockTicks;
+            if (clockInterval > 0.0)
+            {
+                hostBpm = std::clamp(60.0 / (24.0 * clockInterval), 20.0, 400.0);
+                hostPpq = static_cast<double>(clockTicks) / 24.0;
+                hostSampleTime = sampleTime;
+                hostPlaying = clockRunning;
+                clockDriven = true;
+            }
+            break;
+        }
+        case 0xfa:
+            clockTicks = 0;
+            clockRunning = true;
+            break;
+        case 0xfb: clockRunning = true; break;
+        case 0xfc:
+            clockRunning = false;
+            hostPlaying = false;
+            break;
+        case 0xf2: clockTicks = static_cast<std::int64_t>((m.data1 & 0x7f) | ((m.data2 & 0x7f) << 7)) * 6; break;
+        default: break;
+    }
+}
+
 void Engine::handleMidi(const RawMidi& m) noexcept
 {
+    if (m.status >= 0xf0)
+        return handleClock(m);
     midiMonitor.push(m);
 
     const auto* map = midiMapChannel.current();
@@ -443,6 +486,12 @@ void Engine::handleMidi(const RawMidi& m) noexcept
         {
             if (m.data1 == 1)
                 modWheel = static_cast<float>(m.data2) / 127.0f;
+            if (m.data1 == 74 && map != nullptr && map->mpe && ch != 0)
+            {
+                const auto c = static_cast<std::size_t>(ch);
+                mpeTimbre[c] = static_cast<float>(m.data2) / 127.0f;
+                bloom.setChannelExpression(ch, mpeBend[c], mpePressure[c], mpeTimbre[c]);
+            }
             if (m.data1 == 64)
             {
                 sustainPedal = m.data2 >= 64;
@@ -452,9 +501,29 @@ void Engine::handleMidi(const RawMidi& m) noexcept
         }
     }
 
-    const bool channelOk = map == nullptr || map->noteChannel < 0 || map->noteChannel == ch;
+    const bool mpe = map != nullptr && map->mpe;
+    const bool member = mpe && ch != 0;
+    const auto uc = static_cast<std::size_t>(ch);
+    const bool channelOk = mpe || map == nullptr || map->noteChannel < 0 || map->noteChannel == ch;
     if (! channelOk)
         return;
+    if (m.type() == 0xe0)
+    {
+        const float bend = static_cast<float>(((m.data1 & 0x7f) | ((m.data2 & 0x7f) << 7)) - 8192) / 8192.0f;
+        if (member)
+        {
+            mpeBend[uc] = bend * 48.0f;
+            bloom.setChannelExpression(ch, mpeBend[uc], mpePressure[uc], mpeTimbre[uc]);
+        }
+        else
+            bloom.setGlobalBend(bend * 2.0f);
+        return;
+    }
+    if (member && m.type() == 0xd0)
+    {
+        mpePressure[uc] = static_cast<float>(m.data1) / 127.0f;
+        bloom.setChannelExpression(ch, mpeBend[uc], mpePressure[uc], mpeTimbre[uc]);
+    }
     if (m.type() == 0xd0)
         pressure = static_cast<float>(m.data1) / 127.0f;
     else if (m.type() == 0xa0)
@@ -462,7 +531,9 @@ void Engine::handleMidi(const RawMidi& m) noexcept
     if (m.isNoteOn())
     {
         trackNote(m.data1, static_cast<float>(m.data2) / 127.0f);
-        bloom.noteOn(m.data1, static_cast<float>(m.data2) / 127.0f);
+        if (member)
+            bloom.setChannelExpression(ch, mpeBend[uc], mpePressure[uc], mpeTimbre[uc]);
+        bloom.noteOn(m.data1, static_cast<float>(m.data2) / 127.0f, member ? ch : -1);
         if (map != nullptr && map->notesToDrone)
         {
             int root = m.data1;
@@ -1079,6 +1150,13 @@ void Engine::trackNote(int note, float velocity) noexcept
 
 void Engine::updateTempo(float dt) noexcept
 {
+    if (clockDriven && params.current(P::SyncSource) < 0.5f)
+    {
+        clockDriven = clockRunning = false;
+        hostBpm = 0.0;
+        hostPlaying = false;
+        clockInterval = lastClockTime = 0.0;
+    }
     syncOn = params.current(P::SyncOn) > 0.5f;
     bpm = hostBpm > 0.0 ? static_cast<float>(std::clamp(hostBpm, 20.0, 400.0)) : params.current(P::SyncBpm);
     if (hostPlaying)

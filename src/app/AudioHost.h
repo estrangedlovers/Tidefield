@@ -1,5 +1,7 @@
 #pragma once
 
+#include "LinkSync.h"
+
 #include "Host.h"
 
 #include <engine/Engine.h>
@@ -24,6 +26,7 @@ public:
     juce::String describeOutput() const override;
 
     void saveDeviceState();
+    LinkSync* getLink() noexcept override { return &link; }
     juce::PropertiesFile& getSettings() noexcept override { return settings; }
 
 private:
@@ -36,6 +39,8 @@ private:
     juce::AudioDeviceManager deviceManager;
     juce::AudioProcessLoadMeasurer loadMeasurer;
     engine::Engine engine;
+    LinkSync link;
+    double outputLatencySeconds = 0.0;
     std::unique_ptr<juce::Thread> nullThread;
 };
 }

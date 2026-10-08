@@ -19,6 +19,7 @@ endif()
 option(TIDEFIELD_BUILD_APP    "Build the Tidefield standalone app" ${_tf_app_default})
 option(TIDEFIELD_BUILD_TESTS  "Build unit tests"                   ON)
 option(TIDEFIELD_BUILD_RENDER "Build the offline render harness"   ON)
+option(TIDEFIELD_WITH_LINK    "Ableton Link tempo sync (GPL-licensed; makes the app GPL)" OFF)
 
 include(cmake/CompilerWarnings.cmake)
 include(cmake/Dependencies.cmake)

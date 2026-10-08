@@ -59,6 +59,7 @@ bool MidiManager::publish()
         map->bindings.resize(static_cast<std::size_t>(kMaxMidiBindings));
     map->noteChannel = noteChannel;
     map->notesToDrone = notesToDrone;
+    map->mpe = mpe;
     map->version = ++version;
     map->rebuildLookup();
     dirty = ! engine.publishMidiMap(std::move(map));
@@ -121,6 +122,12 @@ std::vector<int> MidiManager::bindingsFor(ParamIndex param) const
 void MidiManager::setNoteChannel(int channel)
 {
     noteChannel = std::clamp(channel, -1, 15);
+    publish();
+}
+
+void MidiManager::setMpe(bool enabled)
+{
+    mpe = enabled;
     publish();
 }
 

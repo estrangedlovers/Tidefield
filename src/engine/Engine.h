@@ -213,6 +213,12 @@ private:
     std::array<Pickup, kMaxMidiBindings> pickups {};
     std::vector<std::int8_t> midiPickup;
     bool sustainPedal = false;
+    std::array<float, 16> mpeBend {}, mpePressure {};
+    std::array<float, 16> mpeTimbre { 0.5f, 0.5f, 0.5f, 0.5f, 0.5f, 0.5f, 0.5f, 0.5f, 0.5f, 0.5f, 0.5f, 0.5f, 0.5f, 0.5f, 0.5f, 0.5f };
+    std::int64_t clockTicks = 0;
+    double lastClockTime = 0.0, clockInterval = 0.0;
+    bool clockRunning = false, clockDriven = false;
+    void handleClock(const RawMidi& m) noexcept;
 
     double sampleRate = 48000.0;
     int maxBlock = 0;

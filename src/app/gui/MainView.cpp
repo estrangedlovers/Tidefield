@@ -954,7 +954,12 @@ MainView::MainView(AppCore& c) : core(c), model(c)
             w->setName("Tidefield - " + core.session.getName());
     };
 
-    vblank = std::make_unique<juce::VBlankAttachment>(this, [this] { frame(); });
+    if (core.osc != nullptr)
+    {
+        oscSceneFallback = core.osc->onScene;
+        core.osc->onScene = [this](int index, bool jump) { glideToScene(index, jump); };
+    }
+        vblank = std::make_unique<juce::VBlankAttachment>(this, [this] { frame(); });
     startTimerHz(4);
     setSize(1440, 900);
 }
@@ -967,6 +972,8 @@ MainView::~MainView()
     releaseHolds();
     core.onStatus = nullptr;
     core.onSessionChanged = nullptr;
+    if (core.osc != nullptr)
+        core.osc->onScene = oscSceneFallback;
     model.onHover = nullptr;
     teardownInterface();
     openViews.erase(std::remove(openViews.begin(), openViews.end(), this), openViews.end());

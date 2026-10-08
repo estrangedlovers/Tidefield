@@ -1,5 +1,6 @@
 #include "Pages.h"
 
+#include "../LinkSync.h"
 #include "../PluginHost.h"
 
 #include <dsp/core/TempoSync.h>
@@ -768,6 +769,150 @@ private:
     juce::String shownSignature;
 };
 
+class RemoteView final : public juce::Component, public Animated
+{
+public:
+    explicit RemoteView(Model& m) : model(m)
+    {
+        model.add(this);
+        mpe.setClickingTogglesState(true);
+        mpe.setHelp(&model, "for MPE keyboards: each note bends, presses and brightens on its own channel");
+        mpe.onClick = [this] { model.core.midi.setMpe(mpe.getToggleState()); };
+        addAndMakeVisible(mpe);
+        if (auto* l = model.core.host.getLink(); l != nullptr && LinkSync::isAvailable())
+        {
+            link.setClickingTogglesState(true);
+            link.setHelp(&model, "share tempo and beat with Ableton Live and other Link apps on this network");
+            link.onClick = [this, l] {
+                l->setEnabled(link.getToggleState());
+                model.core.host.getSettings().setValue("link", link.getToggleState());
+            };
+            addAndMakeVisible(link);
+        }
+        if (model.core.clockOut != nullptr)
+        {
+            clock.setTextWhenNothingSelected("Send clock to...");
+            clock.onChange = [this] {
+                const int id = clock.getSelectedId();
+                model.core.clockOut->setDevice(id > 1 && id - 2 < outputs.size() ? outputs[id - 2].identifier : juce::String());
+            };
+            addAndMakeVisible(clock);
+            fillClock();
+        }
+        if (model.core.osc != nullptr)
+        {
+            for (auto* e : { &inPort, &outTarget })
+            {
+                e->setJustification(juce::Justification::centredLeft);
+                e->setFont(font(12.0f));
+                addAndMakeVisible(*e);
+            }
+            inPort.setInputRestrictions(5, "0123456789");
+            inPort.setText(model.core.osc->getReceivePort() > 0 ? juce::String(model.core.osc->getReceivePort()) : "9000", false);
+            outTarget.setText(model.core.osc->getSendTarget(), false);
+            oscIn.setClickingTogglesState(true);
+            oscOut.setClickingTogglesState(true);
+            oscIn.setHelp(&model, "let phones, tablets and other programs play Tidefield over OSC: /tidefield/param/<id>, /tidefield/terrain x y, /tidefield/scene n, /tidefield/fade and more");
+            oscOut.setHelp(&model, "send the cursor, levels, beat, scene weights and modulation sources out over OSC, for visuals");
+            oscIn.onClick = [this] { model.core.osc->setReceivePort(oscIn.getToggleState() ? inPort.getText().getIntValue() : 0); };
+            oscOut.onClick = [this] {
+                if (oscOut.getToggleState())
+                    model.core.osc->setSendTarget(outTarget.getText());
+                else
+                    model.core.osc->stopSending();
+            };
+            addAndMakeVisible(oscIn);
+            addAndMakeVisible(oscOut);
+        }
+        tick();
+    }
+    ~RemoteView() override { model.remove(this); }
+
+    void tick() override
+    {
+        mpe.setToggleState(model.core.midi.getMpe(), juce::dontSendNotification);
+        if (auto* l = model.core.host.getLink(); l != nullptr && link.isVisible())
+        {
+            link.setToggleState(l->isEnabled(), juce::dontSendNotification);
+            const auto text = l->isEnabled() ? "Ableton Link: " + juce::String(l->numPeers()) + " peers" : juce::String("Ableton Link");
+            if (link.getButtonText() != text)
+                link.setButtonText(text);
+        }
+        if (auto* o = model.core.osc.get())
+        {
+            oscIn.setToggleState(o->isReceiving(), juce::dontSendNotification);
+            oscOut.setToggleState(o->isSending(), juce::dontSendNotification);
+        }
+        if (++frames % 120 == 0 && model.core.clockOut != nullptr && juce::MidiOutput::getAvailableDevices() != outputs)
+            fillClock();
+    }
+
+    void resized() override
+    {
+        auto r = getLocalBounds();
+        mpe.setBounds(r.removeFromTop(24));
+        r.removeFromTop(6);
+        if (link.isVisible())
+        {
+            link.setBounds(r.removeFromTop(24));
+            r.removeFromTop(6);
+        }
+        r.removeFromTop(4);
+        if (clock.isVisible())
+        {
+            r.removeFromTop(14);
+            clock.setBounds(r.removeFromTop(24));
+            r.removeFromTop(10);
+        }
+        if (oscIn.isVisible())
+        {
+            r.removeFromTop(14);
+            auto row = r.removeFromTop(24);
+            oscIn.setBounds(row.removeFromLeft(120));
+            row.removeFromLeft(6);
+            inPort.setBounds(row);
+            r.removeFromTop(6);
+            row = r.removeFromTop(24);
+            oscOut.setBounds(row.removeFromLeft(120));
+            row.removeFromLeft(6);
+            outTarget.setBounds(row);
+        }
+    }
+
+    void paint(juce::Graphics& g) override
+    {
+        g.setFont(caps());
+        g.setColour(colour::textFaint());
+        if (clock.isVisible())
+            g.drawText("MIDI CLOCK OUT", clock.getBounds().translated(0, -16).withHeight(14), juce::Justification::centredLeft);
+        if (oscIn.isVisible())
+            g.drawText("OSC", oscIn.getBounds().translated(0, -16).withHeight(14), juce::Justification::centredLeft);
+    }
+
+private:
+    void fillClock()
+    {
+        outputs = juce::MidiOutput::getAvailableDevices();
+        clock.clear(juce::dontSendNotification);
+        clock.addItem("No clock out", 1);
+        int selected = 1;
+        for (int k = 0; k < outputs.size(); ++k)
+        {
+            clock.addItem(outputs[k].name, k + 2);
+            if (outputs[k].identifier == model.core.clockOut->getDeviceId())
+                selected = k + 2;
+        }
+        clock.setSelectedId(selected, juce::dontSendNotification);
+    }
+
+    Model& model;
+    FlatButton mpe { "MPE keyboard", colour::learn() }, link { "Ableton Link", colour::tide() }, oscIn { "Receive on", colour::tide() }, oscOut { "Send to", colour::tide() };
+    juce::ComboBox clock;
+    juce::TextEditor inPort, outTarget;
+    juce::Array<juce::MidiDeviceInfo> outputs;
+    int frames = 0;
+};
+
 class MidiView final : public juce::Component, public Animated, private juce::ListBoxModel
 {
 public:
@@ -1480,7 +1625,7 @@ void DeviceView::build()
                         P::LoopsVelocity });
             d.setPresets("loops", "loops.", { P::LoopsCount, P::LoopsRate, P::LoopsDensity, P::LoopsRegister, P::LoopsSpread, P::LoopsVelocity, P::LoopsPattern });
             auto& t = device("Tempo", colour::tide());
-            params(t, { P::SyncOn, P::SyncBpm });
+            params(t, { P::SyncOn, P::SyncBpm, P::SyncSource });
             break;
         }
         case Seasons:
@@ -1566,6 +1711,8 @@ void DeviceView::build()
         {
             auto& d = device("MIDI", colour::learn());
             d.add(std::make_unique<MidiView>(model), 800, 0);
+            auto& r = device("Sync and remote", colour::tide());
+            r.add(std::make_unique<RemoteView>(model), 300, 0);
             break;
         }
         default: break;

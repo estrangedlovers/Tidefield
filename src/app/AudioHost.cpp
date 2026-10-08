@@ -85,6 +85,8 @@ void AudioHost::audioDeviceAboutToStart(juce::AudioIODevice* device)
     const double sampleRate = device->getCurrentSampleRate();
     const int blockSize = device->getCurrentBufferSizeSamples();
     loadMeasurer.reset(sampleRate, blockSize);
+    outputLatencySeconds = static_cast<double>(device->getOutputLatencyInSamples() + blockSize) / sampleRate;
+    link.prepare(sampleRate);
     engine.prepare(sampleRate, blockSize);
 }
 
@@ -97,6 +99,7 @@ void AudioHost::audioDeviceIOCallbackWithContext(const float* const* inputs, int
                                                  int numOutputs, int numSamples, const juce::AudioIODeviceCallbackContext&)
 {
     const juce::AudioProcessLoadMeasurer::ScopedTimer timer(loadMeasurer, numSamples);
+    link.apply(engine, numSamples, outputLatencySeconds);
     engine.process(inputs, numInputs, outputs, numOutputs, numSamples);
 }
 }

@@ -1,4 +1,6 @@
 #include "AppCore.h"
+
+#include "LinkSync.h"
 #include "FactoryContent.h"
 
 #include <BinaryData.h>
@@ -57,6 +59,17 @@ AppCore::AppCore(Host& h)
         plugins = std::make_unique<PluginHost>(host.getSettings(), host.getSettings().getFile().getSiblingFile("PluginScanCrashes.txt"));
         plugins->onStatus = [this](const juce::String& m, bool warning) { status(m, warning); };
         fx.setExternal(plugins.get());
+        clockOut = std::make_unique<MidiClockOut>(host.getSettings());
+        if (auto* link = host.getLink(); link != nullptr && LinkSync::isAvailable())
+            link->setEnabled(host.getSettings().getBoolValue("link", false));
+        osc = std::make_unique<OscRemote>(*this, host.getSettings());
+        osc->onScene = [this](int index, bool) {
+            const auto& list = scenes.getScenes();
+            if (index < 0 || index >= static_cast<int>(list.size()))
+                return;
+            engine.setParam(engine::P::TerrainX, list[static_cast<std::size_t>(index)].position.x);
+            engine.setParam(engine::P::TerrainY, list[static_cast<std::size_t>(index)].position.y);
+        };
     }
     startTimerHz(30);
 }
@@ -64,6 +77,8 @@ AppCore::AppCore(Host& h)
 AppCore::~AppCore()
 {
     stopTimer();
+    osc.reset();
+    clockOut.reset();
     fx.setExternal(nullptr);
     recorder.onFinished = nullptr;
     saveRigMidi();
@@ -196,6 +211,14 @@ void AppCore::timerCallback()
     {
         lastFrame = f;
         session.setLatest(lastFrame);
+        if (clockOut != nullptr)
+            clockOut->update(lastFrame.bpm, lastFrame.syncOn);
+        if (osc != nullptr)
+            osc->sendFrame(lastFrame);
+        const float tempoTarget = lastFrame.paramTargets[engine::idx(engine::P::SyncBpm)];
+        if (auto* link = host.getLink(); link != nullptr && link->isEnabled() && lastTempoTarget >= 0.0f && std::abs(tempoTarget - lastTempoTarget) > 0.01f)
+            link->setTempo(tempoTarget);
+        lastTempoTarget = tempoTarget;
         if (lastFrame.guardLevel != lastGuardLevel)
         {
             if (lastFrame.guardLevel > lastGuardLevel)

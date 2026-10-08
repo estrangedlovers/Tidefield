@@ -56,6 +56,7 @@ private:
     std::unique_ptr<juce::VBlankAttachment> vblank;
     std::unique_ptr<juce::FileChooser> chooser;
     std::unique_ptr<juce::DocumentWindow> projector;
+    std::function<void(int, bool)> oscSceneFallback;
 
     struct Hold
     {

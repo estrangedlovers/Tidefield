@@ -3,6 +3,7 @@
 #include "Host.h"
 #include "MidiInputs.h"
 #include "PluginHost.h"
+#include "Remote.h"
 #include "SessionController.h"
 
 #include <engine/capture/CatchManager.h>
@@ -42,6 +43,8 @@ public:
     std::unique_ptr<MidiInputs> midiInputs;
     SessionController session;
     io::Recorder recorder;
+    std::unique_ptr<MidiClockOut> clockOut;
+    std::unique_ptr<OscRemote> osc;
 
     const engine::TelemetryFrame& latest() const noexcept { return lastFrame; }
 
@@ -75,6 +78,7 @@ private:
     double recordingRate = 0.0;
     std::shared_ptr<bool> alive = std::make_shared<bool>(true);
     int lastGuardLevel = 0;
+    float lastTempoTarget = -1.0f;
 
 public:
     juce::ThreadPool workers { juce::ThreadPoolOptions {}.withNumberOfThreads(2).withThreadName("Tidefield worker") };

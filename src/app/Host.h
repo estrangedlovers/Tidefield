@@ -18,5 +18,6 @@ public:
     virtual bool isRunning() const = 0;
     virtual juce::String describeOutput() const = 0;
     virtual bool isPlugin() const noexcept { return false; }
+    virtual class LinkSync* getLink() noexcept { return nullptr; }
 };
 }

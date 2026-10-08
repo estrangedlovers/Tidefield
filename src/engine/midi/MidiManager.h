@@ -29,6 +29,8 @@ public:
     void setNoteChannel(int channel);
     bool getNotesToDrone() const noexcept { return notesToDrone; }
     void setNotesToDrone(bool enabled);
+    bool getMpe() const noexcept { return mpe; }
+    void setMpe(bool enabled);
 
     void learnParam(ParamIndex param);
     void learnAction(MidiAction action);
@@ -53,6 +55,7 @@ private:
     std::vector<MidiBinding> bindings;
     int noteChannel = -1;
     bool notesToDrone = false;
+    bool mpe = false;
     std::uint64_t version = 0;
     bool dirty = false;
 

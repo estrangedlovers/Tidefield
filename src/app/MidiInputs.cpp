@@ -72,13 +72,14 @@ void MidiInputs::setEnabled(const juce::String& identifier, bool enabled)
 
 void MidiInputs::PortCallback::handleIncomingMidiMessage(juce::MidiInput*, const juce::MidiMessage& message)
 {
-    if (message.getRawDataSize() > 3 || message.isSysEx() || message.isMidiClock() || message.isActiveSense())
+    if (message.getRawDataSize() > 3 || message.isSysEx() || message.isActiveSense())
         return;
     const auto* raw = message.getRawData();
     engine::RawMidi m;
     m.status = raw[0];
     m.data1 = message.getRawDataSize() > 1 ? raw[1] : 0;
     m.data2 = message.getRawDataSize() > 2 ? raw[2] : 0;
+    m.time = message.getTimeStamp() > 0.0 ? message.getTimeStamp() : juce::Time::getMillisecondCounterHiRes() * 0.001;
     engine.postMidi(port, m);
 }
 }

@@ -53,6 +53,10 @@ void BloomSampler::reset() noexcept
         v.lpR.reset();
         v.level = 0.0f;
     }
+    globalBend = 0.0f;
+    channelBend.fill(0.0f);
+    channelPressure.fill(0.0f);
+    channelTimbre.fill(0.5f);
 }
 
 void BloomSampler::setBuffer(const SampleBuffer* b) noexcept
@@ -78,7 +82,17 @@ float BloomSampler::quantizedNote(float note, float seed) const noexcept
     return harmony->quantize(note, seed, params.gravity);
 }
 
-void BloomSampler::noteOn(int note, float velocity) noexcept
+void BloomSampler::setChannelExpression(int channel, float bendSemitones, float pressure, float timbre) noexcept
+{
+    if (channel < 0 || channel >= kChannels)
+        return;
+    const auto c = static_cast<std::size_t>(channel);
+    channelBend[c] = bendSemitones;
+    channelPressure[c] = std::clamp(pressure, 0.0f, 1.0f);
+    channelTimbre[c] = std::clamp(timbre, 0.0f, 1.0f);
+}
+
+void BloomSampler::noteOn(int note, float velocity, int channel) noexcept
 {
     if (buffer == nullptr || buffer->size() < 256 || velocity <= 0.0f)
         return;
@@ -106,6 +120,7 @@ void BloomSampler::noteOn(int note, float velocity) noexcept
         }
     }
     startVoice(*target, note, velocity);
+    target->channel = channel >= 0 && channel < kChannels ? channel : -1;
 }
 
 void BloomSampler::noteOff(int note) noexcept
@@ -314,7 +329,7 @@ void BloomSampler::spawnGrain(Voice& v) noexcept
     g->gainR = pans.right;
 }
 
-void BloomSampler::renderVoice(Voice& v, float* left, float* right, int n, float timeScale) noexcept
+void BloomSampler::renderVoice(Voice& v, float* left, float* right, int n, float timeScale, double pitchRatio, float expressionGain) noexcept
 {
     const bool stereo = buffer->isStereo();
     const double sizeD = static_cast<double>(buffer->size());
@@ -364,7 +379,7 @@ void BloomSampler::renderVoice(Voice& v, float* left, float* right, int n, float
                 --t.delay;
                 continue;
             }
-            double inc = t.inc;
+            double inc = t.inc * pitchRatio;
             if (v.transform == Transform::Tape)
             {
                 v.wowPhase += 0.45f * timeScale * dt;
@@ -405,7 +420,7 @@ void BloomSampler::renderVoice(Voice& v, float* left, float* right, int n, float
                 readAt(g.mip, g.pos, sl, sr);
                 l += sl * w * g.gainL;
                 r += sr * w * g.gainR;
-                g.pos += g.inc;
+                g.pos += g.inc * pitchRatio;
                 if (++g.age >= g.length)
                     g.active = false;
             }
@@ -420,7 +435,7 @@ void BloomSampler::renderVoice(Voice& v, float* left, float* right, int n, float
             r = std::tanh(r * (1.0f + 2.0f * amount)) / (1.0f + amount);
         }
 
-        const float g = v.env * v.velocityGain;
+        const float g = v.env * v.velocityGain * expressionGain;
         l = v.lpL.processLow(l) * g;
         r = v.lpR.processLow(r) * g;
         left[i] += l;
@@ -446,9 +461,23 @@ void BloomSampler::process(float* left, float* right, int n, float timeScale) no
     std::fill_n(right, n, 0.0f);
     if (buffer == nullptr || buffer->size() < 256)
         return;
+    const float toneCut = 400.0f * std::pow(45.0f, std::clamp(params.tone, 0.0f, 1.0f));
+    const float follow = 1.0f - std::exp(-static_cast<float>(n) / (0.01f * static_cast<float>(spec.sampleRate)));
     for (auto& v : voices)
-        if (v.active)
-            renderVoice(v, left, right, n, timeScale);
+    {
+        if (! v.active)
+            continue;
+        const bool perNote = v.channel >= 0;
+        const auto c = static_cast<std::size_t>(perNote ? v.channel : 0);
+        v.bendNow += ((perNote ? channelBend[c] : 0.0f) + globalBend - v.bendNow) * follow;
+        v.pressureNow += ((perNote ? channelPressure[c] : 0.0f) - v.pressureNow) * follow;
+        const float timbre = perNote ? channelTimbre[c] : 0.5f;
+        const float cut = std::clamp(toneCut * std::exp2(3.0f * (timbre - 0.5f)) * (1.0f + v.pressureNow), 20.0f,
+                                     0.45f * static_cast<float>(spec.sampleRate));
+        v.lpL.setCutoff(cut);
+        v.lpR.setCutoff(cut);
+        renderVoice(v, left, right, n, timeScale, std::exp2(static_cast<double>(v.bendNow) / 12.0), 1.0f + 0.5f * v.pressureNow);
+    }
 }
 
 int BloomSampler::getActiveVoices() const noexcept

@@ -64,6 +64,7 @@ juce::var midiToJson(const engine::MidiManager& midi, const engine::ParamRegistr
     auto* root = new juce::DynamicObject();
     root->setProperty("noteChannel", midi.getNoteChannel());
     root->setProperty("notesToDrone", midi.getNotesToDrone());
+    root->setProperty("mpe", midi.getMpe());
     juce::Array<juce::var> list;
     for (const auto& b : midi.getBindings())
     {
@@ -121,6 +122,7 @@ std::vector<std::string> applyMidiJson(const juce::var& json, engine::MidiManage
         }
     midi.setNoteChannel(static_cast<int>(json.getProperty("noteChannel", -1)));
     midi.setNotesToDrone(static_cast<bool>(json.getProperty("notesToDrone", false)));
+    midi.setMpe(static_cast<bool>(json.getProperty("mpe", false)));
     midi.setBindings(std::move(list));
     return warnings;
 }

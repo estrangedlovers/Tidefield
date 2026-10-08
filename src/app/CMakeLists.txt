@@ -29,6 +29,8 @@ target_sources(tidefield_app_core INTERFACE
     ${CMAKE_CURRENT_SOURCE_DIR}/FactoryContent.cpp
     ${CMAKE_CURRENT_SOURCE_DIR}/MidiInputs.cpp
     ${CMAKE_CURRENT_SOURCE_DIR}/PluginHost.cpp
+    ${CMAKE_CURRENT_SOURCE_DIR}/Remote.cpp
+    ${CMAKE_CURRENT_SOURCE_DIR}/LinkSync.cpp
     ${CMAKE_CURRENT_SOURCE_DIR}/SessionController.cpp
     ${CMAKE_CURRENT_SOURCE_DIR}/gui/Controls.cpp
     ${CMAKE_CURRENT_SOURCE_DIR}/gui/MainView.cpp
@@ -37,11 +39,19 @@ target_sources(tidefield_app_core INTERFACE
     ${CMAKE_CURRENT_SOURCE_DIR}/gui/Style.cpp
     ${CMAKE_CURRENT_SOURCE_DIR}/gui/TerrainView.cpp
     ${CMAKE_CURRENT_SOURCE_DIR}/gui/Widgets.cpp)
-target_link_libraries(tidefield_app_core INTERFACE tidefield_fx_juce tidefield_engine tidefield_io TidefieldBinaryData)
+target_link_libraries(tidefield_app_core INTERFACE tidefield_fx_juce tidefield_engine tidefield_io TidefieldBinaryData juce::juce_osc)
 
 target_sources(Tidefield PRIVATE
     Main.cpp
     AudioHost.cpp)
+if(TIDEFIELD_WITH_LINK)
+    include(FetchContent)
+    FetchContent_Declare(link GIT_REPOSITORY https://github.com/Ableton/link.git GIT_TAG Link-3.1.5 GIT_SHALLOW TRUE GIT_SUBMODULES modules/asio-standalone)
+    FetchContent_MakeAvailable(link)
+    include(${link_SOURCE_DIR}/AbletonLinkConfig.cmake)
+    target_link_libraries(Tidefield PRIVATE Ableton::Link)
+    target_compile_definitions(Tidefield PRIVATE TIDEFIELD_WITH_LINK=1)
+endif()
 
 target_compile_definitions(Tidefield PRIVATE
     JUCE_PLUGINHOST_VST3=1

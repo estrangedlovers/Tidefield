@@ -118,6 +118,8 @@ juce::StringArray Model::choices(P p) const
     else if (id.starts_with("mod.lfo") && id.ends_with(".shape"))
         for (const auto* n : engine::kLfoShapeNames)
             c.add(n);
+    else if (id == "sync.source")
+        c = { "Internal", "MIDI clock" };
     else if (id == "master.autoTarget")
         c = { "Broadcast -23", "Streaming -16", "Loud -14" };
     else if (spec(p).flags & engine::ParamFlag::kDiscrete && spec(p).minValue == 0.0f && spec(p).maxValue == 1.0f)

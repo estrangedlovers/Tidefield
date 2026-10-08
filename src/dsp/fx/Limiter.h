@@ -14,7 +14,7 @@ public:
     void setCeilingDb(float db) noexcept;
     void setReleaseMs(float ms) noexcept;
 
-    void process(float* left, float* right, int numSamples, float* gainOut = nullptr) noexcept;
+    void process(float* left, float* right, int numSamples, float* gainOut = nullptr, const float* extraPeak = nullptr) noexcept;
     float getCeiling() const noexcept { return ceiling; }
 
     int getLatencySamples() const noexcept { return window + kTruePeakDelay; }
@@ -33,7 +33,7 @@ private:
     float released = 1.0f;
     float lastGain = 1.0f;
 
-    float histL[9] {}, histR[9] {};
+    float histL[9] {}, histR[9] {}, histX[9] {};
     float phaseTaps[3][8] {};
 
     std::vector<float> delayL, delayR, boxBuffer;

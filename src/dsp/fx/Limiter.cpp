@@ -7,6 +7,10 @@
 #include <cmath>
 
 namespace tf::dsp {
+namespace {
+constexpr float kExtraMargin = 1.05f;
+}
+
 void Limiter::prepare(const ProcessSpec& spec, float lookaheadMs)
 {
     fs = spec.sampleRate;
@@ -51,6 +55,7 @@ float Limiter::truePeak(const float* h) const noexcept
 
 void Limiter::reset() noexcept
 {
+    std::fill(std::begin(histX), std::end(histX), 0.0f);
     std::fill(delayL.begin(), delayL.end(), 0.0f);
     std::fill(delayR.begin(), delayR.end(), 0.0f);
     std::fill(boxBuffer.begin(), boxBuffer.end(), 1.0f);
@@ -100,7 +105,7 @@ float Limiter::pushMin(float g) noexcept
     return dequeValue[static_cast<size_t>(dequeHead)];
 }
 
-void Limiter::process(float* left, float* right, int numSamples, float* gainOut) noexcept
+void Limiter::process(float* left, float* right, int numSamples, float* gainOut, const float* extraPeak) noexcept
 {
     const auto w = static_cast<size_t>(window);
 
@@ -115,7 +120,14 @@ void Limiter::process(float* left, float* right, int numSamples, float* gainOut)
         histR[8] = right[i];
         const float inL = histL[4];
         const float inR = histR[4];
-        const float peak = std::max({ truePeak(histL), truePeak(histL + 1), truePeak(histR), truePeak(histR + 1) });
+        float peak = std::max({ truePeak(histL), truePeak(histL + 1), truePeak(histR), truePeak(histR + 1) });
+        if (extraPeak != nullptr)
+        {
+            for (int k = 0; k < 8; ++k)
+                histX[k] = histX[k + 1];
+            histX[8] = extraPeak[i];
+            peak = std::max(peak, kExtraMargin * std::max({ histX[3], histX[4], histX[5] }));
+        }
         const float required = peak > ceiling ? ceiling / peak : 1.0f;
 
         const float held = pushMin(required);

@@ -75,6 +75,7 @@ private:
         std::array<double, 3> phase {};
         std::array<double, 3> modPhase {};
         float breath = 0.0f;
+        double fmIndex = 0.0;
         Svf filter;
         Random noise;
         Drift pitchDrift, cutoffDrift, panDrift, ampDrift;
@@ -96,7 +97,7 @@ private:
 
     void updateControl(float dtSeconds, float realSeconds) noexcept;
     float renderVoiceSample(Voice& v) noexcept;
-    float waveSample(int wave, double t, double dt, double tm) const noexcept;
+    float waveSample(int wave, double t, double dt, double tm, double fmIndex) const noexcept;
 
     ProcessSpec spec;
     Params params;
@@ -108,6 +109,8 @@ private:
     float breathMakeup = 1.0f;
     float fmRatio = 2.0f;
     int filterType = 0;
+    std::array<float, 3> filterWeight { 1.0f, 0.0f, 0.0f };
+    float filterStep = 0.0f;
     int wave = 0, previousWave = 0;
     float waveFade = 1.0f, waveFadeStep = 0.0f;
     int chord = 0;

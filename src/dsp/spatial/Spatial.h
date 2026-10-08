@@ -76,14 +76,15 @@ public:
         const float rearCut = front < 0.0f ? 18000.0f * std::pow(0.35f, -front) : 20000.0f;
         Params p;
         const bool right = lateral >= 0.0f;
+        const float nearGain = 1.0f + 0.15f * side, farGain = 1.0f - 0.3f * side;
+        const float farCoef = coefficient(farCut);
         p.delayL = right ? itd : 0.0f;
         p.delayR = right ? 0.0f : itd;
-        p.gainNear = 1.0f + 0.15f * side;
-        p.gainFar = 1.0f - 0.3f * side;
-        p.coefFar = coefficient(farCut);
+        p.gainL = right ? farGain : nearGain;
+        p.gainR = right ? nearGain : farGain;
+        p.coefL = right ? farCoef : 1.0f;
+        p.coefR = right ? 1.0f : farCoef;
         p.coefRear = coefficient(rearCut);
-        p.leftIsFar = right && side > 1.0e-4f;
-        p.rightIsFar = ! right && side > 1.0e-4f;
         target = p;
     }
 
@@ -94,33 +95,30 @@ public:
         if (n <= 0)
             return;
         const float inv = 1.0f / static_cast<float>(n);
-        const float dL = (target.delayL - current.delayL) * inv, dR = (target.delayR - current.delayR) * inv;
-        const float dNear = (target.gainNear - current.gainNear) * inv, dFar = (target.gainFar - current.gainFar) * inv;
-        const float dCoef = (target.coefFar - current.coefFar) * inv, dRear = (target.coefRear - current.coefRear) * inv;
+        const float dDelayL = (target.delayL - current.delayL) * inv, dDelayR = (target.delayR - current.delayR) * inv;
+        const float dGainL = (target.gainL - current.gainL) * inv, dGainR = (target.gainR - current.gainR) * inv;
+        const float dCoefL = (target.coefL - current.coefL) * inv, dCoefR = (target.coefR - current.coefR) * inv;
+        const float dRear = (target.coefRear - current.coefRear) * inv;
         const int mask = size - 1;
         for (int i = 0; i < n; ++i)
         {
-            current.delayL += dL;
-            current.delayR += dR;
-            current.gainNear += dNear;
-            current.gainFar += dFar;
-            current.coefFar += dCoef;
+            current.delayL += dDelayL;
+            current.delayR += dDelayR;
+            current.gainL += dGainL;
+            current.gainR += dGainR;
+            current.coefL += dCoefL;
+            current.coefR += dCoefR;
             current.coefRear += dRear;
             line[static_cast<std::size_t>(write)] = in[i];
             const float l = read(current.delayL, mask);
             const float r = read(current.delayR, mask);
             write = (write + 1) & mask;
-
-            const float leftCoef = target.leftIsFar ? current.coefFar : 1.0f;
-            const float rightCoef = target.rightIsFar ? current.coefFar : 1.0f;
-            shadowL += leftCoef * (l - shadowL);
-            shadowR += rightCoef * (r - shadowR);
+            shadowL += current.coefL * (l - shadowL);
+            shadowR += current.coefR * (r - shadowR);
             rearL += current.coefRear * (shadowL - rearL);
             rearR += current.coefRear * (shadowR - rearR);
-            const float gl = target.leftIsFar ? current.gainFar : current.gainNear;
-            const float gr = target.rightIsFar ? current.gainFar : current.gainNear;
-            outL[i] += rearL * gl * scale;
-            outR[i] += rearR * gr * scale;
+            outL[i] += rearL * current.gainL * scale;
+            outR[i] += rearR * current.gainR * scale;
         }
         current = target;
         shadowL = flushDenormal(shadowL);
@@ -133,9 +131,8 @@ private:
     struct Params
     {
         float delayL = 0.0f, delayR = 0.0f;
-        float gainNear = 1.0f, gainFar = 1.0f;
-        float coefFar = 1.0f, coefRear = 1.0f;
-        bool leftIsFar = false, rightIsFar = false;
+        float gainL = 1.0f, gainR = 1.0f;
+        float coefL = 1.0f, coefR = 1.0f, coefRear = 1.0f;
     };
 
     float coefficient(float cutoff) const noexcept

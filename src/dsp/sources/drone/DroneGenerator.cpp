@@ -95,6 +95,8 @@ void DroneGenerator::reset() noexcept
         v.breath = 0.0f;
     }
     waveFade = 1.0f;
+    filterWeight = { 1.0f, 0.0f, 0.0f };
+    filterType = 0;
     subGain = prevSubGain = 0.0f;
     driveL.reset();
     driveR.reset();
@@ -114,10 +116,12 @@ void DroneGenerator::updateControl(float dt, float real) noexcept
     sineMix = std::clamp(p.shape, 0.0f, 1.0f);
     noiseGain = std::clamp(p.noise, 0.0f, 1.0f) * 0.35f;
     const float tone = std::clamp(p.breathTone, 0.0f, 1.0f);
-    breathCoef = 0.02f + 0.98f * tone * tone;
+    breathCoef = tone >= 0.999f ? 1.0f
+                                : 1.0f - std::exp(-6.28318530718f * 150.0f * std::pow(120.0f, tone) / static_cast<float>(spec.sampleRate));
     breathMakeup = std::min(4.0f, 1.0f / std::sqrt(breathCoef / (2.0f - breathCoef)));
     fmRatio = std::clamp(p.fmRatio, 0.25f, 16.0f);
     filterType = std::clamp(p.filterType, 0, 2);
+    filterStep = 1.0f / (0.03f * static_cast<float>(spec.sampleRate));
 
     const int wantedWave = std::clamp(p.wave, 0, kNumWaves - 1);
     if (wantedWave != wave && waveFade >= 1.0f)
@@ -156,6 +160,7 @@ void DroneGenerator::updateControl(float dt, float real) noexcept
         else
             v.densityGain = std::max(densityTarget, v.densityGain - densityStep);
 
+        const bool wasRevoicing = v.revoicing;
         if (v.revoicing)
         {
             if (! v.fadingIn)
@@ -178,12 +183,16 @@ void DroneGenerator::updateControl(float dt, float real) noexcept
                 }
             }
         }
-        else if (chordChanged && i > 0)
+        if (chordChanged && i > 0)
         {
             v.pendingInterval = set.initial[static_cast<size_t>(i)];
-            v.revoicing = v.pendingInterval != v.interval;
+            if (v.pendingInterval != v.interval)
+            {
+                v.revoicing = true;
+                v.fadingIn = false;
+            }
         }
-        else if (i > 0 && v.densityGain > 0.0f && rng.chance(revoiceChance))
+        else if (! wasRevoicing && i > 0 && v.densityGain > 0.0f && rng.chance(revoiceChance))
         {
             v.pendingInterval = set.pool[static_cast<size_t>(rng.nextInt(set.poolSize))];
             v.revoicing = v.pendingInterval != v.interval;
@@ -203,6 +212,11 @@ void DroneGenerator::updateControl(float dt, float real) noexcept
             const double hz = baseHz * std::exp2(detune * spreadFactor[o]);
             v.increment[o] = std::min(hz / spec.sampleRate, 0.45);
         }
+
+        const double modStep = v.increment[1] * static_cast<double>(fmRatio);
+        const double fullIndex = 0.75 * static_cast<double>(sineMix);
+        const double maxIndex = modStep > 0.0 ? std::max(0.0, 0.45 / modStep - 1.0) / 6.283185307179586 : fullIndex;
+        v.fmIndex = std::min(fullIndex, maxIndex);
 
         const float track = std::clamp(p.keyTrack, 0.0f, 1.0f) * (v.note - p.rootNote) / 12.0f;
         const float cutoff = p.cutoffHz * std::exp2(1.5f * depth * v.cutoffDrift.getValue() + track);
@@ -237,7 +251,7 @@ void DroneGenerator::updateControl(float dt, float real) noexcept
     snapPitch = false;
 }
 
-float DroneGenerator::waveSample(int w, double t, double dt, double tm) const noexcept
+float DroneGenerator::waveSample(int w, double t, double dt, double tm, double fmIndex) const noexcept
 {
     const float shape = sineMix;
     switch (static_cast<Wave>(w))
@@ -277,8 +291,7 @@ float DroneGenerator::waveSample(int w, double t, double dt, double tm) const no
         }
         case Wave::Fm:
         {
-            const double index = 0.75 * static_cast<double>(shape);
-            return fastSin01(static_cast<float>(wrap01(t + index * static_cast<double>(fastSin01(static_cast<float>(tm))))));
+            return fastSin01(static_cast<float>(wrap01(t + fmIndex * static_cast<double>(fastSin01(static_cast<float>(tm))))));
         }
         default: return 0.0f;
     }
@@ -294,9 +307,9 @@ float DroneGenerator::renderVoiceSample(Voice& v) noexcept
         const double t = v.phase[o];
         const double dt = v.increment[o];
         const double tm = v.modPhase[o];
-        float y = waveSample(wave, t, dt, tm);
+        float y = waveSample(wave, t, dt, tm, v.fmIndex);
         if (fading)
-            y = lerp(waveSample(previousWave, t, dt, tm), y, waveFade);
+            y = lerp(waveSample(previousWave, t, dt, tm, v.fmIndex), y, waveFade);
         osc += y;
         double next = t + dt;
         if (next >= 1.0)
@@ -312,7 +325,7 @@ float DroneGenerator::renderVoiceSample(Voice& v) noexcept
         breath = v.breath * breathMakeup;
     }
     const auto out = v.filter.process(osc + breath * noiseGain);
-    return filterType == 0 ? out.low : filterType == 1 ? 1.6f * out.band : out.high;
+    return filterWeight[0] * out.low + filterWeight[1] * 1.6f * out.band + filterWeight[2] * out.high;
 }
 
 void DroneGenerator::process(float* left, float* right, int numSamples, float timeScale) noexcept
@@ -347,6 +360,11 @@ void DroneGenerator::process(float* left, float* right, int numSamples, float ti
             }
             if (waveFade < 1.0f)
                 waveFade = std::min(1.0f, waveFade + waveFadeStep);
+            for (int f = 0; f < 3; ++f)
+            {
+                auto& w = filterWeight[static_cast<std::size_t>(f)];
+                w = f == filterType ? std::min(1.0f, w + filterStep) : std::max(0.0f, w - filterStep);
+            }
             outL *= kVoiceGain;
             outR *= kVoiceGain;
             const float sg = lerp(prevSubGain, subGain, frac);

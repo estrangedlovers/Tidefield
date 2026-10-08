@@ -68,7 +68,7 @@ private:
     std::uint32_t guardTrips = 0;
 
     static constexpr int kMaxExtra = 8;
-    std::vector<float> gainTrace, panicTrace;
+    std::vector<float> gainTrace, panicTrace, peakTrace;
     std::array<std::vector<float>, kMaxExtra> extraDelay;
     std::array<dsp::DcBlocker, kMaxExtra> extraDc;
     int extraWrite = 0;

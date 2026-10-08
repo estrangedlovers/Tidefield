@@ -72,7 +72,7 @@ float MultimodeFilter::processChannel(Channel& ch, float x, float g, float kk, f
     const float v2 = ch.ic2 + a2 * ch.ic1 + a3 * v3;
     ch.ic1 = flushDenormal(2.0f * v1 - ch.ic1);
     ch.ic2 = flushDenormal(2.0f * v2 - ch.ic2);
-    const float peakTrim = 1.0f / (1.0f + 1.0f / kk * 0.08f);
+    const float peakTrim = 1.0f / (1.0f + 0.04f / (kk * kk));
     const float low = v2 * peakTrim;
     const float band = kk * v1;
     const float high = (in - kk * v1 - v2) * peakTrim;

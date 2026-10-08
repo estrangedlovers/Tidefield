@@ -13,6 +13,7 @@ void MasterChain::prepare(const dsp::ProcessSpec& spec)
     panicStep = 1.0f / static_cast<float>(kPanicSeconds * fs);
     gainTrace.assign(static_cast<std::size_t>(std::max(1, spec.maxBlockSize)), 1.0f);
     panicTrace.assign(gainTrace.size(), 1.0f);
+    peakTrace.assign(gainTrace.size(), 0.0f);
     for (auto& d : extraDelay)
         d.assign(static_cast<std::size_t>(std::max(1, limiter.getLatencySamples())), 0.0f);
     for (auto& dc : extraDc)
@@ -131,7 +132,15 @@ MasterChain::Events MasterChain::process(float* left, float* right, int n, float
             extra[c][i] = extraDc[static_cast<std::size_t>(c)].process(extra[c][i] * g);
     }
 
-    limiter.process(left, right, n, numExtra > 0 ? gainTrace.data() : nullptr);
+    if (numExtra > 0)
+        for (int i = 0; i < n; ++i)
+        {
+            float peak = 0.0f;
+            for (int c = 0; c < numExtra; ++c)
+                peak = std::max(peak, std::fabs(extra[c][i]));
+            peakTrace[static_cast<std::size_t>(i)] = peak;
+        }
+    limiter.process(left, right, n, numExtra > 0 ? gainTrace.data() : nullptr, numExtra > 0 ? peakTrace.data() : nullptr);
 
     if (panicActive)
     {

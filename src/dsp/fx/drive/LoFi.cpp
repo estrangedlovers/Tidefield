@@ -7,6 +7,7 @@
 
 namespace tf::dsp {
 namespace {
+constexpr float kFullRateHz = 47000.0f;
 constexpr float kBaseDelayMs = 4.0f;
 constexpr float kWowMs = 3.0f;
 constexpr float kNoiseLevel = 0.04f;
@@ -97,7 +98,8 @@ void LoFi::process(float* left, float* right, int n) noexcept
         const float wobble = wow * kWowMs * (0.8f * drift + 0.2f * fastSin01(flutterPhase));
         const float delay = (kBaseDelayMs + wobble) * msToSamples;
 
-        holdPhase += std::exp2(rateLog) * dt;
+        const float rate = std::exp2(rateLog);
+        holdPhase += rate >= kFullRateHz ? 1.0f : rate * dt;
         const bool take = holdPhase >= 1.0f;
         if (take)
             holdPhase -= std::floor(holdPhase);

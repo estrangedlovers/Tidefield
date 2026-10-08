@@ -184,7 +184,38 @@ inline constexpr unsigned kDiscrete = 1u << 4;
     TF_FX_SLOT(X, FreezeFx1, "freeze.fx1") TF_FX_SLOT(X, FreezeFx2, "freeze.fx2") \
     TF_FX_SLOT(X, BusAFx1,   "busA.fx1")   TF_FX_SLOT(X, BusAFx2,   "busA.fx2")   \
     TF_FX_SLOT(X, BusBFx1,   "busB.fx1")   TF_FX_SLOT(X, BusBFx2,   "busB.fx2")   \
-    TF_FX_SLOT(X, MasterFx1, "master.fx1") TF_FX_SLOT(X, MasterFx2, "master.fx2")
+    TF_FX_SLOT(X, MasterFx1, "master.fx1") TF_FX_SLOT(X, MasterFx2, "master.fx2") \
+    X(ModLfo1Rate,     "mod.lfo1.rate",     "Rate",            0.005f, 20.0f,   0.1f, Log,     LogExponential, 0.2f,  "Hz", TF_TB_ML) \
+    X(ModLfo1Shape,    "mod.lfo1.shape",    "Shape",             0.0f,   4.0f,    0.0f, Linear,  Linear,         0.0f,  "",   TF_TB_ML | kDiscrete) \
+    X(ModLfo2Rate,     "mod.lfo2.rate",     "Rate",            0.005f, 20.0f,   0.03f, Log,     LogExponential, 0.2f,  "Hz", TF_TB_ML) \
+    X(ModLfo2Shape,    "mod.lfo2.shape",    "Shape",             0.0f,   4.0f,    0.0f, Linear,  Linear,         0.0f,  "",   TF_TB_ML | kDiscrete) \
+    X(ModLfo3Rate,     "mod.lfo3.rate",     "Rate",            0.005f, 20.0f,   0.5f, Log,     LogExponential, 0.2f,  "Hz", TF_TB_ML) \
+    X(ModLfo3Shape,    "mod.lfo3.shape",    "Shape",             0.0f,   4.0f,    0.0f, Linear,  Linear,         0.0f,  "",   TF_TB_ML | kDiscrete) \
+    X(ModLfo4Rate,     "mod.lfo4.rate",     "Rate",            0.005f, 20.0f,   0.011f, Log,     LogExponential, 0.2f,  "Hz", TF_TB_ML) \
+    X(ModLfo4Shape,    "mod.lfo4.shape",    "Shape",             0.0f,   4.0f,    0.0f, Linear,  Linear,         0.0f,  "",   TF_TB_ML | kDiscrete) \
+    X(ModRandom1Rate,  "mod.random1.rate",  "Rate",            0.01f,  10.0f,   0.2f, Log,     LogExponential, 0.2f,  "Hz", TF_TB_ML) \
+    X(ModRandom1Smooth,"mod.random1.smooth","Smooth",            0.0f,   1.0f,    0.7f, Linear,  Exponential,    0.1f,  "",   TF_TB_ML) \
+    X(ModRandom2Rate,  "mod.random2.rate",  "Rate",            0.01f,  10.0f,   0.05f, Log,     LogExponential, 0.2f,  "Hz", TF_TB_ML) \
+    X(ModRandom2Smooth,"mod.random2.smooth","Smooth",            0.0f,   1.0f,    0.7f, Linear,  Exponential,    0.1f,  "",   TF_TB_ML) \
+    X(ModFollowAttack,  "mod.follow.attack",  "Attack",          0.001f,  1.0f,    0.02f, Log,    LogExponential, 0.1f,  "s",  kMidiLearnable) \
+    X(ModFollowRelease, "mod.follow.release", "Release",         0.01f,   5.0f,    0.4f, Log,     LogExponential, 0.1f,  "s",  kMidiLearnable) \
+    X(ModFollowGain,    "mod.follow.gain",    "Sensitivity",    -24.0f,  24.0f,    0.0f, Linear,  Linear,         0.05f, "dB", kMidiLearnable) \
+    X(ModRoute1Depth, "mod.route1.depth", "Depth", -1.0f, 1.0f, 0.0f, Linear, Linear, 0.05f, "", TF_TB_ML) \
+    X(ModRoute2Depth, "mod.route2.depth", "Depth", -1.0f, 1.0f, 0.0f, Linear, Linear, 0.05f, "", TF_TB_ML) \
+    X(ModRoute3Depth, "mod.route3.depth", "Depth", -1.0f, 1.0f, 0.0f, Linear, Linear, 0.05f, "", TF_TB_ML) \
+    X(ModRoute4Depth, "mod.route4.depth", "Depth", -1.0f, 1.0f, 0.0f, Linear, Linear, 0.05f, "", TF_TB_ML) \
+    X(ModRoute5Depth, "mod.route5.depth", "Depth", -1.0f, 1.0f, 0.0f, Linear, Linear, 0.05f, "", TF_TB_ML) \
+    X(ModRoute6Depth, "mod.route6.depth", "Depth", -1.0f, 1.0f, 0.0f, Linear, Linear, 0.05f, "", TF_TB_ML) \
+    X(ModRoute7Depth, "mod.route7.depth", "Depth", -1.0f, 1.0f, 0.0f, Linear, Linear, 0.05f, "", TF_TB_ML) \
+    X(ModRoute8Depth, "mod.route8.depth", "Depth", -1.0f, 1.0f, 0.0f, Linear, Linear, 0.05f, "", TF_TB_ML) \
+    X(ModRoute9Depth, "mod.route9.depth", "Depth", -1.0f, 1.0f, 0.0f, Linear, Linear, 0.05f, "", TF_TB_ML) \
+    X(ModRoute10Depth, "mod.route10.depth", "Depth", -1.0f, 1.0f, 0.0f, Linear, Linear, 0.05f, "", TF_TB_ML) \
+    X(ModRoute11Depth, "mod.route11.depth", "Depth", -1.0f, 1.0f, 0.0f, Linear, Linear, 0.05f, "", TF_TB_ML) \
+    X(ModRoute12Depth, "mod.route12.depth", "Depth", -1.0f, 1.0f, 0.0f, Linear, Linear, 0.05f, "", TF_TB_ML) \
+    X(ModRoute13Depth, "mod.route13.depth", "Depth", -1.0f, 1.0f, 0.0f, Linear, Linear, 0.05f, "", TF_TB_ML) \
+    X(ModRoute14Depth, "mod.route14.depth", "Depth", -1.0f, 1.0f, 0.0f, Linear, Linear, 0.05f, "", TF_TB_ML) \
+    X(ModRoute15Depth, "mod.route15.depth", "Depth", -1.0f, 1.0f, 0.0f, Linear, Linear, 0.05f, "", TF_TB_ML) \
+    X(ModRoute16Depth, "mod.route16.depth", "Depth", -1.0f, 1.0f, 0.0f, Linear, Linear, 0.05f, "", TF_TB_ML)
 
 enum class P : ParamIndex
 {

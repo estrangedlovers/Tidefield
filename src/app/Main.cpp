@@ -176,6 +176,13 @@ public:
         auto* view = new gui::MainView(*core);
         window = std::make_unique<MainWindow>(getApplicationName() + " - " + core->session.getName(), view);
 
+        if (const auto page = commandLine.fromFirstOccurrenceOf("--page=", false, false).upToFirstOccurrenceOf(" ", false, false); page.isNotEmpty())
+            juce::Timer::callAfterDelay(300, [this, page] {
+                if (auto* v = window != nullptr ? dynamic_cast<gui::MainView*>(window->getContentComponent()) : nullptr)
+                    for (int p = 0; p < gui::DeviceView::NumPages; ++p)
+                        if (gui::DeviceView::pageName(p).equalsIgnoreCase(page))
+                            v->showPage(p);
+            });
         if (commandLine.contains("--ui-test"))
         {
             juce::Timer::callAfterDelay(500, [this] {

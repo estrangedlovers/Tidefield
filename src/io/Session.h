@@ -20,6 +20,7 @@ class PathManager;
 class GestureManager;
 class SceneManager;
 class SeasonManager;
+class ModRouteManager;
 }
 
 namespace tf::io {
@@ -42,6 +43,7 @@ struct SessionData
     std::map<std::string, std::string> fx;
     juce::var midi;
     juce::var seasons;
+    juce::var modRoutes;
     std::vector<engine::Point2> path;
     juce::var gesture;
     std::map<std::string, std::shared_ptr<const dsp::SampleBuffer>> samples;
@@ -52,18 +54,21 @@ struct SessionData
 SessionData captureSession(const engine::Engine& engine, const engine::TelemetryFrame& latest, const engine::SceneManager& scenes,
                            const engine::FxManager& fx, const engine::MidiManager* midi = nullptr,
                            const engine::SeasonManager* seasons = nullptr, const engine::PathManager* path = nullptr,
-                           const engine::GestureManager* gestures = nullptr);
+                           const engine::GestureManager* gestures = nullptr, const engine::ModRouteManager* mod = nullptr);
 
 std::vector<std::string> applySession(const SessionData& session, engine::Engine& engine, engine::SceneManager& scenes,
                                       engine::FxManager& fx, bool snap, engine::MidiManager* midi = nullptr,
                                       engine::SeasonManager* seasons = nullptr, engine::PathManager* path = nullptr,
-                                      engine::GestureManager* gestures = nullptr);
+                                      engine::GestureManager* gestures = nullptr, engine::ModRouteManager* mod = nullptr);
 
 juce::var midiToJson(const engine::MidiManager& midi, const engine::ParamRegistry& registry);
 std::vector<std::string> applyMidiJson(const juce::var& json, engine::MidiManager& midi, const engine::ParamRegistry& registry);
 
 juce::var seasonsToJson(const engine::SeasonManager& seasons, const engine::ParamRegistry& registry);
 std::vector<std::string> applySeasonsJson(const juce::var& json, engine::SeasonManager& seasons, const engine::ParamRegistry& registry);
+
+juce::var modRoutesToJson(const engine::ModRouteManager& mod, const engine::ParamRegistry& registry);
+std::vector<std::string> applyModRoutesJson(const juce::var& json, engine::ModRouteManager& mod, const engine::ParamRegistry& registry);
 
 juce::var gestureToJson(const engine::GestureTake& take, const engine::ParamRegistry& registry);
 std::vector<std::string> applyGestureJson(const juce::var& json, engine::GestureManager& gestures, const engine::ParamRegistry& registry);

@@ -1,6 +1,7 @@
 #pragma once
 
 #include "../mix/Layout.h"
+#include "../mod/ModMatrix.h"
 #include "../params/ParamDefs.h"
 #include "../perform/Gesture.h"
 #include "../scene/SceneSet.h"
@@ -87,6 +88,8 @@ struct TelemetryFrame
     std::array<float, kMaxScenes> sceneWeights {};
 
     std::array<float, kNumParams> paramTargets {};
+    std::array<float, kNumParams> paramMod {};
+    std::array<float, kNumModSources> modValue {};
     std::array<std::uint8_t, kNumParams> live {};
 
     std::array<std::int8_t, kNumParams> midiPickup {};

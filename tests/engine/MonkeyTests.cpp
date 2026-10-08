@@ -3,6 +3,7 @@
 #include <dsp/fx/ProcessorFactory.h>
 #include <engine/Engine.h>
 #include <engine/mix/FxManager.h>
+#include <engine/mod/ModRouteManager.h>
 #include <engine/mod/SeasonManager.h>
 #include <engine/scene/SceneManager.h>
 
@@ -25,6 +26,7 @@ TEST_CASE("Monkey: random everything never breaks the output", "[monkey]")
     SceneManager scenes(engine);
     FxManager fx(engine);
     SeasonManager seasons(engine);
+    ModRouteManager routes(engine);
     fx.loadDefaultLayout();
 
     auto glass = std::make_shared<dsp::SampleBuffer>();
@@ -75,6 +77,11 @@ TEST_CASE("Monkey: random everything never breaks the output", "[monkey]")
             s.periodSeconds = 20.0f + 100.0f * rng.nextFloat();
             seasons.set(static_cast<int>(seasons.getSeasons().size()) % kMaxSeasons, s);
         }
+        if (rng.chance(0.005f))
+            routes.add(static_cast<ModSource>(rng.nextInt(kNumModSources)), static_cast<ParamIndex>(rng.nextInt(static_cast<int>(kNumParams))),
+                       rng.nextBipolar());
+        if (rng.chance(0.003f) && ! routes.getRoutes().empty())
+            routes.remove(rng.nextInt(static_cast<int>(routes.getRoutes().size())));
         if (rng.chance(0.01f))
             engine.command(Command::FadeIn);
 
@@ -96,6 +103,7 @@ TEST_CASE("Monkey: random everything never breaks the output", "[monkey]")
         scenes.tick();
         fx.tick();
         seasons.tick();
+        routes.tick();
         engine.collectGarbage();
         TelemetryFrame f;
         while (engine.popTelemetry(f)) {}
@@ -103,5 +111,24 @@ TEST_CASE("Monkey: random everything never breaks the output", "[monkey]")
         while (engine.popNotice(notice)) {}
         t += n / kFs;
     }
-    CHECK(peak > 0.01f);
+
+    engine.command(Command::ResumeFromPanic);
+    engine.setParam(P::MasterFadeSecs, 0.5f);
+    engine.setParam(P::MasterLevel, 0.0f);
+    engine.command(Command::FadeIn);
+    float recovered = 0.0f;
+    for (int b = 0; b < static_cast<int>(3.0 * kFs / 512); ++b)
+    {
+        float* outs[2] = { l.data(), r.data() };
+        const float* ins[2] = { in.data(), in.data() };
+        engine.process(ins, 2, outs, 2, 512);
+        for (int i = 0; i < 512; ++i)
+            recovered = std::max({ recovered, std::fabs(l[static_cast<std::size_t>(i)]), std::fabs(r[static_cast<std::size_t>(i)]) });
+        TelemetryFrame f;
+        while (engine.popTelemetry(f)) {}
+        EngineNotice notice;
+        while (engine.popNotice(notice)) {}
+    }
+    CHECK(recovered > 0.01f);
+    CHECK(recovered <= ceiling);
 }

@@ -10,3 +10,4 @@ ui/dist/
 !resources/samples/*.wav
 !resources/**/*.wav
 ui/node_modules/
+.claude/worktrees/

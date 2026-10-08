@@ -10,8 +10,8 @@ const char* const kWildcard = "*.tidefield";
 
 SessionController::SessionController(engine::Engine& e, engine::SceneManager& s, engine::FxManager& f, engine::MidiManager* m,
                                      engine::SeasonManager* sm, engine::PathManager* pm,
-                                     engine::GestureManager* gm)
-    : engine(e), scenes(s), fx(f), midi(m), seasons(sm), path(pm), gestures(gm)
+                                     engine::GestureManager* gm, engine::ModRouteManager* mm)
+    : engine(e), scenes(s), fx(f), midi(m), seasons(sm), path(pm), gestures(gm), mod(mm)
 {
 }
 
@@ -86,7 +86,7 @@ void SessionController::applyNow()
         return;
     const bool resume = waitingForFadeOut;
     waitingForFadeOut = false;
-    auto warnings = io::applySession(*pending, engine, scenes, fx, true, midi, seasons, path, gestures);
+    auto warnings = io::applySession(*pending, engine, scenes, fx, true, midi, seasons, path, gestures, mod);
     if (onApplied)
         onApplied(*pending);
     const auto fadeIt = pending->params.find("master.fadeSeconds");
@@ -140,7 +140,7 @@ void SessionController::saveTo(const juce::File& file)
     if (busy)
         return;
     busy = true;
-    auto data = std::make_shared<io::SessionData>(io::captureSession(engine, latest, scenes, fx, midi, seasons, path, gestures));
+    auto data = std::make_shared<io::SessionData>(io::captureSession(engine, latest, scenes, fx, midi, seasons, path, gestures, mod));
     data->name = file.getFileNameWithoutExtension().toStdString();
     if (onStatus)
         onStatus("Saving " + file.getFileName() + "...");

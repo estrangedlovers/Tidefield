@@ -1,6 +1,7 @@
 #include <engine/Engine.h>
 #include <engine/midi/MidiManager.h>
 #include <engine/mix/FxManager.h>
+#include <engine/mod/ModRouteManager.h>
 #include <engine/mod/SeasonManager.h>
 #include <engine/perform/GestureManager.h>
 #include <engine/scene/PathManager.h>
@@ -262,6 +263,49 @@ TEST_CASE("Seasons round-trip through a session and an empty list clears them", 
 
     io::applySession(io::defaultSession(e2), e2, scenes2, fx2, true, nullptr, &seasons2);
     CHECK(seasons2.getSeasons().empty());
+}
+
+TEST_CASE("Modulation routes round-trip through a session and unknown ones become warnings", "[session][mod]")
+{
+    engine::Engine e;
+    e.prepare(kFs, 256);
+    engine::SceneManager scenes(e);
+    engine::FxManager fx(e);
+    engine::ModRouteManager mod(e);
+    REQUIRE(mod.add(engine::ModSource::Lfo2, engine::idx(engine::P::DroneCutoff), 0.3f) == 0);
+    REQUIRE(mod.add(engine::ModSource::InputLevel, engine::idx(engine::P::BloomTone), -0.5f) == 1);
+    mod.remove(0);
+    REQUIRE(mod.add(engine::ModSource::Random2, engine::idx(engine::P::Cloud1Spray), 0.2f) == 1);
+
+    engine::TelemetryFrame frame;
+    auto data = io::captureSession(e, frame, scenes, fx, nullptr, nullptr, nullptr, nullptr, &mod);
+    auto json = io::sessionToJson(data);
+    juce::String error;
+    auto parsed = io::sessionFromJson(juce::JSON::parse(juce::JSON::toString(json)), error);
+    REQUIRE(parsed.has_value());
+
+    engine::Engine e2;
+    e2.prepare(kFs, 256);
+    engine::SceneManager scenes2(e2);
+    engine::FxManager fx2(e2);
+    engine::ModRouteManager mod2(e2);
+    REQUIRE(io::applySession(*parsed, e2, scenes2, fx2, true, nullptr, nullptr, nullptr, nullptr, &mod2).empty());
+    REQUIRE(mod2.getRoutes().size() == 2);
+    CHECK(mod2.getRoutes()[0].source == engine::ModSource::InputLevel);
+    CHECK(mod2.getRoutes()[0].param == engine::idx(engine::P::BloomTone));
+    CHECK(mod2.getRoutes()[0].slot == 1);
+    CHECK(mod2.getRoutes()[1].source == engine::ModSource::Random2);
+    CHECK(mod2.getRoutes()[1].slot == 0);
+
+    auto* routes = json.getProperty("modRoutes", {}).getArray();
+    REQUIRE(routes != nullptr);
+    routes->getReference(0).getDynamicObject()->setProperty("source", "theremin");
+    parsed = io::sessionFromJson(juce::JSON::parse(juce::JSON::toString(json)), error);
+    CHECK(io::applySession(*parsed, e2, scenes2, fx2, true, nullptr, nullptr, nullptr, nullptr, &mod2).size() == 1);
+    CHECK(mod2.getRoutes().size() == 1);
+
+    io::applySession(io::defaultSession(e2), e2, scenes2, fx2, true, nullptr, nullptr, nullptr, nullptr, &mod2);
+    CHECK(mod2.getRoutes().empty());
 }
 
 TEST_CASE("A session from before a parameter or slot existed resets it to default", "[session]")

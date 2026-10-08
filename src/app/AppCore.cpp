@@ -8,8 +8,8 @@
 
 namespace tf::app {
 AppCore::AppCore(Host& h)
-    : host(h), engine(h.getEngine()), scenes(h.getEngine()), fx(h.getEngine()), catcher(h.getEngine()), midi(h.getEngine()), seasons(h.getEngine()), paths(h.getEngine()), gestures(h.getEngine()),
-      session(h.getEngine(), scenes, fx, &midi, &seasons, &paths, &gestures), recorder(h.getEngine().getRecordTap())
+    : host(h), engine(h.getEngine()), scenes(h.getEngine()), fx(h.getEngine()), catcher(h.getEngine()), midi(h.getEngine()), seasons(h.getEngine()), paths(h.getEngine()), gestures(h.getEngine()), mod(h.getEngine()),
+      session(h.getEngine(), scenes, fx, &midi, &seasons, &paths, &gestures, &mod), recorder(h.getEngine().getRecordTap())
 {
     engine.setGuardrailsEnabled(true);
     session.setWorkers(&workers);
@@ -170,6 +170,7 @@ void AppCore::timerCallback()
     seasons.tick();
     paths.tick();
     gestures.tick();
+    mod.tick();
     engine.collectGarbage();
 
     engine::RawMidi monitored;

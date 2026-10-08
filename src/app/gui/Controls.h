@@ -52,6 +52,7 @@ public:
 
 private:
     juce::String lastText;
+    float shownMod = 0.0f;
 };
 
 class Fader final : public ParamComponent

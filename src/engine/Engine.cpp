@@ -103,6 +103,16 @@ void Engine::prepare(double newSampleRate, int maxBlockSize)
     cursorY.reset(params.current(P::TerrainY));
     wander.setSeed(config.seed ^ 0x77616e64ull);
     loopRng.setSeed(config.seed ^ 0x6c6f6f70ull);
+    modRng.setSeed(config.seed ^ 0x6d6f6475ull);
+    lfoPhase = {};
+    lfoStep = {};
+    randomValue = randomTarget = randomClock = {};
+    modValue = {};
+    inputEnergy = inputDiffEnergy = mixEnergy = 0.0;
+    inputEnergyCount = mixEnergyCount = 0;
+    inputPrev = inputFollow = brightFollow = mixFollow = 0.0f;
+    lastVelocity = modWheel = pressure = 0.0f;
+    lastNote = 60.0f;
     loopPattern = -1;
     loopCycle.fill(std::numeric_limits<std::int64_t>::min());
     beatPos = 0.0;
@@ -273,6 +283,7 @@ void Engine::collectGarbage()
     sceneChannel.collectGarbage();
     seasonChannel.collectGarbage();
     pathChannel.collectGarbage();
+    modChannel.collectGarbage();
     gestureChannel.collectGarbage();
     midiMapChannel.collectGarbage();
     bloomBuffers.collectGarbage();
@@ -305,6 +316,7 @@ void Engine::drainControl() noexcept
     sceneChannel.acquire();
     seasonChannel.acquire();
     pathChannel.acquire();
+    modChannel.acquire();
     gestureChannel.acquire();
     if (midiMapChannel.acquire())
     {
@@ -429,6 +441,8 @@ void Engine::handleMidi(const RawMidi& m) noexcept
         }
         if (m.isCc())
         {
+            if (m.data1 == 1)
+                modWheel = static_cast<float>(m.data2) / 127.0f;
             if (m.data1 == 64)
             {
                 sustainPedal = m.data2 >= 64;
@@ -441,8 +455,13 @@ void Engine::handleMidi(const RawMidi& m) noexcept
     const bool channelOk = map == nullptr || map->noteChannel < 0 || map->noteChannel == ch;
     if (! channelOk)
         return;
+    if (m.type() == 0xd0)
+        pressure = static_cast<float>(m.data1) / 127.0f;
+    else if (m.type() == 0xa0)
+        pressure = std::max(pressure * 0.98f, static_cast<float>(m.data2) / 127.0f);
     if (m.isNoteOn())
     {
+        trackNote(m.data1, static_cast<float>(m.data2) / 127.0f);
         bloom.noteOn(m.data1, static_cast<float>(m.data2) / 127.0f);
         if (map != nullptr && map->notesToDrone)
         {
@@ -605,6 +624,7 @@ void Engine::applyEvent(const ControlEvent& e) noexcept
             break;
 
         case ControlEvent::Type::Note:
+            trackNote(static_cast<int>(e.param), e.value);
             if (e.value > 0.0f)
                 bloom.noteOn(static_cast<int>(e.param), e.value);
             else
@@ -927,6 +947,16 @@ void Engine::updateModulation(float dt) noexcept
             params.addModulation(idx(P::TideRate), -0.273f * dsp::smoothstep(std::clamp(slowEnv, 0.0f, 1.0f)));
     }
 
+    updateModSources(dt);
+    if (const auto* routes = modChannel.current())
+        for (int k = 0; k < routes->count; ++k)
+        {
+            const auto& r = routes->routes[static_cast<std::size_t>(k)];
+            const float depth = params.current(static_cast<ParamIndex>(idx(P::ModRoute1Depth) + routes->slot[static_cast<std::size_t>(k)]));
+            if (depth != 0.0f)
+                params.addModulation(r.param, depth * modValue[static_cast<std::size_t>(r.source)]);
+        }
+
     const auto* set = seasonChannel.current();
     if (set == nullptr)
         return;
@@ -960,6 +990,91 @@ void Engine::updateModulation(float dt) noexcept
         seasonValue[uk] = v;
         params.addModulation(s.param, v * s.depth * depthAll);
     }
+}
+
+void Engine::updateModSources(float dt) noexcept
+{
+    const float scaled = dt * tide;
+    for (int k = 0; k < kNumLfos; ++k)
+    {
+        const auto uk = static_cast<std::size_t>(k);
+        const auto rateParam = static_cast<ParamIndex>(idx(P::ModLfo1Rate) + 2 * k);
+        const float rate = params.current(rateParam);
+        const int shape = static_cast<int>(std::lround(params.current(static_cast<ParamIndex>(rateParam + 1))));
+        float& ph = lfoPhase[uk];
+        ph += rate * scaled;
+        if (ph >= 1.0f)
+        {
+            ph -= std::floor(ph);
+            lfoStep[uk] = modRng.nextBipolar();
+        }
+        float v = 0.0f;
+        switch (shape)
+        {
+            case 0: v = std::sin(dsp::kTwoPi * ph); break;
+            case 1: v = 1.0f - 4.0f * std::fabs(ph - 0.5f); break;
+            case 2: v = 2.0f * ph - 1.0f; break;
+            case 3: v = ph < 0.5f ? 1.0f : -1.0f; break;
+            default: v = lfoStep[uk]; break;
+        }
+        modValue[static_cast<std::size_t>(ModSource::Lfo1) + uk] = v;
+    }
+    for (int k = 0; k < kNumRandoms; ++k)
+    {
+        const auto uk = static_cast<std::size_t>(k);
+        const auto rateParam = static_cast<ParamIndex>(idx(P::ModRandom1Rate) + 2 * k);
+        const float rate = params.current(rateParam);
+        const float smooth = params.current(static_cast<ParamIndex>(rateParam + 1));
+        randomClock[uk] += rate * scaled;
+        if (randomClock[uk] >= 1.0f)
+        {
+            randomClock[uk] -= std::floor(randomClock[uk]);
+            randomTarget[uk] = modRng.nextBipolar();
+        }
+        const float glideSeconds = smooth * 0.98f / std::max(0.01f, rate) + 1.0e-3f;
+        randomValue[uk] += (randomTarget[uk] - randomValue[uk]) * (1.0f - std::exp(-scaled / glideSeconds));
+        randomValue[uk] = dsp::flushDenormal(randomValue[uk]);
+        modValue[static_cast<std::size_t>(ModSource::Random1) + uk] = randomValue[uk];
+    }
+
+    const float attack = params.current(P::ModFollowAttack);
+    const float release = params.current(P::ModFollowRelease);
+    const float sensitivity = dsp::dbToGain(params.current(P::ModFollowGain));
+    auto follow = [&](float& state, float target) {
+        const float t = target > state ? attack : release;
+        state = dsp::flushDenormal(state + (target - state) * (1.0f - std::exp(-dt / t)));
+        return std::clamp(state, 0.0f, 1.0f);
+    };
+    auto levelOf = [&](double energy, int count) {
+        if (count <= 0)
+            return 0.0f;
+        const float rms = static_cast<float>(std::sqrt(energy / count)) * sensitivity;
+        const float db = 20.0f * std::log10(std::max(rms, 1.0e-6f));
+        return std::clamp((db + 60.0f) / 60.0f, 0.0f, 1.0f);
+    };
+    const float inLevel = levelOf(inputEnergy, inputEnergyCount);
+    const float bright = inputEnergy > 1.0e-9 ? std::clamp(static_cast<float>(std::sqrt(inputDiffEnergy / (4.0 * inputEnergy))) * 2.5f, 0.0f, 1.0f)
+                                              : 0.0f;
+    modValue[static_cast<std::size_t>(ModSource::InputLevel)] = follow(inputFollow, inLevel);
+    modValue[static_cast<std::size_t>(ModSource::InputBrightness)] = follow(brightFollow, inLevel > 0.05f ? bright : brightFollow);
+    modValue[static_cast<std::size_t>(ModSource::MixLevel)] = follow(mixFollow, levelOf(mixEnergy, mixEnergyCount));
+    inputEnergy = inputDiffEnergy = mixEnergy = 0.0;
+    inputEnergyCount = mixEnergyCount = 0;
+
+    modValue[static_cast<std::size_t>(ModSource::Velocity)] = lastVelocity;
+    modValue[static_cast<std::size_t>(ModSource::NotePitch)] = std::clamp((lastNote - 24.0f) / 72.0f, 0.0f, 1.0f);
+    modValue[static_cast<std::size_t>(ModSource::ModWheel)] = modWheel;
+    modValue[static_cast<std::size_t>(ModSource::Pressure)] = pressure;
+    modValue[static_cast<std::size_t>(ModSource::TerrainX)] = position.x;
+    modValue[static_cast<std::size_t>(ModSource::TerrainY)] = position.y;
+}
+
+void Engine::trackNote(int note, float velocity) noexcept
+{
+    if (velocity <= 0.0f)
+        return;
+    lastVelocity = std::clamp(velocity, 0.0f, 1.0f);
+    lastNote = static_cast<float>(note);
 }
 
 void Engine::updateTempo(float dt) noexcept
@@ -1066,6 +1181,15 @@ void Engine::processChunk(const float* const* inputs, int numInputs, int inputOf
 
     float* in = inputMono.data() + o;
     liveInput.process(inputs, numInputs, inputOffset, in, n);
+    for (int i = 0; i < n; ++i)
+    {
+        const float d = in[i] - inputPrev;
+        inputPrev = in[i];
+        inputEnergy += static_cast<double>(in[i]) * in[i];
+        inputDiffEnergy += static_cast<double>(d) * d;
+    }
+    inputEnergyCount += n;
+    inputPrev = dsp::flushDenormal(inputPrev);
     {
         auto pos = inputWritten.load(std::memory_order_relaxed);
         for (int i = 0; i < n; ++i, ++pos)
@@ -1404,7 +1528,10 @@ void Engine::process(const float* const* inputs, int numInputs, float* const* ou
             const auto ring = static_cast<std::size_t>((preWritten + static_cast<std::uint64_t>(i)) % preCapacity);
             preRingL[ring] = masterL[static_cast<std::size_t>(i)];
             preRingR[ring] = masterR[static_cast<std::size_t>(i)];
+            mixEnergy += 0.5 * (static_cast<double>(masterL[static_cast<std::size_t>(i)]) * masterL[static_cast<std::size_t>(i)]
+                                + static_cast<double>(masterR[static_cast<std::size_t>(i)]) * masterR[static_cast<std::size_t>(i)]);
         }
+        mixEnergyCount += block;
         preWritten += static_cast<std::uint64_t>(block);
         medium.process(masterL.data(), masterR.data(), block);
         autoMaster.process(masterL.data(), masterR.data(), block);
@@ -1601,10 +1728,12 @@ void Engine::accumulateTelemetry(const float* l, const float* r, int n) noexcept
     for (std::size_t i = 0; i < kNumParams; ++i)
     {
         f.paramTargets[i] = params.target(static_cast<ParamIndex>(i));
+        f.paramMod[i] = params.modulation(static_cast<ParamIndex>(i));
         f.live[i] = live[i];
         f.midiPickup[i] = midiPickup[i];
     }
     f.sustainPedal = sustainPedal;
+    f.modValue = modValue;
 
     telemetryQueue.push(f);
 

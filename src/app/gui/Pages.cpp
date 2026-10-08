@@ -45,6 +45,17 @@ juce::String helpFor(P p)
         { P::LoopsRate, "pace of every cycle; they never line up" },
         { P::LoopsPattern, "which set of cycle lengths and notes" },
         { P::SeasonsDepth, "scales every season at once" },
+        { P::ModLfo1Rate, "how fast LFO 1 cycles; it follows Tide" },
+        { P::ModLfo2Rate, "how fast LFO 2 cycles; it follows Tide" },
+        { P::ModLfo3Rate, "how fast LFO 3 cycles; it follows Tide" },
+        { P::ModLfo4Rate, "how fast LFO 4 cycles; it follows Tide" },
+        { P::ModRandom1Rate, "how often Random 1 picks a new value" },
+        { P::ModRandom2Rate, "how often Random 2 picks a new value" },
+        { P::ModRandom1Smooth, "low: jumps to each new value; high: drifts there" },
+        { P::ModRandom2Smooth, "low: jumps to each new value; high: drifts there" },
+        { P::ModFollowAttack, "how quickly the followers rise when the sound gets louder" },
+        { P::ModFollowRelease, "how slowly the followers fall back when it gets quieter" },
+        { P::ModFollowGain, "raise for a quiet input, lower for a loud one" },
     };
     const auto it = help.find(p);
     return it != help.end() ? juce::String(it->second) : juce::String();
@@ -462,6 +473,215 @@ private:
     FlatButton addButton;
     std::size_t shownCount = 0;
     int frames = 0;
+};
+
+class ModMeter final : public juce::Component, public Animated
+{
+public:
+    ModMeter(Model& m, engine::ModSource s, bool label = false) : model(m), source(s), labelled(label) { model.add(this); }
+    ~ModMeter() override { model.remove(this); }
+
+    void tick() override
+    {
+        const float v = model.frame().modValue[static_cast<std::size_t>(source)];
+        trace[static_cast<std::size_t>(head)] = v;
+        head = (head + 1) % kTrace;
+        if (isShowing() && std::abs(v - shown) > 0.003f)
+        {
+            shown = v;
+            repaint();
+        }
+    }
+
+    void paint(juce::Graphics& g) override
+    {
+        auto r = getLocalBounds().toFloat();
+        drawWell(g, r);
+        r = r.reduced(4.0f, 3.0f);
+        const bool bipolar = engine::kModSources[static_cast<std::size_t>(source)].bipolar;
+        auto yOf = [&](float v) { return bipolar ? r.getCentreY() - v * r.getHeight() * 0.5f : r.getBottom() - v * r.getHeight(); };
+        if (bipolar)
+        {
+            g.setColour(display::wellLine());
+            g.drawHorizontalLine(juce::roundToInt(r.getCentreY()), r.getX(), r.getRight());
+        }
+        juce::Path line;
+        for (int k = 0; k < kTrace; ++k)
+        {
+            const float v = trace[static_cast<std::size_t>((head + k) % kTrace)];
+            const float x = r.getX() + r.getWidth() * static_cast<float>(k) / static_cast<float>(kTrace - 1);
+            k == 0 ? line.startNewSubPath(x, yOf(v)) : line.lineTo(x, yOf(v));
+        }
+        g.setColour(display::tide());
+        g.strokePath(line, juce::PathStrokeType(1.5f));
+        g.fillEllipse(juce::Rectangle<float>(6.0f, 6.0f).withCentre({ r.getRight(), yOf(shown) }));
+        if (labelled)
+        {
+            g.setFont(caps(9.0f));
+            g.setColour(display::textFaint());
+            g.drawText(juce::String(engine::kModSources[static_cast<std::size_t>(source)].name).toUpperCase(), r, juce::Justification::topLeft, false);
+        }
+    }
+
+    void mouseEnter(const juce::MouseEvent&) override
+    {
+        if (model.onHover)
+            model.onHover(juce::String(engine::kModSources[static_cast<std::size_t>(source)].name)
+                          + ": right-click any knob and choose Modulate with to let this move it");
+    }
+
+private:
+    static constexpr int kTrace = 90;
+    Model& model;
+    engine::ModSource source;
+    bool labelled = false;
+    std::array<float, kTrace> trace {};
+    int head = 0;
+    float shown = 0.0f;
+};
+
+class RouteList final : public juce::Component, public Animated
+{
+public:
+    explicit RouteList(Model& m) : model(m), addButton("Add a route")
+    {
+        model.add(this);
+        addButton.setHelp(&model, "let a source move any control; the depth knob sets how far and which way");
+        addButton.onClick = [this] { showSourceMenu(); };
+        addAndMakeVisible(addButton);
+        rebuild();
+    }
+    ~RouteList() override { model.remove(this); }
+
+    void tick() override
+    {
+        if (signature() != shownSignature)
+            rebuild();
+    }
+
+    void resized() override
+    {
+        auto r = getLocalBounds();
+        addButton.setBounds(r.removeFromBottom(24).removeFromLeft(140));
+        r.removeFromBottom(4);
+        const int colW = (r.getWidth() - kGap) / 2;
+        for (std::size_t k = 0; k < knobs.size(); ++k)
+        {
+            const int col = static_cast<int>(k) / kRowsPerColumn, row = static_cast<int>(k) % kRowsPerColumn;
+            auto cell = juce::Rectangle<int>(r.getX() + col * (colW + kGap), r.getY() + row * kRowH, colW, kRowH);
+            knobs[k]->setBounds(cell.removeFromRight(kKnobW));
+        }
+    }
+
+    void paint(juce::Graphics& g) override
+    {
+        auto r = getLocalBounds().toFloat().withTrimmedBottom(28.0f);
+        drawWell(g, r);
+        const auto& routes = model.core.mod.getRoutes();
+        if (routes.empty())
+        {
+            g.setFont(font(11.5f));
+            g.setColour(display::textFaint());
+            g.drawText("No routes yet. Right-click any knob and choose Modulate with, or add one here.", r.reduced(8.0f),
+                       juce::Justification::centred, true);
+            return;
+        }
+        const float colW = (r.getWidth() - static_cast<float>(kGap)) / 2.0f;
+        for (std::size_t k = 0; k < routes.size(); ++k)
+        {
+            const int col = static_cast<int>(k) / kRowsPerColumn, row = static_cast<int>(k) % kRowsPerColumn;
+            auto cell = juce::Rectangle<float>(r.getX() + static_cast<float>(col) * (colW + static_cast<float>(kGap)),
+                                               r.getY() + static_cast<float>(row * kRowH), colW, static_cast<float>(kRowH))
+                            .withTrimmedRight(static_cast<float>(kKnobW));
+            const auto& route = routes[k];
+            g.setColour(colour::forScene(static_cast<int>(route.source)));
+            g.fillRoundedRectangle(cell.removeFromLeft(4.0f).reduced(0.0f, 8.0f).translated(6.0f, 0.0f), 1.0f);
+            cell.removeFromLeft(14.0f);
+            auto top = cell.removeFromTop(cell.getHeight() * 0.5f);
+            g.setFont(font(11.5f, 600));
+            g.setColour(display::text());
+            g.drawText(engine::kModSources[static_cast<std::size_t>(route.source)].name, top, juce::Justification::bottomLeft, true);
+            g.setFont(font(11.0f));
+            g.setColour(display::textDim());
+            g.drawText(juce::String::fromUTF8("\xe2\x86\x92 ") + model.longName(route.param), cell, juce::Justification::topLeft, true);
+            g.setColour(display::textFaint());
+            g.drawText("x", juce::Rectangle<float>(cell.getRight() - 14.0f, top.getY(), 14.0f, top.getHeight() * 2.0f), juce::Justification::centred);
+        }
+    }
+
+    void mouseDown(const juce::MouseEvent& e) override
+    {
+        const int k = rowAt(e.getPosition());
+        if (k >= 0)
+            later(this, [this, k] { model.core.mod.remove(k); });
+    }
+
+private:
+    static constexpr int kRowH = 40, kKnobW = 46, kRowsPerColumn = 8;
+
+    int rowAt(juce::Point<int> p) const
+    {
+        const auto r = getLocalBounds().withTrimmedBottom(28);
+        const int colW = (r.getWidth() - kGap) / 2;
+        const int col = (p.x - r.getX()) / (colW + kGap), row = (p.y - r.getY()) / kRowH;
+        const int k = col * kRowsPerColumn + row;
+        const int xInCol = p.x - r.getX() - col * (colW + kGap);
+        if (col < 0 || col > 1 || row < 0 || row >= kRowsPerColumn || k >= static_cast<int>(model.core.mod.getRoutes().size()))
+            return -1;
+        return xInCol > colW - kKnobW - 18 && xInCol < colW - kKnobW ? k : -1;
+    }
+
+    juce::String signature() const
+    {
+        juce::String sig;
+        for (const auto& r : model.core.mod.getRoutes())
+            sig << static_cast<int>(r.source) << ":" << static_cast<int>(r.param) << ":" << r.slot << ";";
+        return sig;
+    }
+
+    void rebuild()
+    {
+        shownSignature = signature();
+        for (auto& k : knobs)
+            removeChildComponent(k.get());
+        knobs.clear();
+        for (const auto& route : model.core.mod.getRoutes())
+        {
+            auto k = std::make_unique<Knob>(model, static_cast<P>(engine::idx(P::ModRoute1Depth) + route.slot),
+                                            "how far " + juce::String(engine::kModSources[static_cast<std::size_t>(route.source)].name)
+                                                + " moves " + model.longName(route.param) + "; left of centre moves it the other way");
+            k->setLabel("Depth");
+            addAndMakeVisible(*k);
+            knobs.push_back(std::move(k));
+        }
+        resized();
+        repaint();
+    }
+
+    void showSourceMenu()
+    {
+        juce::PopupMenu m;
+        m.addSectionHeader("Which source?");
+        for (int s = 0; s < engine::kNumModSources; ++s)
+            m.addItem(1 + s, engine::kModSources[static_cast<std::size_t>(s)].name);
+        showMenu(m, this, [this](int r) { showTargetMenu(static_cast<engine::ModSource>(r - 1)); });
+    }
+
+    void showTargetMenu(engine::ModSource source)
+    {
+        juce::PopupMenu m;
+        m.addSectionHeader("What should " + juce::String(engine::kModSources[static_cast<std::size_t>(source)].name) + " move?");
+        model.addParamMenus(m, [this](engine::ParamIndex i) {
+            const juce::String id(model.registry.spec(i).id);
+            return model.core.mod.canModulate(i) && ! id.startsWith("mod.") && ! id.startsWith("terrain.x") && ! id.startsWith("terrain.y");
+        }, 1);
+        showMenu(m, this, [this, source](int r) { model.modulate(source, static_cast<engine::ParamIndex>(r - 1)); });
+    }
+
+    Model& model;
+    FlatButton addButton;
+    std::vector<std::unique_ptr<Knob>> knobs;
+    juce::String shownSignature;
 };
 
 class MidiView final : public juce::Component, public Animated, private juce::ListBoxModel
@@ -919,7 +1139,7 @@ DeviceView::~DeviceView()
 
 juce::String DeviceView::pageName(int p)
 {
-    static const char* names[] = { "Drone", "Clouds", "Resonator", "Bloom", "Input", "Looper", "Weather", "Gestures", "Cycles", "Seasons", "Mixer", "Effects", "Master", "MIDI" };
+    static const char* names[] = { "Drone", "Clouds", "Resonator", "Bloom", "Input", "Looper", "Weather", "Gestures", "Cycles", "Seasons", "Modulation", "Mixer", "Effects", "Master", "MIDI" };
     return names[juce::jlimit(0, NumPages - 1, p)];
 }
 
@@ -1185,6 +1405,32 @@ void DeviceView::build()
             d.add(std::make_unique<SeasonList>(model), 560, 0);
             auto& g = device("All seasons", sceneTint(8));
             params(g, { P::SeasonsDepth });
+            break;
+        }
+        case Modulation:
+        {
+            auto& routes = device("Routes", colour::tide());
+            routes.add(std::make_unique<RouteList>(model), 620, 0);
+            for (int k = 0; k < engine::kNumLfos; ++k)
+            {
+                auto& d = device("LFO " + juce::String(k + 1), colour::forScene(k));
+                d.setTop(std::make_unique<ModMeter>(model, static_cast<engine::ModSource>(k)), 40, 2 * metric::knobW);
+                d.add(static_cast<P>(engine::idx(P::ModLfo1Rate) + 2 * k));
+                d.add(static_cast<P>(engine::idx(P::ModLfo1Rate) + 2 * k + 1));
+            }
+            for (int k = 0; k < engine::kNumRandoms; ++k)
+            {
+                auto& d = device("Random " + juce::String(k + 1), colour::forScene(4 + k));
+                d.setTop(std::make_unique<ModMeter>(model, static_cast<engine::ModSource>(static_cast<int>(engine::ModSource::Random1) + k)), 40,
+                         2 * metric::knobW);
+                d.add(static_cast<P>(engine::idx(P::ModRandom1Rate) + 2 * k));
+                d.add(static_cast<P>(engine::idx(P::ModRandom1Rate) + 2 * k + 1));
+            }
+            auto& f = device("Followers", colour::forScene(6));
+            f.add(std::make_unique<ModMeter>(model, engine::ModSource::InputLevel, true), 2 * metric::knobW, 34);
+            f.add(std::make_unique<ModMeter>(model, engine::ModSource::InputBrightness, true), 2 * metric::knobW, 34);
+            f.add(std::make_unique<ModMeter>(model, engine::ModSource::MixLevel, true), 2 * metric::knobW, 34);
+            params(f, { P::ModFollowAttack, P::ModFollowRelease, P::ModFollowGain });
             break;
         }
         case Mixer:

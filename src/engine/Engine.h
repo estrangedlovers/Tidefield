@@ -10,6 +10,7 @@
 #include "mix/FxSlot.h"
 #include "midi/MidiTypes.h"
 #include "mix/Layout.h"
+#include "mod/ModMatrix.h"
 #include "mod/Seasons.h"
 #include "params/ParamRegistry.h"
 #include "params/ParamState.h"
@@ -75,6 +76,7 @@ public:
     bool publishScenes(std::unique_ptr<SceneSet> scenes) { return sceneChannel.publish(std::move(scenes)); }
     bool publishSeasons(std::unique_ptr<SeasonSet> set) { return seasonChannel.publish(std::move(set)); }
     bool publishPath(std::unique_ptr<TerrainPath> path) { return pathChannel.publish(std::move(path)); }
+    bool publishModRoutes(std::unique_ptr<ModRouteSet> routes) { return modChannel.publish(std::move(routes)); }
 
     bool loadCloudSample(int cloud, std::shared_ptr<const dsp::SampleBuffer> buffer);
 
@@ -169,6 +171,17 @@ private:
     SnapshotChannel<SceneSet> sceneChannel;
     SnapshotChannel<SeasonSet> seasonChannel { 4 };
     SnapshotChannel<TerrainPath> pathChannel { 4 };
+    SnapshotChannel<ModRouteSet> modChannel { 4 };
+    std::array<float, kNumModSources> modValue {};
+    std::array<float, kNumLfos> lfoPhase {}, lfoStep {};
+    std::array<float, kNumRandoms> randomValue {}, randomTarget {}, randomClock {};
+    dsp::Random modRng;
+    double inputEnergy = 0.0, inputDiffEnergy = 0.0, mixEnergy = 0.0;
+    int inputEnergyCount = 0, mixEnergyCount = 0;
+    float inputPrev = 0.0f, inputFollow = 0.0f, brightFollow = 0.0f, mixFollow = 0.0f;
+    float lastVelocity = 0.0f, lastNote = 60.0f, modWheel = 0.0f, pressure = 0.0f;
+    void updateModSources(float dt) noexcept;
+    void trackNote(int note, float velocity) noexcept;
 
     std::array<std::unique_ptr<SpscQueue<RawMidi>>, kMaxMidiPorts> midiQueues;
     SpscQueue<RawMidi> midiMonitor { 512 };

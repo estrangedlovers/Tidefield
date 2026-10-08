@@ -54,6 +54,7 @@ add_library(tidefield_engine STATIC
     src/engine/capture/CatchManager.cpp
     src/engine/midi/MidiManager.cpp
     src/engine/mod/SeasonManager.cpp
+    src/engine/mod/ModRouteManager.cpp
     src/engine/scene/PathManager.cpp
     src/engine/perform/GestureManager.cpp
 )

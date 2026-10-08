@@ -5,6 +5,7 @@
 #include <engine/Engine.h>
 #include <engine/midi/MidiManager.h>
 #include <engine/mix/FxManager.h>
+#include <engine/mod/ModRouteManager.h>
 #include <engine/mod/SeasonManager.h>
 #include <engine/perform/GestureManager.h>
 #include <engine/scene/PathManager.h>
@@ -269,9 +270,49 @@ std::vector<std::string> applyGestureJson(const juce::var& json, engine::Gesture
     return warnings;
 }
 
+juce::var modRoutesToJson(const engine::ModRouteManager& mod, const engine::ParamRegistry& reg)
+{
+    juce::Array<juce::var> out;
+    for (const auto& r : mod.getRoutes())
+    {
+        auto* o = new juce::DynamicObject();
+        o->setProperty("source", juce::String(engine::kModSources[static_cast<std::size_t>(r.source)].id));
+        o->setProperty("param", juce::String(reg.spec(r.param).id));
+        o->setProperty("slot", r.slot);
+        out.add(juce::var(o));
+    }
+    return out;
+}
+
+std::vector<std::string> applyModRoutesJson(const juce::var& json, engine::ModRouteManager& mod, const engine::ParamRegistry& reg)
+{
+    std::vector<std::string> warnings;
+    std::vector<engine::ModRouteManager::Route> list;
+    if (const auto* arr = json.getArray())
+        for (const auto& v : *arr)
+        {
+            const auto sourceId = v.getProperty("source", "").toString().toStdString();
+            const auto paramId = v.getProperty("param", "").toString().toStdString();
+            const int source = engine::modSourceFromId(sourceId);
+            const auto param = reg.find(paramId);
+            if (source < 0 || ! param.has_value())
+            {
+                warnings.push_back("Modulation from '" + sourceId + "' to '" + paramId + "' was skipped: this version does not have it");
+                continue;
+            }
+            engine::ModRouteManager::Route r;
+            r.source = static_cast<engine::ModSource>(source);
+            r.param = *param;
+            r.slot = static_cast<int>(v.getProperty("slot", -1));
+            list.push_back(r);
+        }
+    mod.replaceAll(list);
+    return warnings;
+}
+
 SessionData captureSession(const engine::Engine& engine, const engine::TelemetryFrame& latest, const engine::SceneManager& scenes,
                            const engine::FxManager& fx, const engine::MidiManager* midi, const engine::SeasonManager* seasons,
-                           const engine::PathManager* path, const engine::GestureManager* gestures)
+                           const engine::PathManager* path, const engine::GestureManager* gestures, const engine::ModRouteManager* mod)
 {
     const auto& reg = engine.getRegistry();
     SessionData s;
@@ -307,6 +348,8 @@ SessionData captureSession(const engine::Engine& engine, const engine::Telemetry
         s.path = path->getStroke();
     if (gestures != nullptr && gestures->hasTake())
         s.gesture = gestureToJson(gestures->getTake(), reg);
+    if (mod != nullptr)
+        s.modRoutes = modRoutesToJson(*mod, reg);
     return s;
 }
 
@@ -327,7 +370,7 @@ SessionData defaultSession(const engine::Engine& engine)
 std::vector<std::string> applySession(const SessionData& session, engine::Engine& engine, engine::SceneManager& scenes,
                                       engine::FxManager& fx, bool snap, engine::MidiManager* midi,
                                       engine::SeasonManager* seasons, engine::PathManager* path,
-                                      engine::GestureManager* gestures)
+                                      engine::GestureManager* gestures, engine::ModRouteManager* mod)
 {
     const auto& reg = engine.getRegistry();
     std::vector<std::string> warnings = session.warnings;
@@ -411,6 +454,9 @@ std::vector<std::string> applySession(const SessionData& session, engine::Engine
     if (gestures != nullptr)
         for (auto& w : applyGestureJson(session.gesture, *gestures, reg))
             warnings.push_back(std::move(w));
+    if (mod != nullptr)
+        for (auto& w : applyModRoutesJson(session.modRoutes, *mod, reg))
+            warnings.push_back(std::move(w));
     return warnings;
 }
 
@@ -447,6 +493,8 @@ juce::var sessionToJson(const SessionData& s)
     root->setProperty("midi", s.midi);
     if (s.seasons.isArray())
         root->setProperty("seasons", s.seasons);
+    if (s.modRoutes.isArray())
+        root->setProperty("modRoutes", s.modRoutes);
     if (! s.path.empty())
     {
         juce::Array<juce::var> pts;
@@ -514,6 +562,7 @@ std::optional<SessionData> sessionFromJson(const juce::var& json, juce::String& 
             s.fx[prop.name.toString().toStdString()] = prop.value.toString().toStdString();
     s.midi = root->getProperty("midi");
     s.seasons = root->getProperty("seasons");
+    s.modRoutes = root->getProperty("modRoutes");
     s.gesture = root->getProperty("gesture");
     if (const auto* pts = root->getProperty("path").getArray())
         for (int i = 0; i + 1 < pts->size(); i += 2)

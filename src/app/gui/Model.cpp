@@ -115,6 +115,9 @@ juce::StringArray Model::choices(P p) const
         c = { "Live input", "The mix" };
     else if (id == "loops.target")
         c = { "Bloom", "Resonator", "Both" };
+    else if (id.starts_with("mod.lfo") && id.ends_with(".shape"))
+        for (const auto* n : engine::kLfoShapeNames)
+            c.add(n);
     else if (id == "master.autoTarget")
         c = { "Broadcast -23", "Streaming -16", "Loud -14" };
     else if (spec(p).flags & engine::ParamFlag::kDiscrete && spec(p).minValue == 0.0f && spec(p).maxValue == 1.0f)
@@ -173,6 +176,90 @@ juce::String Model::format(P p, float v) const
     return fixed(v, std::abs(s.maxValue - s.minValue) > 50.0f ? 0 : 2);
 }
 
+juce::String Model::groupName(engine::ParamIndex i) const
+{
+    const juce::String id(registry.spec(i).id);
+    for (int s = 0; s < engine::kNumFxSlots; ++s)
+    {
+        const juce::String slotId(engine::kFxSlots[static_cast<std::size_t>(s)].id);
+        if (id.startsWith(slotId + "."))
+            return engine::kFxSlots[static_cast<std::size_t>(s)].name;
+    }
+    const auto head = id.upToFirstOccurrenceOf(".", false, false);
+    if (head == "mod")
+    {
+        const auto part = id.fromFirstOccurrenceOf(".", false, false).upToFirstOccurrenceOf(".", false, false);
+        if (part.startsWith("lfo"))
+            return "LFO " + part.substring(3);
+        if (part.startsWith("random"))
+            return "Random " + part.substring(6);
+        if (part.startsWith("route"))
+            return "Route " + part.substring(5);
+        return "Followers";
+    }
+    static const std::pair<const char*, const char*> names[] = {
+        { "drone", "Drone" }, { "cloud1", "Cloud 1" }, { "cloud2", "Cloud 2" }, { "cloud3", "Cloud 3" }, { "cloud4", "Cloud 4" },
+        { "res", "Resonator" }, { "input", "Input" }, { "bloom", "Bloom" }, { "loop", "Looper" }, { "loops", "Cycles" },
+        { "weather", "Weather" }, { "freeze", "Freeze all" }, { "master", "Master" }, { "terrain", "Terrain" }, { "tide", "Tide" },
+        { "harmony", "Harmony" }, { "medium", "Medium" }, { "catch", "Catch" }, { "swell", "Swell" }, { "hush", "Hush" },
+        { "slow", "Slow" }, { "perform", "Shape" }, { "seasons", "Seasons" }, { "sync", "Tempo" }, { "busA", "Reverb return" },
+        { "busB", "Delay return" },
+    };
+    for (const auto& [key, name] : names)
+        if (head == key)
+            return name;
+    return head;
+}
+
+juce::String Model::longName(engine::ParamIndex i) const
+{
+    const juce::String id(registry.spec(i).id);
+    juce::String control = registry.spec(i).name;
+    for (int s = 0; s < engine::kNumFxSlots; ++s)
+    {
+        const auto first = engine::idx(engine::kFxSlots[static_cast<std::size_t>(s)].firstParam);
+        if (i >= first && i < first + 6)
+            if (const auto* info = core.fx.getInfo(s); info != nullptr && info->controls[static_cast<std::size_t>(i - first)].name[0] != 0)
+                control = info->controls[static_cast<std::size_t>(i - first)].name;
+    }
+    return groupName(i) + " " + control;
+}
+
+void Model::addParamMenus(juce::PopupMenu& menu, const std::function<bool(engine::ParamIndex)>& include, int idOffset) const
+{
+    std::vector<std::pair<juce::String, juce::PopupMenu>> groups;
+    for (engine::ParamIndex i = 0; i < engine::kNumParams; ++i)
+    {
+        if (! include(i))
+            continue;
+        const auto group = groupName(i);
+        auto it = std::find_if(groups.begin(), groups.end(), [&group](const auto& g) { return g.first == group; });
+        if (it == groups.end())
+        {
+            groups.emplace_back(group, juce::PopupMenu());
+            it = groups.end() - 1;
+        }
+        const auto full = longName(i);
+        it->second.addItem(static_cast<int>(i) + idOffset, full.fromFirstOccurrenceOf(group + " ", false, false).isNotEmpty()
+                                                               ? full.fromFirstOccurrenceOf(group + " ", false, false)
+                                                               : full);
+    }
+    for (auto& [name, sub] : groups)
+        menu.addSubMenu(name, sub);
+}
+
+void Model::modulate(engine::ModSource source, engine::ParamIndex param, float depth)
+{
+    if (core.mod.add(source, param, depth) < 0)
+    {
+        core.status(core.mod.freeSlot() < 0 ? "All 16 modulation routes are in use. Remove one on the Modulation tab." : "That control cannot be modulated.",
+                    true);
+        return;
+    }
+    core.status(juce::String(engine::kModSources[static_cast<std::size_t>(source)].name) + " now moves " + longName(param)
+                + ". Set the depth on the Modulation tab.");
+}
+
 void Model::showParamMenu(P p, juce::Component* owner)
 {
     const auto i = engine::idx(p);
@@ -186,7 +273,24 @@ void Model::showParamMenu(P p, juce::Component* owner)
     m.addSeparator();
     m.addItem(3, "Release to the terrain", isLive(p));
     m.addItem(4, "Reset to default");
+    if (core.mod.canModulate(i))
+    {
+        juce::PopupMenu sources;
+        for (int s = 0; s < engine::kNumModSources; ++s)
+            sources.addItem(1000 + s, engine::kModSources[static_cast<std::size_t>(s)].name);
+        m.addSeparator();
+        m.addSubMenu("Modulate with", sources);
+        const auto& routes = core.mod.getRoutes();
+        for (std::size_t k = 0; k < routes.size(); ++k)
+            if (routes[k].param == i)
+                m.addItem(2000 + static_cast<int>(k),
+                          "Stop " + juce::String(engine::kModSources[static_cast<std::size_t>(routes[k].source)].name) + " moving this");
+    }
     showMenu(m, owner, [this, p, i](int r) {
+        if (r >= 1000 && r < 1000 + engine::kNumModSources)
+            return modulate(static_cast<engine::ModSource>(r - 1000), i);
+        if (r >= 2000 && r < 2000 + engine::kMaxModRoutes)
+            return core.mod.remove(r - 2000);
         if (r == 1)
             isLearning(p) ? core.midi.cancelLearn() : core.midi.learnParam(i);
         else if (r == 2)

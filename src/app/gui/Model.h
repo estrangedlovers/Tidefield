@@ -59,6 +59,11 @@ public:
     juce::StringArray choices(P p) const;
 
     void showParamMenu(P p, juce::Component* owner);
+    float modulation(P p) const noexcept { return frame().paramMod[engine::idx(p)]; }
+    juce::String groupName(engine::ParamIndex i) const;
+    juce::String longName(engine::ParamIndex i) const;
+    void addParamMenus(juce::PopupMenu& menu, const std::function<bool(engine::ParamIndex)>& include, int idOffset) const;
+    void modulate(engine::ModSource source, engine::ParamIndex param, float depth = 0.25f);
 
     std::function<void(const juce::String&)> onHover;
 

@@ -7,6 +7,7 @@
 #include <engine/capture/CatchManager.h>
 #include <engine/midi/MidiManager.h>
 #include <engine/mix/FxManager.h>
+#include <engine/mod/ModRouteManager.h>
 #include <engine/perform/GestureManager.h>
 #include <engine/scene/PathManager.h>
 #include <engine/scene/SceneManager.h>
@@ -34,6 +35,7 @@ public:
     engine::SeasonManager seasons;
     engine::PathManager paths;
     engine::GestureManager gestures;
+    engine::ModRouteManager mod;
     io::PresetLibrary presets;
     std::unique_ptr<MidiInputs> midiInputs;
     SessionController session;

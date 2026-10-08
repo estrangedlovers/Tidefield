@@ -116,6 +116,15 @@ void Knob::paint(juce::Graphics& g)
     g.setColour(valueColour());
     g.strokePath(arc, juce::PathStrokeType(4.0f, juce::PathStrokeType::curved, juce::PathStrokeType::rounded));
 
+    if (const float m = shownMod; std::abs(m) > 0.002f)
+    {
+        const float modAngle = kArcStart + std::clamp(n + m, 0.0f, 1.0f) * (kArcEnd - kArcStart);
+        juce::Path swing;
+        swing.addCentredArc(c.x, c.y, radius - 5.0f, radius - 5.0f, 0.0f, std::min(angle, modAngle), std::max(angle, modAngle), true);
+        g.setColour(colour::tide());
+        g.strokePath(swing, juce::PathStrokeType(2.0f, juce::PathStrokeType::curved, juce::PathStrokeType::rounded));
+    }
+
     g.setColour(colour::text());
     g.drawLine(juce::Line<float>(c.getPointOnCircumference(radius * 0.25f, angle), c.getPointOnCircumference(radius - 4.0f, angle)), 2.0f);
 
@@ -136,6 +145,11 @@ void Knob::paint(juce::Graphics& g)
 void Knob::tick()
 {
     ParamComponent::tick();
+    if (const float m = model.modulation(param); std::abs(m - shownMod) > 0.004f)
+    {
+        shownMod = m;
+        repaint();
+    }
     if (formatter && isShowing())
         if (auto t = formatter(model.value(param)); t != lastText)
         {

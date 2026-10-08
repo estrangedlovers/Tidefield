@@ -35,6 +35,14 @@ add_library(tidefield_dsp STATIC
     src/dsp/fx/delay/TapeDelay.cpp
     src/dsp/fx/medium/Medium.cpp
     src/dsp/fx/reverb/FdnReverb.cpp
+    src/dsp/fx/filter/MultimodeFilter.cpp
+    src/dsp/fx/pitch/PitchShimmer.cpp
+    src/dsp/fx/modulation/Phaser.cpp
+    src/dsp/fx/modulation/Tremolo.cpp
+    src/dsp/fx/drive/Saturator.cpp
+    src/dsp/fx/drive/LoFi.cpp
+    src/dsp/fx/delay/GrainDelay.cpp
+    src/dsp/fx/dynamics/GlueCompressor.cpp
     src/dsp/sources/bloom/BloomSampler.cpp
     src/dsp/sources/drone/DroneGenerator.cpp
     src/dsp/sources/granular/GranularCloud.cpp

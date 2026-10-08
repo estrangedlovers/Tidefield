@@ -6,8 +6,47 @@ namespace {
 constexpr auto kDeviceStateKey = "audioDeviceState";
 } // namespace
 
-AudioHost::AudioHost(juce::PropertiesFile& s) : settings(s)
+namespace {
+
+/** Drives the engine like an audio device would, at real-time pace, output discarded. */
+class NullAudioThread final : public juce::Thread
 {
+public:
+    explicit NullAudioThread(engine::Engine& e) : juce::Thread("Tidefield null audio"), engine(e) {}
+    ~NullAudioThread() override { stopThread(2000); }
+
+    void run() override
+    {
+        constexpr int kBlock = 512;
+        constexpr double kRate = 48000.0;
+        engine.prepare(kRate, kBlock);
+        std::vector<float> l(kBlock), r(kBlock);
+        float* outs[2] = { l.data(), r.data() };
+        auto due = juce::Time::getMillisecondCounterHiRes();
+        while (! threadShouldExit())
+        {
+            engine.process(nullptr, 0, outs, 2, kBlock);
+            due += kBlock / kRate * 1000.0;
+            const auto ms = due - juce::Time::getMillisecondCounterHiRes();
+            if (ms > 0.0)
+                wait(static_cast<int>(ms));
+        }
+    }
+
+private:
+    engine::Engine& engine;
+};
+
+} // namespace
+
+AudioHost::AudioHost(juce::PropertiesFile& s, bool nullAudio) : settings(s)
+{
+    if (nullAudio)
+    {
+        nullThread = std::make_unique<NullAudioThread>(engine);
+        nullThread->startThread(juce::Thread::Priority::high);
+        return;
+    }
     const auto saved = settings.getXmlValue(kDeviceStateKey);
     // Stereo out, up to two inputs for the live channel (guitar/cello).
     const auto error = deviceManager.initialise(2, 2, saved.get(), true);
@@ -19,6 +58,11 @@ AudioHost::AudioHost(juce::PropertiesFile& s) : settings(s)
 
 AudioHost::~AudioHost()
 {
+    if (nullThread != nullptr)
+    {
+        nullThread.reset();
+        return;
+    }
     saveDeviceState();
     deviceManager.removeAudioCallback(this);
     deviceManager.closeAudioDevice();
@@ -26,6 +70,8 @@ AudioHost::~AudioHost()
 
 juce::String AudioHost::describeOutput() const
 {
+    if (nullThread != nullptr)
+        return "No device (test)  48.0 kHz";
     auto* device = deviceManager.getCurrentAudioDevice();
     if (device == nullptr)
         return {};

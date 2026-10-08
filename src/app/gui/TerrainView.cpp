@@ -10,9 +10,36 @@ constexpr float kInset = 26.0f;
 const std::array<juce::Colour, 4> kCloudTints { juce::Colour(0xff7fe6ff), juce::Colour(0xffffd9a0), juce::Colour(0xffc4b2ff), juce::Colour(0xffb4f08c) };
 
 float ease(float dt, float tau) { return 1.0f - std::exp(-dt / tau); }
+
+/** A soft radial falloff (alpha only), drawn tinted and scaled for every glow: far
+    cheaper than computing a radial gradient over a large area every frame. */
+const juce::Image& glowImage()
+{
+    static const juce::Image image = [] {
+        constexpr int size = 256;
+        juce::Image img(juce::Image::SingleChannel, size, size, true);
+        juce::Image::BitmapData data(img, juce::Image::BitmapData::writeOnly);
+        for (int y = 0; y < size; ++y)
+            for (int x = 0; x < size; ++x)
+            {
+                const float dx = (static_cast<float>(x) + 0.5f) / (size * 0.5f) - 1.0f;
+                const float dy = (static_cast<float>(y) + 0.5f) / (size * 0.5f) - 1.0f;
+                const float a = std::max(0.0f, 1.0f - std::sqrt(dx * dx + dy * dy)); // linear, like the gradient it replaces
+                *data.getPixelPointer(x, y) = static_cast<juce::uint8>(juce::roundToInt(a * 255.0f));
+            }
+        return img;
+    }();
+    return image;
+}
+
+void drawGlow(juce::Graphics& g, juce::Point<float> centre, float radius, juce::Colour c)
+{
+    g.setColour(c);
+    g.drawImage(glowImage(), juce::Rectangle<float>(radius * 2.0f, radius * 2.0f).withCentre(centre), juce::RectanglePlacement::stretchToFit, true);
+}
 } // namespace
 
-void showSceneMenu(Model& model, int scene)
+void showSceneMenu(Model& model, int scene, juce::Component* owner)
 {
     juce::PopupMenu m;
     m.addSectionHeader(juce::String(model.core.scenes.getScenes()[static_cast<std::size_t>(scene)].name));
@@ -22,7 +49,8 @@ void showSceneMenu(Model& model, int scene)
     m.addItem(4, "Fold held controls into this scene");
     m.addSeparator();
     m.addItem(5, "Delete");
-    m.showMenuAsync(juce::PopupMenu::Options(), [&model, scene](int r) {
+    juce::Component::SafePointer<juce::Component> safeOwner(owner);
+    showMenu(m, owner, [&model, scene, safeOwner](int r) {
         auto& sm = model.core.scenes;
         if (scene >= sm.size())
             return;
@@ -38,8 +66,8 @@ void showSceneMenu(Model& model, int scene)
             w->addTextEditor("name", juce::String(sc.name));
             w->addButton("Rename", 1, juce::KeyPress(juce::KeyPress::returnKey));
             w->addButton("Cancel", 0, juce::KeyPress(juce::KeyPress::escapeKey));
-            w->enterModalState(true, juce::ModalCallbackFunction::create([&model, scene, w](int ok) {
-                                   if (ok == 1)
+            w->enterModalState(true, juce::ModalCallbackFunction::create([&model, scene, w, safeOwner](int ok) {
+                                   if (ok == 1 && safeOwner != nullptr && scene < model.core.scenes.size())
                                        model.core.scenes.renameScene(scene, w->getTextEditorContents("name").toStdString());
                                }),
                                true);
@@ -69,6 +97,7 @@ TerrainView::TerrainView(Model& m, bool present) : model(m), presentation(presen
     clearButton.setHelp(&model, "forget the drawn path; the sound wanders freely again");
     clearButton.onClick = [this] {
         model.core.paths.clear();
+        needsRepaint = true;
         if (juce::roundToInt(model.value(engine::P::TerrainWanderStyle)) == 4)
             model.set(engine::P::TerrainWanderStyle, 0.0f);
     };
@@ -199,6 +228,12 @@ void TerrainView::tick()
     const float tide = f.tide;
 
     const float audible = f.panicActive ? 0.0f : std::pow(f.fadeGain, 1.5f);
+    // Anything still moving? When nothing is (no sound, nothing gliding), skip the
+    // repaint: an idle terrain costs nothing.
+    bool moving = std::abs(audible - energy) > 1.0e-3f || std::abs(f.position.x - shownPos.x) > 1.0e-4f || std::abs(f.position.y - shownPos.y) > 1.0e-4f
+                  || std::abs(f.cursor.x - shownCursor.x) > 1.0e-4f || std::abs(f.cursor.y - shownCursor.y) > 1.0e-4f || energy > 0.01f
+                  || ! particles.empty() || ! ripples.empty() || drag != Drag::None || model.core.scenes.getVersion() != shownSceneVersion;
+    shownSceneVersion = model.core.scenes.getVersion();
     energy += (audible - energy) * ease(dt, 0.6f);
     shownPos.x += (f.position.x - shownPos.x) * ease(dt, 0.12f);
     shownPos.y += (f.position.y - shownPos.y) * ease(dt, 0.12f);
@@ -208,11 +243,13 @@ void TerrainView::tick()
     for (std::size_t k = 0; k < scenes.size(); ++k)
     {
         const float target = k < static_cast<std::size_t>(f.numScenes) ? f.sceneWeights[k] : 0.0f;
+        moving = moving || std::abs(target - shownWeights[k]) > 1.0e-3f;
         shownWeights[k] += (target - shownWeights[k]) * ease(dt, 0.25f);
     }
     if (model.core.paths.getVersion() != shownPathVersion)
     {
         shownPathVersion = model.core.paths.getVersion();
+        needsRepaint = true;
         const auto loop = engine::TerrainPath::build(model.core.paths.getStroke(), 0);
         shownPath.assign(loop.points.begin(), loop.points.begin() + loop.count);
         clearButton.setVisible(loop.count > 0 && ! presentation);
@@ -263,15 +300,15 @@ void TerrainView::tick()
     for (std::size_t m = 0; m < lastModes.size(); ++m)
     {
         const float lv = f.modeLevel[m];
-        if (lv > lastModes[m] * 1.6f + 0.02f && ripples.size() < 40)
+        if (lv > lastModes[m] * 1.6f + 0.02f && ripples.size() < 40 && energy > 0.05f) // only strikes you can hear
             ripples.push_back({ at + juce::Point<float>(rng.nextFloat() * 40.0f - 20.0f, rng.nextFloat() * 40.0f - 20.0f), 0.0f,
-                                juce::jlimit(0.2f, 1.0f, lv * 4.0f), colour::live });
+                                juce::jlimit(0.2f, 1.0f, lv * 4.0f) * std::min(1.0f, energy * 1.5f), colour::live });
         lastModes[m] = lv;
     }
     for (std::size_t v = 0; v < lastBloom.size(); ++v)
     {
         const bool active = f.bloomVoices[v].active;
-        if (active && ! lastBloom[v] && ripples.size() < 40)
+        if (active && ! lastBloom[v] && ripples.size() < 40 && energy > 0.05f)
             ripples.push_back({ at + juce::Point<float>(rng.nextFloat() * 60.0f - 30.0f, rng.nextFloat() * 60.0f - 30.0f), 0.0f, 1.0f,
                                 colour::forScene(static_cast<int>(v) + 2) });
         lastBloom[v] = active;
@@ -280,7 +317,9 @@ void TerrainView::tick()
         r.age += dt;
     ripples.erase(std::remove_if(ripples.begin(), ripples.end(), [](const Ripple& r) { return r.age > 2.6f; }), ripples.end());
 
-    repaint();
+    if (moving || needsRepaint)
+        repaint();
+    needsRepaint = false;
 }
 
 void TerrainView::paint(juce::Graphics& g)
@@ -288,36 +327,39 @@ void TerrainView::paint(juce::Graphics& g)
     const auto f = field();
     if (backdrop.isValid())
         g.drawImage(backdrop, f, juce::RectanglePlacement::stretchToFit);
+    // A rectangular clip: cheap to draw against (a rounded one makes every fill
+    // an edge-table intersection); the corners are a few pixels of the backdrop.
     juce::Graphics::ScopedSaveState clip(g);
-    {
-        juce::Path round;
-        round.addRoundedRectangle(f, metric::radius + 2.0f);
-        g.reduceClipRegion(round);
-    }
+    g.reduceClipRegion(f.reduced(1.0f).toNearestInt());
     const auto& scenes = model.core.scenes.getScenes();
     const auto& fr = model.frame();
     const auto at = toScreen(shownPos);
     const auto tint = soundColour();
     const float big = std::max(f.getWidth(), f.getHeight());
 
-    // Scene light: each scene glows by its share of the sound.
-    for (std::size_t k = 0; k < scenes.size(); ++k)
+    // The light: each scene glows by its share of the sound, and the sound itself.
+    // Glows are soft, so they are drawn into a quarter-resolution layer that is
+    // scaled up once: one large image draw per frame instead of one per glow.
     {
-        const auto c = colour::forScene(static_cast<int>(k));
-        const auto s = toScreen(scenes[k].position);
-        const float w = k < shownWeights.size() ? shownWeights[k] : 0.0f;
-        const float radius = big * (0.12f + 0.28f * w);
-        juce::ColourGradient grad(c.withAlpha(0.10f + 0.35f * w * (0.4f + 0.6f * energy)), s.x, s.y, c.withAlpha(0.0f), s.x + radius, s.y, true);
-        g.setGradientFill(grad);
-        g.fillEllipse(juce::Rectangle<float>(radius * 2.0f, radius * 2.0f).withCentre(s));
-    }
-
-    // The sound's own glow.
-    {
-        const float radius = big * (0.10f + 0.12f * energy);
-        juce::ColourGradient grad(tint.withAlpha(0.22f + 0.33f * energy), at.x, at.y, tint.withAlpha(0.0f), at.x + radius, at.y, true);
-        g.setGradientFill(grad);
-        g.fillEllipse(juce::Rectangle<float>(radius * 2.0f, radius * 2.0f).withCentre(at));
+        constexpr float kLayerScale = 0.25f;
+        const int lw = std::max(1, juce::roundToInt(f.getWidth() * kLayerScale));
+        const int lh = std::max(1, juce::roundToInt(f.getHeight() * kLayerScale));
+        if (glowLayer.getWidth() != lw || glowLayer.getHeight() != lh)
+            glowLayer = juce::Image(juce::Image::ARGB, lw, lh, true);
+        else
+            glowLayer.clear(glowLayer.getBounds());
+        {
+            juce::Graphics lg(glowLayer);
+            lg.addTransform(juce::AffineTransform::translation(-f.getX(), -f.getY()).scaled(kLayerScale));
+            for (std::size_t k = 0; k < scenes.size(); ++k)
+            {
+                const auto c = colour::forScene(static_cast<int>(k));
+                const float w = k < shownWeights.size() ? shownWeights[k] : 0.0f;
+                drawGlow(lg, toScreen(scenes[k].position), big * (0.12f + 0.28f * w), c.withAlpha(0.08f + 0.22f * w * (0.4f + 0.6f * energy)));
+            }
+            drawGlow(lg, at, big * (0.08f + 0.08f * energy), tint.withAlpha(0.14f + 0.18f * energy));
+        }
+        g.drawImage(glowLayer, f, juce::RectanglePlacement::stretchToFit);
     }
 
     // Drawn path the sound follows.
@@ -470,7 +512,7 @@ void TerrainView::mouseDown(const juce::MouseEvent& e)
     if (e.mods.isPopupMenu())
     {
         if (scene >= 0)
-            showSceneMenu(model, scene);
+            showSceneMenu(model, scene, this);
         return;
     }
     if (drawMode)
@@ -529,11 +571,7 @@ void TerrainView::mouseUp(const juce::MouseEvent& e)
         const auto p = model.core.scenes.getScenes()[static_cast<std::size_t>(dragScene)].position;
         if (e.mods.isShiftDown())
         {
-            const float glide = model.value(engine::P::TerrainGlide);
-            model.set(engine::P::TerrainGlide, 0.05f);
-            model.set(engine::P::TerrainX, p.x);
-            model.set(engine::P::TerrainY, p.y);
-            juce::Timer::callAfterDelay(120, [this, glide] { model.set(engine::P::TerrainGlide, glide); });
+            model.jumpTerrain(p);
         }
         else
         {
@@ -574,6 +612,7 @@ void TerrainView::mouseMove(const juce::MouseEvent& e)
     if (s != hoverScene)
     {
         hoverScene = s;
+        needsRepaint = true;
         setMouseCursor(s >= 0 ? juce::MouseCursor::PointingHandCursor : juce::MouseCursor::CrosshairCursor);
         if (model.onHover)
             model.onHover(s >= 0 ? "Scene \"" + juce::String(model.core.scenes.getScenes()[static_cast<std::size_t>(s)].name)
@@ -582,6 +621,10 @@ void TerrainView::mouseMove(const juce::MouseEvent& e)
     }
 }
 
-void TerrainView::mouseExit(const juce::MouseEvent&) { hoverScene = -1; }
+void TerrainView::mouseExit(const juce::MouseEvent&)
+{
+    hoverScene = -1;
+    needsRepaint = true;
+}
 
 } // namespace tf::app::gui

@@ -18,6 +18,14 @@ SessionController::SessionController(engine::Engine& e, engine::SceneManager& s,
 
 SessionController::~SessionController() { *alive = false; }
 
+void SessionController::runInBackground(std::function<void()> job)
+{
+    if (workers != nullptr)
+        workers->addJob(std::move(job));
+    else
+        std::thread(std::move(job)).detach();
+}
+
 void SessionController::newSession()
 {
     current = juce::File();
@@ -41,7 +49,7 @@ void SessionController::openFile(const juce::File& file)
     busy = true;
     if (onStatus)
         onStatus("Opening " + file.getFileName() + "...");
-    std::thread([this, file, token = alive] {
+    runInBackground([this, file, token = alive] {
         juce::String error;
         auto data = io::loadSession(file, error);
         std::shared_ptr<io::SessionData> shared = data ? std::make_shared<io::SessionData>(std::move(*data)) : nullptr;
@@ -57,7 +65,7 @@ void SessionController::openFile(const juce::File& file)
             current = file;
             apply(shared);
         });
-    }).detach();
+    });
 }
 
 void SessionController::apply(std::shared_ptr<io::SessionData> data)
@@ -141,7 +149,7 @@ void SessionController::saveTo(const juce::File& file)
     data->name = file.getFileNameWithoutExtension().toStdString();
     if (onStatus)
         onStatus("Saving " + file.getFileName() + "...");
-    std::thread([this, file, data, token = alive] {
+    runInBackground([this, file, data, token = alive] {
         juce::String error;
         const bool ok = io::saveSession(*data, file, error);
         juce::MessageManager::callAsync([this, token, file, ok, error] {
@@ -159,7 +167,7 @@ void SessionController::saveTo(const juce::File& file)
             if (onSessionChanged)
                 onSessionChanged();
         });
-    }).detach();
+    });
 }
 
 } // namespace tf::app

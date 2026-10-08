@@ -9,7 +9,7 @@
 namespace tf::app::gui {
 
 /** Glide, rename, update, fold in, delete: the menu for one scene. */
-void showSceneMenu(Model& model, int scene);
+void showSceneMenu(Model& model, int scene, juce::Component* owner);
 
 /** The performance surface. Scenes are coloured places; each one's light grows with
     how much of the sound it is shaping right now. The performer's cursor is the
@@ -68,7 +68,8 @@ private:
     void setCursorTo(juce::Point<float> s);
 
     Model& model;
-    juce::Image backdrop; // grid and contours, redrawn on resize only
+    juce::Image backdrop;  // grid and contours, redrawn on resize only
+    juce::Image glowLayer; // the glows, at a quarter resolution
     double lastTime = 0.0;
     float energy = 0.0f, tidePhase = 0.0f, orbit = 0.0f;
     engine::Point2 shownPos { 0.5f, 0.5f }, shownCursor { 0.5f, 0.5f };
@@ -93,6 +94,8 @@ private:
     std::vector<engine::Point2> drawing;
     std::vector<engine::Point2> shownPath; // the loop the engine follows, if any
     std::uint64_t shownPathVersion = 0;
+    std::uint64_t shownSceneVersion = ~std::uint64_t { 0 };
+    bool needsRepaint = true; // something changed that the motion check cannot see
     FlatButton drawButton { "Draw path", colour::tide }, clearButton { "Clear path" };
 };
 

@@ -25,19 +25,27 @@ void Meter::tick()
     const float r = strip < 0 ? f.peakR : f.stripPeakR[static_cast<std::size_t>(strip)];
     auto follow = [](float& shown, float& hold, int& frames, float v) {
         shown = v > shown ? v : shown * 0.86f + v * 0.14f; // fast up, smooth fall
-        if (v >= hold)
+        if (shown < 1.0e-5f)
+            shown = 0.0f;
+        if (v > 0.0f && v >= hold)
         {
             hold = v;
-            frames = 50;
+            frames = 50; // hold the peak line a moment, then let it fall
         }
         else if (--frames < 0)
-            hold *= 0.94f;
+            hold = hold * 0.94f < 1.0e-5f ? 0.0f : hold * 0.94f;
     };
-    const float pl = shownL, pr = shownR;
+    const float before[] = { meterNorm(shownL), meterNorm(shownR), meterNorm(holdL), meterNorm(holdR) };
     follow(shownL, holdL, holdFramesL, l);
     follow(shownR, holdR, holdFramesR, r);
-    if (std::abs(pl - shownL) > 1.0e-4f || std::abs(pr - shownR) > 1.0e-4f || holdFramesL >= 0)
-        repaint();
+    const float after[] = { meterNorm(shownL), meterNorm(shownR), meterNorm(holdL), meterNorm(holdR) };
+    // Repaint only when a bar or a peak line moves visibly (silence costs nothing).
+    for (int i = 0; i < 4; ++i)
+        if (std::abs(after[i] - before[i]) > 0.002f)
+        {
+            repaint();
+            break;
+        }
 }
 
 void Meter::paint(juce::Graphics& g)
@@ -117,8 +125,18 @@ void Waveform::tick()
     {
         shown = current;
         rebuildPeaks();
+        repaint();
+        return;
     }
-    repaint();
+    // Grains move only while they play; the read position marker moves with its knob.
+    const int slotIndex = std::min(slot, engine::kNumClouds - 1);
+    const int views = slot < engine::kNumClouds ? model.frame().cloudGrainViews[static_cast<std::size_t>(slotIndex)] : 0;
+    const float pos = slot < engine::kNumClouds ? model.value(static_cast<engine::P>(engine::idx(engine::kCloudFirstParam[static_cast<std::size_t>(slotIndex)]) + 2))
+                                                : model.value(engine::P::BloomPosition);
+    if (views > 0 || shownViews > 0 || pos != shownPos)
+        repaint();
+    shownViews = views;
+    shownPos = pos;
 }
 
 void Waveform::paint(juce::Graphics& g)
@@ -184,7 +202,7 @@ void Waveform::mouseDown(const juce::MouseEvent& e)
         juce::PopupMenu m;
         m.addItem(1, "Load a sound...");
         m.addItem(2, "Clear", shown != nullptr);
-        m.showMenuAsync(juce::PopupMenu::Options(), [this](int r) {
+        showMenu(m, this, [this](int r) {
             if (r == 1 && onLoad)
                 onLoad(slot);
             else if (r == 2)
@@ -264,7 +282,7 @@ void ShapePad::mouseDown(const juce::MouseEvent& e)
 {
     if (e.mods.isPopupMenu())
     {
-        model.showParamMenu(e.position.x < static_cast<float>(getWidth()) * 0.5f ? engine::P::PerformColour : engine::P::PerformSpace);
+        model.showParamMenu(e.position.x < static_cast<float>(getWidth()) * 0.5f ? engine::P::PerformColour : engine::P::PerformSpace, this);
         return;
     }
     model.beginTouch(engine::P::PerformColour);

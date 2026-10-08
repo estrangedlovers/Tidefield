@@ -24,6 +24,7 @@ class Model
 {
 public:
     explicit Model(AppCore& core);
+    ~Model();
 
     AppCore& core;
     engine::Engine& engine;
@@ -34,7 +35,11 @@ public:
     /** Once per display frame: ticks every registered Animated. */
     void tick();
     void add(Animated* a) { animated.push_back(a); }
-    void remove(Animated* a) { animated.erase(std::remove(animated.begin(), animated.end(), a), animated.end()); }
+    void remove(Animated* a)
+    {
+        animated.erase(std::remove(animated.begin(), animated.end(), a), animated.end());
+        std::replace(ticking.begin(), ticking.end(), a, static_cast<Animated*>(nullptr)); // removed mid-frame: skip it
+    }
 
     // --- Parameters -------------------------------------------------------------------
     using P = engine::P;
@@ -51,6 +56,9 @@ public:
     void release(P p);
     void resetToDefault(P p) { set(p, spec(p).defaultValue); }
     void toggle(P p) { set(p, value(p) > 0.5f ? 0.0f : 1.0f); }
+    /** Moves the sound to `to` at once (a near-zero glide, then the glide comes back).
+        Jumps in quick succession keep the performer's glide, not the jump's. */
+    void jumpTerrain(engine::Point2 to);
 
     float toNorm(P p, float v) const noexcept { return spec(p).toNormalised(v); }
     float fromNorm(P p, float n) const noexcept { return spec(p).fromNormalised(n); }
@@ -60,7 +68,8 @@ public:
     juce::StringArray choices(P p) const;
 
     /** Shows the parameter's MIDI / layer menu at the mouse. */
-    void showParamMenu(P p);
+    /** owner: the control asking; the menu does nothing if it is gone by then. */
+    void showParamMenu(P p, juce::Component* owner);
 
     // --- Help line (the status bar shows what is under the mouse) ---------------------
     std::function<void(const juce::String&)> onHover;
@@ -73,6 +82,11 @@ private:
     std::vector<float> local;
     std::vector<int> holdFrames; // frames to keep the local value after a set (telemetry lags)
     std::vector<std::uint8_t> setHere;
+    std::vector<Animated*> ticking; // reused each frame
+    float savedGlide = 1.5f;
+    bool jumpPending = false;
+    int jumpToken = 0;
+    std::shared_ptr<bool> alive = std::make_shared<bool>(true);
 };
 
 } // namespace tf::app::gui

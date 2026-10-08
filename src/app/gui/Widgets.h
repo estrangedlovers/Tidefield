@@ -47,6 +47,8 @@ private:
     juce::Colour colour;
     std::shared_ptr<const dsp::SampleBuffer> shown;
     std::vector<float> peaks;
+    int shownViews = 0;
+    float shownPos = -1.0f;
 };
 
 /** Colour and space on one surface: left dark / right bright, down close and dry /

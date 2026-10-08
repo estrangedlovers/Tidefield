@@ -49,6 +49,9 @@ public:
     /** After a session is applied (message thread), with what was applied. */
     std::function<void(const io::SessionData&)> onApplied;
 
+    /** Where file work runs (the app core's pool, which waits for it on shutdown). */
+    void setWorkers(juce::ThreadPool* pool) { workers = pool; }
+
 private:
     void apply(std::shared_ptr<io::SessionData> data);
     void applyNow();
@@ -67,6 +70,8 @@ private:
     std::shared_ptr<io::SessionData> pending;
     bool waitingForFadeOut = false;
     bool busy = false;
+    juce::ThreadPool* workers = nullptr;
+    void runInBackground(std::function<void()> job);
     std::shared_ptr<bool> alive = std::make_shared<bool>(true);
 };
 

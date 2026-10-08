@@ -3,6 +3,7 @@
 #include <juce_gui_basics/juce_gui_basics.h>
 
 #include <array>
+#include <functional>
 
 namespace tf::app::gui {
 
@@ -57,6 +58,28 @@ void drawPanel(juce::Graphics& g, juce::Rectangle<float> r, const juce::String& 
 
 /** A dark display well (terrain, meters, readouts). */
 void drawWell(juce::Graphics& g, juce::Rectangle<float> r);
+
+/** Shows a menu at the mouse. The callback runs only if an item was chosen and
+    `owner` still exists: a plugin window can close while a menu is open, and JUCE
+    still calls back (with 0) after it is dismissed. */
+inline void showMenu(juce::PopupMenu& menu, juce::Component* owner, std::function<void(int)> chosen)
+{
+    juce::Component::SafePointer<juce::Component> safe(owner);
+    menu.showMenuAsync(juce::PopupMenu::Options().withMousePosition(), [safe, chosen = std::move(chosen)](int r) {
+        if (safe != nullptr && r != 0)
+            chosen(r);
+    });
+}
+
+/** Runs on the message thread later, only if `owner` still exists. */
+inline void later(juce::Component* owner, std::function<void()> f)
+{
+    juce::Component::SafePointer<juce::Component> safe(owner);
+    juce::MessageManager::callAsync([safe, f = std::move(f)] {
+        if (safe != nullptr)
+            f();
+    });
+}
 
 } // namespace tf::app::gui
 

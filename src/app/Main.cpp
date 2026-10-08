@@ -137,8 +137,17 @@ public:
         setUsingNativeTitleBar(true);
         setContentOwned(content, true);
         setResizable(true, true);
-        setResizeLimits(1100, 720, 10000, 10000);
-        centreWithSize(getWidth(), getHeight());
+        // Fit the screen: a 13-inch laptop at default scaling is smaller than the
+        // preferred 1440 x 900.
+        int w = getWidth(), h = getHeight();
+        if (const auto* display = juce::Desktop::getInstance().getDisplays().getPrimaryDisplay())
+        {
+            const auto area = display->userBounds.toNearestInt();
+            w = std::min(w, area.getWidth() - 24);
+            h = std::min(h, area.getHeight() - 24);
+        }
+        setResizeLimits(std::min(1100, w), std::min(720, h), 10000, 10000);
+        centreWithSize(std::max(w, 1), std::max(h, 1));
         setVisible(true);
         toFront(true); // key window from the start, so the first key press reaches the instrument
     }
@@ -169,7 +178,7 @@ public:
         options.folderName = "Tidefield";
         settings.setStorageParameters(options);
 
-        host = std::make_unique<AudioHost>(*settings.getUserSettings());
+        host = std::make_unique<AudioHost>(*settings.getUserSettings(), commandLine.contains("--null-audio"));
         core = std::make_unique<AppCore>(*host);
 
         auto* view = new gui::MainView(*core);

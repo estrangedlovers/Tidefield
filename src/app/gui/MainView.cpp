@@ -38,7 +38,7 @@ void gestureToggle(AppCore& core, bool recordNew)
         core.gestures.play();
 }
 
-void showGestureMenu(AppCore& core)
+void showGestureMenu(AppCore& core, juce::Component* owner)
 {
     juce::PopupMenu m;
     const auto state = core.latest().gestureState;
@@ -49,7 +49,7 @@ void showGestureMenu(AppCore& core)
     m.addItem(4, "Loop", core.gestures.hasTake(), core.gestures.isLooping());
     m.addSeparator();
     m.addItem(5, "Clear the take", core.gestures.hasTake());
-    m.showMenuAsync(juce::PopupMenu::Options(), [&core, state](int r) {
+    showMenu(m, owner, [&core, state](int r) {
         if (r == 1) gestureToggle(core, true);
         else if (r == 2) core.gestures.play();
         else if (r == 3) core.gestures.stop();
@@ -87,13 +87,13 @@ public:
     void mouseDown(const juce::MouseEvent& e) override
     {
         if (e.mods.isPopupMenu())
-            return model.showParamMenu(param);
+            return model.showParamMenu(param, this);
         juce::PopupMenu m;
         const auto items = model.choices(param);
         const int current = juce::roundToInt(model.value(param));
         for (int i = 0; i < items.size(); ++i)
             m.addItem(i + 1, items[i], true, i == current);
-        m.showMenuAsync(juce::PopupMenu::Options().withTargetComponent(this), [this](int r) {
+        showMenu(m, this, [this](int r) {
             if (r > 0)
                 model.set(param, static_cast<float>(r - 1));
         });
@@ -148,7 +148,7 @@ public:
         m.addItem(1, "Record stems too", idle, model.core.getRecordStems());
         m.addItem(2, "Recordings folder...");
         m.addItem(3, "Show recordings");
-        m.showMenuAsync(juce::PopupMenu::Options().withTargetComponent(this), [this](int r) {
+        showMenu(m, this, [this](int r) {
             if (r == 1)
                 model.core.setRecordStems(! model.core.getRecordStems());
             else if (r == 2)
@@ -237,7 +237,7 @@ public:
     void mouseDown(const juce::MouseEvent& e) override
     {
         if (e.mods.isPopupMenu())
-            return model.showParamMenu(e.x < 54 ? P::SyncOn : P::SyncBpm);
+            return model.showParamMenu(e.x < 54 ? P::SyncOn : P::SyncBpm, this);
         if (e.x < 54)
             return model.toggle(P::SyncOn);
         if (e.x > getWidth() - 38)
@@ -353,7 +353,7 @@ public:
             menu.addItem(4, "Save as...");
             menu.addSeparator();
             menu.addItem(5, "Projector window (Cmd+P)", true, view.isProjectorOpen());
-            menu.showMenuAsync(juce::PopupMenu::Options().withTargetComponent(&sessionButton), [this](int r) {
+            showMenu(menu, this, [this](int r) {
                 auto& s = model.core.session;
                 if (r == 1) s.newSession();
                 else if (r == 2) s.open();
@@ -493,16 +493,13 @@ public:
     void tick() override
     {
         const auto& scenes = model.core.scenes.getScenes();
-        juce::String sig;
-        for (const auto& s : scenes)
-            sig << s.name << ";";
         const auto& f = model.frame();
         bool weightsMoved = false;
         for (std::size_t k = 0; k < scenes.size() && k < shownWeights.size(); ++k)
             weightsMoved = weightsMoved || std::abs(shownWeights[k] - f.sceneWeights[k]) > 0.01f;
-        if (sig != signature)
+        if (model.core.scenes.getVersion() != shownVersion) // added, removed or renamed
         {
-            signature = sig;
+            shownVersion = model.core.scenes.getVersion();
             layout();
         }
         if (weightsMoved || shownWeights.size() != scenes.size())
@@ -664,7 +661,7 @@ private:
         if (row.kind == Row::Scene)
         {
             if (e.mods.isPopupMenu())
-                return showSceneMenu(model, row.index);
+                return showSceneMenu(model, row.index, this);
             const auto p = model.core.scenes.getScenes()[static_cast<std::size_t>(row.index)].position;
             model.set(P::TerrainX, p.x);
             model.set(P::TerrainY, p.y);
@@ -682,7 +679,7 @@ private:
             }
             const auto bloom = model.engine.getBloomSample();
             m.addItem(engine::kNumClouds + 1, "Bloom" + (bloom != nullptr ? "   (" + juce::String(bloom->name) + ")" : juce::String()));
-            m.showMenuAsync(juce::PopupMenu::Options(), [this, row](int r) {
+            showMenu(m, this, [this, row](int r) {
                 if (r <= 0)
                     return;
                 if (row.kind == Row::Sound)
@@ -696,7 +693,7 @@ private:
     void doubleClicked(int i)
     {
         if (i >= 0 && i < static_cast<int>(rows.size()) && rows[static_cast<std::size_t>(i)].kind == Row::Scene)
-            showSceneMenu(model, rows[static_cast<std::size_t>(i)].index);
+            showSceneMenu(model, rows[static_cast<std::size_t>(i)].index, this);
     }
 
     Model& model;
@@ -704,7 +701,7 @@ private:
     juce::Viewport viewport;
     List list;
     std::vector<Row> rows;
-    juce::String signature = "\x01";
+    std::uint64_t shownVersion = ~std::uint64_t { 0 };
     std::vector<float> shownWeights;
 };
 
@@ -720,7 +717,7 @@ public:
           glide(m, P::TerrainGlide, "how long the sound takes to arrive where you point"),
           root(m, P::HarmonyRoot, 6, "the key: every source retunes to it over the key-morph time"),
           scale(m, P::HarmonyScale, "the scale every source plays in"),
-          medium(m, P::MediumType, 2, "what the whole piece sounds recorded on"),
+          medium(m, P::MediumType, 4, "what the whole piece sounds recorded on"),
           style(m, P::TerrainWanderStyle, 3, "how the sound wanders: drift, orbit, tide pool, a journey between scenes, or along a path you draw")
     {
         tide.setLabel("Tide");
@@ -734,7 +731,8 @@ public:
     void resized() override
     {
         auto r = getLocalBounds().withTrimmedTop(metric::header).reduced(metric::pad, 8);
-        auto faders = r.removeFromTop(juce::jlimit(110, 170, r.getHeight() - 250));
+        // The choices need ~232 px; the faders take what is left (all of it on a tall window).
+        auto faders = r.removeFromTop(juce::jlimit(60, 170, r.getHeight() - 240));
         const int w = (faders.getWidth() - 3 * 6) / 4;
         for (auto* f : { &tide, &wander, &gravity, &glide })
         {
@@ -743,15 +741,19 @@ public:
         }
         r.removeFromTop(8);
         labels.clear();
+        // Short window: drop the section labels before any control loses its room
+        // (hovering still names each one).
+        const int labelH = r.getHeight() >= 4 * 16 + 48 + 24 + 48 + 24 + 4 * 6 ? 16 : 0;
         auto place = [&](juce::Component& c, const juce::String& label, int h) {
-            labels.push_back({ r.removeFromTop(16), label });
+            if (labelH > 0)
+                labels.push_back({ r.removeFromTop(labelH), label });
             c.setBounds(r.removeFromTop(h));
             r.removeFromTop(6);
         };
         place(root, "Key", 48);
         place(scale, "Scale", 24);
         place(style, "Wander", 48);
-        place(medium, "Recorded on", 48);
+        place(medium, "Recorded on", 24);
     }
 
     void paint(juce::Graphics& g) override
@@ -827,7 +829,7 @@ public:
         auto gesture = std::make_unique<Pad>(model, "Gesture", "G", colour::learn,
                                              "record your moves (knobs, terrain, notes) and play them back, looped; right-click for more");
         gesture->onPress = [this] { gestureToggle(model.core, juce::ModifierKeys::currentModifiers.isShiftDown()); };
-        gesture->onMenu = [this] { showGestureMenu(model.core); };
+        gesture->onMenu = [this] { showGestureMenu(model.core, this); };
         gesture->level = [f] {
             const auto& fr = f();
             if (fr.gestureState == engine::GestureState::Playing && fr.gestureLength > 0.0f)
@@ -1030,7 +1032,9 @@ void MainView::timerCallback()
         releaseHolds();
         return;
     }
-    if (juce::Component::getCurrentlyFocusedComponent() == nullptr && isShowing() && ! juce::ModalComponentManager::getInstance()->getNumModalComponents())
+    // Standalone only: in a DAW, taking focus would take the keyboard from the DAW.
+    if (! core.host.isPlugin() && juce::Component::getCurrentlyFocusedComponent() == nullptr && isShowing()
+        && ! juce::ModalComponentManager::getInstance()->getNumModalComponents())
         grabKeyboardFocus();
 }
 
@@ -1136,14 +1140,7 @@ void MainView::glideToScene(int index, bool jump)
     const auto p = scenes[static_cast<std::size_t>(index)].position;
     if (jump)
     {
-        const float glide = model.value(P::TerrainGlide);
-        model.set(P::TerrainGlide, 0.05f);
-        model.set(P::TerrainX, p.x);
-        model.set(P::TerrainY, p.y);
-        juce::Timer::callAfterDelay(150, [safe = juce::Component::SafePointer<MainView>(this), glide] {
-            if (safe != nullptr)
-                safe->model.set(P::TerrainGlide, glide);
-        });
+        model.jumpTerrain(p);
     }
     else
     {
@@ -1274,7 +1271,7 @@ void MainView::chooseSample(int slot)
         const auto file = fc.getResult();
         if (safe == nullptr || file == juce::File())
             return;
-        std::thread([safe, slot, file] {
+        safe->core.workers.addJob([safe, slot, file] {
             juce::String error;
             std::shared_ptr<dsp::SampleBuffer> buffer(io::loadSample(file, error).release());
             juce::MessageManager::callAsync([safe, slot, buffer, error] {
@@ -1288,7 +1285,7 @@ void MainView::chooseSample(int slot)
                     safe->core.engine.loadCloudSample(slot, buffer);
                 safe->core.status("Loaded " + juce::String(buffer->name));
             });
-        }).detach();
+        });
     });
 }
 
@@ -1299,7 +1296,7 @@ void MainView::loadFactory(int soundIndex, int slot)
         return;
     const auto sound = sounds[static_cast<std::size_t>(soundIndex)];
     juce::Component::SafePointer<MainView> safe(this);
-    std::thread([safe, slot, sound] {
+    core.workers.addJob([safe, slot, sound] {
         auto buffer = loadFactorySound(sound);
         juce::MessageManager::callAsync([safe, slot, sound, buffer] {
             if (safe == nullptr || buffer == nullptr)
@@ -1321,7 +1318,7 @@ void MainView::loadFactory(int soundIndex, int slot)
             }
             core.status("Loaded " + juce::String(sound.name) + (slot == engine::kNumClouds ? " into Bloom" : " into Cloud " + juce::String(slot + 1)));
         });
-    }).detach();
+    });
 }
 
 void MainView::showAudioSettings()

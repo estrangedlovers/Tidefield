@@ -5,7 +5,10 @@
 
 #include <juce_audio_processors/juce_audio_processors.h>
 
+#include <atomic>
+#include <io/Session.h>
 #include <memory>
+#include <mutex>
 
 namespace tf::plugin {
 
@@ -13,7 +16,7 @@ namespace tf::plugin {
     MIDI from the track plays Bloom, drives mappings and learns like a controller;
     the whole piece (scenes, sounds, effects, seasons, path) is saved in the project.
     The interface and everything above the engine are the standalone app's own. */
-class TidefieldProcessor final : public juce::AudioProcessor, public app::Host
+class TidefieldProcessor final : public juce::AudioProcessor, public app::Host, private juce::Timer
 {
 public:
     TidefieldProcessor();
@@ -55,11 +58,19 @@ public:
     app::AppCore& getCore() noexcept { return *core; }
 
 private:
+    void timerCallback() override;
+    std::shared_ptr<const io::SessionData> captureNow();
+
     juce::ApplicationProperties settings;
     engine::Engine engine;
     std::unique_ptr<app::AppCore> core;
     juce::AudioProcessLoadMeasurer loadMeasurer;
-    bool prepared = false;
+    std::atomic<bool> prepared { false };
+    // State for hosts that ask from other threads: refreshed on the message thread.
+    std::mutex stateLock;
+    std::shared_ptr<const io::SessionData> snapshot;
+    std::atomic<bool> restorePending { false };
+    std::shared_ptr<bool> alive = std::make_shared<bool>(true);
     int lastLatency = -1;
 
     JUCE_DECLARE_NON_COPYABLE_WITH_LEAK_DETECTOR(TidefieldProcessor)

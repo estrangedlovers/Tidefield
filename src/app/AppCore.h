@@ -84,6 +84,12 @@ private:
     double recordingRate = 0.0;
     std::shared_ptr<bool> alive = std::make_shared<bool>(true); // for callbacks posted from other threads
     int lastGuardLevel = 0;
+
+public:
+    /** Background work (file loading, decoding, saving). Declared last, so it is
+        destroyed first: its destructor waits for running jobs before anything they
+        touch goes away. */
+    juce::ThreadPool workers { juce::ThreadPoolOptions {}.withNumberOfThreads(2).withThreadName("Tidefield worker") };
 };
 
 } // namespace tf::app

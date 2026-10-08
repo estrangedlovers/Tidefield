@@ -9,6 +9,7 @@
 
 #include <cmath>
 #include <cstring>
+#include <ctime>
 #include <iostream>
 #include <map>
 
@@ -214,6 +215,47 @@ int main(int argc, char** argv)
         const auto r = render(*second, 48000.0, { 256 }, 4.0);
         check(r.finite && r.peak <= ceiling, "restored instance plays cleanly");
         second->releaseResources();
+    }
+
+    if (argc > 2 && juce::String(argv[2]) == "--ui-load")
+    {
+        // The interface while it plays: the editor open, audio fed in real time (blocks
+        // paced by the clock, the message loop running in between), CPU measured for
+        // the whole process. Run once with and once without the editor to separate the
+        // interface's share from the audio's.
+        const bool withEditor = argc > 3 && juce::String(argv[3]) == "on";
+        std::unique_ptr<juce::AudioProcessorEditor> editor(withEditor ? plugin->createEditorAndMakeActive() : nullptr);
+        if (editor != nullptr)
+        {
+            editor->setVisible(true);
+            editor->addToDesktop(juce::ComponentPeer::windowHasTitleBar);
+        }
+        plugin->prepareToPlay(48000.0, 512);
+        juce::AudioBuffer<float> buffer(2, 512);
+        juce::MidiBuffer midi;
+        midi.addEvent(juce::MidiMessage::noteOn(1, 60, 0.8f), 0);
+        const auto cpuStart = std::clock();
+        const double start = juce::Time::getMillisecondCounterHiRes();
+        double audioMs = 0.0;
+        for (int block = 0; block < 48000 * 20 / 512; ++block)
+        {
+            buffer.clear();
+            const double t0 = juce::Time::getMillisecondCounterHiRes();
+            plugin->processBlock(buffer, midi);
+            audioMs += juce::Time::getMillisecondCounterHiRes() - t0;
+            midi.clear();
+            const double due = start + (block + 1) * 512.0 / 48.0;
+            while (juce::Time::getMillisecondCounterHiRes() < due)
+                juce::MessageManager::getInstance()->runDispatchLoopUntil(1);
+        }
+        const double wall = (juce::Time::getMillisecondCounterHiRes() - start) / 1000.0;
+        const double cpu = static_cast<double>(std::clock() - cpuStart) / CLOCKS_PER_SEC;
+        std::cout << "ui-load editor=" << (withEditor ? "on" : "off") << "  process CPU " << juce::String(100.0 * cpu / wall, 1)
+                  << "% of a core over " << juce::String(wall, 1) << " s (audio " << juce::String(audioMs / 10.0 / wall, 1) << "%)" << std::endl;
+        editor.reset();
+        plugin.reset();
+        second.reset();
+        return 0;
     }
 
     if (argc > 2 && juce::String(argv[2]) == "--editor")

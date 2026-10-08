@@ -17,16 +17,29 @@ ParamComponent::ParamComponent(Model& m, engine::P p, juce::String h) : model(m)
     setRepaintsOnMouseActivity(true);
 }
 
-ParamComponent::~ParamComponent() { model.remove(this); }
+ParamComponent::~ParamComponent()
+{
+    // Destroyed mid-drag (a page rebuilt under the mouse): let the value follow the
+    // engine again instead of freezing at the last local value.
+    if (dragging)
+        model.endTouch(param);
+    model.remove(this);
+}
 
 void ParamComponent::tick()
 {
     const float v = model.value(param);
     const int flags = (model.isLive(param) ? 1 : 0) | (model.isLearning(param) ? 2 : 0) | ((model.pickup(param) + 1) << 2);
-    if (v != lastValue || flags != lastFlags)
+    // A value easing toward its target changes by invisible amounts for a long time:
+    // repaint for visible moves at once, and catch up on the last digits a few times a
+    // second, so the shown number always ends exact.
+    const bool visible = std::abs(model.toNorm(param, v) - model.toNorm(param, lastValue)) > 5.0e-4f;
+    const bool settle = v != lastValue && ++framesSincePaint >= 15;
+    if (visible || settle || flags != lastFlags)
     {
         lastValue = v;
         lastFlags = flags;
+        framesSincePaint = 0;
         repaint();
     }
 }
@@ -44,7 +57,7 @@ void ParamComponent::mouseDown(const juce::MouseEvent& e)
 {
     if (e.mods.isPopupMenu())
     {
-        model.showParamMenu(param);
+        model.showParamMenu(param, this);
         return;
     }
     if (e.mods.isAltDown())
@@ -221,7 +234,7 @@ void Toggle::mouseDown(const juce::MouseEvent& e)
 {
     if (e.mods.isPopupMenu())
     {
-        model.showParamMenu(param);
+        model.showParamMenu(param, this);
         return;
     }
     model.toggle(param);
@@ -298,7 +311,7 @@ void Choice::mouseDown(const juce::MouseEvent& e)
 {
     if (e.mods.isPopupMenu())
     {
-        model.showParamMenu(param);
+        model.showParamMenu(param, this);
         return;
     }
     const int i = indexAt(e.getPosition());
@@ -314,7 +327,13 @@ Pad::Pad(Model& m, juce::String t, juce::String s, juce::Colour c, juce::String 
     model.add(this);
 }
 
-Pad::~Pad() { model.remove(this); }
+Pad::~Pad()
+{
+    // Destroyed while held (the window closed): end the gesture so it cannot latch on.
+    if (pressed && onRelease)
+        onRelease();
+    model.remove(this);
+}
 
 void Pad::tick()
 {

@@ -3,6 +3,7 @@
 #include <app/gui/MainView.h>
 #include <io/Session.h>
 
+#include <mutex>
 #include <optional>
 
 namespace tf::plugin {
@@ -44,10 +45,14 @@ TidefieldProcessor::TidefieldProcessor()
     core = std::make_unique<app::AppCore>(*this);
     // An instrument in a DAW should sound when the track plays, not wait for Fade in.
     engine.command(engine::Command::FadeIn);
+    snapshot = captureNow();
+    startTimer(1000);
 }
 
 TidefieldProcessor::~TidefieldProcessor()
 {
+    stopTimer();
+    *alive = false;
     core.reset();
     settings.closeFiles();
 }
@@ -123,24 +128,38 @@ void TidefieldProcessor::processBlock(juce::AudioBuffer<float>& buffer, juce::Mi
 
 juce::AudioProcessorEditor* TidefieldProcessor::createEditor() { return new Editor(*this); }
 
+std::shared_ptr<const io::SessionData> TidefieldProcessor::captureNow()
+{
+    return std::make_shared<const io::SessionData>(
+        io::captureSession(engine, core->latest(), core->scenes, core->fx, &core->midi, &core->seasons, &core->paths, &core->gestures));
+}
+
+void TidefieldProcessor::timerCallback()
+{
+    // Keep a recent snapshot for hosts that ask for state from another thread (the
+    // managers belong to this one). Cheap: sounds are shared, not copied.
+    if (restorePending.load())
+        return;
+    auto fresh = captureNow();
+    const std::scoped_lock lock(stateLock);
+    snapshot = std::move(fresh);
+}
+
 void TidefieldProcessor::getStateInformation(juce::MemoryBlock& dest)
 {
-    // The whole piece, sounds included, in the same format as a .tidefield file. The
-    // managers belong to the message thread; some hosts ask for state from another
-    // thread, so the capture runs there (writing the zip can happen here).
-    std::optional<io::SessionData> session;
-    auto capture = [&] { session = io::captureSession(engine, core->latest(), core->scenes, core->fx, &core->midi, &core->seasons, &core->paths, &core->gestures); };
-    auto* mm = juce::MessageManager::getInstance();
-    if (mm->isThisTheMessageThread() || mm->currentThreadHasLockedMessageManager())
-        capture();
+    // The whole piece, sounds included, in the same format as a .tidefield file. On the
+    // message thread it is captured now; from another thread (or while a restore is
+    // still on its way) the latest snapshot is used. Nothing here blocks on another
+    // thread, so a host cannot deadlock against us.
+    std::shared_ptr<const io::SessionData> session;
+    if (juce::MessageManager::getInstance()->isThisTheMessageThread() && ! restorePending.load())
+        session = captureNow();
     else
-        mm->callFunctionOnMessageThread(
-            [](void* f) -> void* {
-                (*static_cast<decltype(capture)*>(f))();
-                return nullptr;
-            },
-            &capture);
-    if (! session)
+    {
+        const std::scoped_lock lock(stateLock);
+        session = snapshot;
+    }
+    if (session == nullptr)
         return;
     juce::MemoryOutputStream out(dest, false);
     juce::String error;
@@ -157,14 +176,25 @@ void TidefieldProcessor::setStateInformation(const void* data, int size)
         juce::Logger::writeToLog("Tidefield: could not restore state: " + error);
         return;
     }
-    auto apply = [this, s = std::make_shared<io::SessionData>(std::move(*session))] {
-        io::applySession(*s, engine, core->scenes, core->fx, true, &core->midi, &core->seasons, &core->paths, &core->gestures);
-        core->seedTargets(*s);
+    auto restored = std::make_shared<const io::SessionData>(std::move(*session));
+    {
+        // Until it is applied, saving returns exactly what was restored.
+        const std::scoped_lock lock(stateLock);
+        snapshot = restored;
+    }
+    restorePending = true;
+    auto apply = [this, restored] {
+        io::applySession(*restored, engine, core->scenes, core->fx, true, &core->midi, &core->seasons, &core->paths, &core->gestures);
+        core->seedTargets(*restored);
+        restorePending = false;
     };
     if (juce::MessageManager::getInstance()->isThisTheMessageThread())
         apply();
     else
-        juce::MessageManager::callAsync(apply);
+        juce::MessageManager::callAsync([weak = std::weak_ptr<bool>(alive), apply] {
+            if (! weak.expired()) // the host may delete us before the message loop runs
+                apply();
+        });
 }
 
 } // namespace tf::plugin

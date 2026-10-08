@@ -175,8 +175,15 @@ public:
     ~AutoMasterView() override { model.remove(this); }
     void tick() override
     {
-        if (isShowing())
+        // Repaint only when a reading or a setting moved.
+        const auto& a = model.frame().autoMaster;
+        const float settings = model.value(P::MasterAuto) + 10.0f * model.value(P::MasterAutoTarget);
+        if (isShowing() && (a != shown || settings != shownSettings))
+        {
+            shown = a;
+            shownSettings = settings;
             repaint();
+        }
     }
     void paint(juce::Graphics& g) override
     {
@@ -223,6 +230,8 @@ public:
 
 private:
     Model& model;
+    std::array<float, 8> shown {};
+    float shownSettings = -1.0f;
 };
 
 /** Looper state, the loop's ring and its two buttons. */
@@ -242,8 +251,13 @@ public:
     ~LooperView() override { model.remove(this); }
     void tick() override
     {
-        if (isShowing())
+        const auto& f = model.frame();
+        const float sig = static_cast<float>(f.loopState) * 1000.0f + f.loopPosition + f.loopSeconds * 0.001f + static_cast<float>(f.loopPasses) * 7.0f;
+        if (isShowing() && sig != shownSig)
+        {
+            shownSig = sig;
             repaint();
+        }
     }
     void resized() override
     {
@@ -295,6 +309,7 @@ public:
 private:
     Model& model;
     FlatButton rec, clear;
+    float shownSig = -1.0f;
 };
 
 /** The seasons: slow cycles on any continuous parameter, minutes to an hour long. */
@@ -317,8 +332,10 @@ public:
         {
             shownCount = list.size();
             resized();
+            repaint();
         }
-        if (isShowing())
+        // The seasons move over minutes: ten redraws a second are plenty.
+        if (isShowing() && ++frames % 6 == 0)
             repaint();
     }
 
@@ -407,7 +424,7 @@ private:
         m.addSectionHeader("Which parameter should the season move?");
         for (auto& [name, sub] : groups)
             m.addSubMenu(name, sub);
-        m.showMenuAsync(juce::PopupMenu::Options(), [this, index](int r) {
+        showMenu(m, this, [this, index](int r) {
             if (r <= 0)
                 return;
             engine::Season s;
@@ -441,7 +458,7 @@ private:
         m.addItem(1, "Change parameter...");
         m.addSeparator();
         m.addItem(2, "Remove");
-        m.showMenuAsync(juce::PopupMenu::Options(), [this, index, s, periods](int r) mutable {
+        showMenu(m, this, [this, index, s, periods](int r) mutable {
             if (r == 1)
                 return showParamMenu(index);
             if (r == 2)
@@ -461,6 +478,7 @@ private:
     Model& model;
     FlatButton addButton;
     std::size_t shownCount = 0;
+    int frames = 0;
 };
 
 /** MIDI: what is mapped, learning actions, devices and the note channel. */
@@ -507,7 +525,9 @@ public:
 
     void tick() override
     {
-        // Rebuild cheaply when anything visible changed.
+        // Rebuild when anything visible changed; a few times a second is plenty.
+        if (++frames % 10 != 0 || ! isShowing())
+            return;
         juce::String sig = juce::String(model.core.midi.getBindings().size()) + (model.core.midi.isLearning() ? "L" : "-");
         if (model.core.midiInputs != nullptr)
             for (const auto& d : model.core.midiInputs->getDevices())
@@ -600,7 +620,7 @@ private:
             b->setHelp(&model, "listen to this MIDI device");
             const auto id = d.info.identifier;
             const bool enabled = d.enabled;
-            b->onClick = [this, id, enabled] { juce::MessageManager::callAsync([this, id, enabled] { if (model.core.midiInputs != nullptr) model.core.midiInputs->setEnabled(id, ! enabled); }); };
+            b->onClick = [this, id, enabled] { later(this, [this, id, enabled] { if (model.core.midiInputs != nullptr) model.core.midiInputs->setEnabled(id, ! enabled); }); };
             addAndMakeVisible(*b);
             deviceButtons.push_back(std::move(b));
         }
@@ -614,6 +634,7 @@ private:
     FlatButton defaults { "Default mapping" }, clearAll { "Clear all" }, notesToDrone { "Notes move the drone", colour::good };
     juce::ComboBox channel;
     juce::String signature;
+    int frames = 9;
 };
 
 /** Which effect chain to show on the Effects page. */
@@ -1050,7 +1071,7 @@ void DeviceView::build()
         d.addKnob(info.sendB, "Delay", "send to the delay bus", 56, 62);
         auto fx = std::make_unique<FlatButton>("Effects");
         fx->setHelp(&model, "open this strip's two insert effects");
-        fx->onClick = [this, s] { juce::MessageManager::callAsync([this, s] { showEffectsFor(s); }); };
+        fx->onClick = [this, s] { later(this, [this, s] { showEffectsFor(s); }); };
         d.add(std::move(fx), 56, 24);
     };
     auto sample = [&](Device& d, int slot, juce::Colour c) {
@@ -1212,7 +1233,7 @@ void DeviceView::build()
         case Effects:
         {
             auto& pick = device("Chain", colour::tide);
-            pick.add(std::make_unique<ChainPicker>(fxChain, [this](int i) { juce::MessageManager::callAsync([this, i] { showEffectsFor(i); }); }), 220, 0);
+            pick.add(std::make_unique<ChainPicker>(fxChain, [this](int i) { later(this, [this, i] { showEffectsFor(i); }); }), 220, 0);
             const int firstSlot = fxChain < engine::kNumStrips ? fxChain * 2 : engine::kBusASlot + (fxChain - engine::kNumStrips) * 2;
             for (int k = 0; k < 2; ++k)
                 devices.push_back(std::make_unique<FxDevice>(model, firstSlot + k));
@@ -1228,13 +1249,13 @@ void DeviceView::build()
             a.add(std::make_unique<AutoMasterView>(model), 250, 0);
             auto& fx = device("Master effects", colour::tide);
             auto open = std::make_unique<FlatButton>("Master inserts");
-            open->onClick = [this] { juce::MessageManager::callAsync([this] { showEffectsFor(engine::kNumStrips + 2); }); };
+            open->onClick = [this] { later(this, [this] { showEffectsFor(engine::kNumStrips + 2); }); };
             fx.add(std::move(open), 2 * metric::knobW, 26);
             auto rev = std::make_unique<FlatButton>("Reverb bus");
-            rev->onClick = [this] { juce::MessageManager::callAsync([this] { showEffectsFor(engine::kNumStrips); }); };
+            rev->onClick = [this] { later(this, [this] { showEffectsFor(engine::kNumStrips); }); };
             fx.add(std::move(rev), 2 * metric::knobW, 26);
             auto del = std::make_unique<FlatButton>("Delay bus");
-            del->onClick = [this] { juce::MessageManager::callAsync([this] { showEffectsFor(engine::kNumStrips + 1); }); };
+            del->onClick = [this] { later(this, [this] { showEffectsFor(engine::kNumStrips + 1); }); };
             fx.add(std::move(del), 2 * metric::knobW, 26);
             break;
         }

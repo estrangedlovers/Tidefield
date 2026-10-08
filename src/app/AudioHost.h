@@ -16,7 +16,9 @@ namespace tf::app {
 class AudioHost final : public Host, private juce::AudioIODeviceCallback
 {
 public:
-    explicit AudioHost(juce::PropertiesFile& settings);
+    /** nullAudio: no device; a thread runs the engine at real-time pace into nothing
+        (`--null-audio`, for testing the interface on machines without sound). */
+    AudioHost(juce::PropertiesFile& settings, bool nullAudio = false);
     ~AudioHost() override;
 
     engine::Engine& getEngine() noexcept override { return engine; }
@@ -25,7 +27,7 @@ public:
     /** 0..1 share of the callback's time budget, smoothed by JUCE. */
     double getCpuLoad() const override { return loadMeasurer.getLoadAsProportion(); }
     int getXrunCount() const { return loadMeasurer.getXRunCount(); }
-    bool isRunning() const override { return deviceManager.getCurrentAudioDevice() != nullptr; }
+    bool isRunning() const override { return deviceManager.getCurrentAudioDevice() != nullptr || nullThread != nullptr; }
     juce::String describeOutput() const override;
 
     void saveDeviceState();
@@ -41,6 +43,7 @@ private:
     juce::AudioDeviceManager deviceManager;
     juce::AudioProcessLoadMeasurer loadMeasurer;
     engine::Engine engine;
+    std::unique_ptr<juce::Thread> nullThread;
 };
 
 } // namespace tf::app

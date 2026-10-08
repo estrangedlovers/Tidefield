@@ -47,6 +47,7 @@ protected:
 private:
     float lastValue = -1.0e9f;
     int lastFlags = -1;
+    int framesSincePaint = 0;
 };
 
 /** Rotary: a 270-degree arc with the value under it. */

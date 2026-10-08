@@ -1,4 +1,5 @@
 #include "Model.h"
+#include "Style.h"
 
 #include <dsp/fx/medium/Medium.h>
 #include <dsp/harmony/Scale.h>
@@ -20,15 +21,37 @@ Model::Model(AppCore& c) : core(c), engine(c.engine), registry(c.engine.getRegis
     setHere.assign(engine::kNumParams, 0);
 }
 
+Model::~Model() { *alive = false; }
+
 void Model::tick()
 {
     for (auto& h : holdFrames)
         if (h > 0)
             --h;
-    // Copy: a component may unregister itself while ticking.
-    const auto list = animated;
-    for (auto* a : list)
-        a->tick();
+    // A copy (a component may unregister itself while ticking), into a buffer that
+    // keeps its capacity, so a frame allocates nothing.
+    ticking.assign(animated.begin(), animated.end());
+    for (std::size_t i = 0; i < ticking.size(); ++i) // by index: remove() may null entries as we go
+        if (auto* a = ticking[i])
+            a->tick();
+    ticking.clear();
+}
+
+void Model::jumpTerrain(engine::Point2 to)
+{
+    if (! jumpPending)
+        savedGlide = value(P::TerrainGlide);
+    jumpPending = true;
+    const int token = ++jumpToken;
+    set(P::TerrainGlide, 0.05f);
+    set(P::TerrainX, to.x);
+    set(P::TerrainY, to.y);
+    juce::Timer::callAfterDelay(150, [this, weak = std::weak_ptr<bool>(alive), token] {
+        if (weak.expired() || token != jumpToken) // gone, or a later jump owns the restore
+            return;
+        set(P::TerrainGlide, savedGlide);
+        jumpPending = false;
+    });
 }
 
 float Model::value(P p) const noexcept
@@ -154,7 +177,7 @@ juce::String Model::format(P p, float v) const
     return fixed(v, std::abs(s.maxValue - s.minValue) > 50.0f ? 0 : 2);
 }
 
-void Model::showParamMenu(P p)
+void Model::showParamMenu(P p, juce::Component* owner)
 {
     const auto i = engine::idx(p);
     const bool learnable = (spec(p).flags & engine::ParamFlag::kMidiLearnable) != 0;
@@ -167,7 +190,7 @@ void Model::showParamMenu(P p)
     m.addSeparator();
     m.addItem(3, "Release to the terrain", isLive(p));
     m.addItem(4, "Reset to default");
-    m.showMenuAsync(juce::PopupMenu::Options(), [this, p, i](int r) {
+    showMenu(m, owner, [this, p, i](int r) {
         if (r == 1)
             isLearning(p) ? core.midi.cancelLearn() : core.midi.learnParam(i);
         else if (r == 2)

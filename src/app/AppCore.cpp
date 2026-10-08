@@ -13,6 +13,7 @@ AppCore::AppCore(Host& h)
       session(h.getEngine(), scenes, fx, &midi, &seasons, &paths, &gestures), recorder(h.getEngine().getRecordTap())
 {
     engine.setGuardrailsEnabled(true);
+    session.setWorkers(&workers);
     const auto& registry = engine.getRegistry();
     for (engine::ParamIndex i = 0; i < engine::kNumParams; ++i)
         lastFrame.paramTargets[i] = registry.spec(i).defaultValue;

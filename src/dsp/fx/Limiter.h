@@ -14,7 +14,8 @@ public:
     void setCeilingDb(float db) noexcept;
     void setReleaseMs(float ms) noexcept;
 
-    void process(float* left, float* right, int numSamples) noexcept;
+    void process(float* left, float* right, int numSamples, float* gainOut = nullptr) noexcept;
+    float getCeiling() const noexcept { return ceiling; }
 
     int getLatencySamples() const noexcept { return window + kTruePeakDelay; }
     float getCurrentGain() const noexcept { return lastGain; }

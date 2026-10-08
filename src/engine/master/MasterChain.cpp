@@ -11,6 +11,12 @@ void MasterChain::prepare(const dsp::ProcessSpec& spec)
     dcR.prepare(fs);
     limiter.prepare(spec);
     panicStep = 1.0f / static_cast<float>(kPanicSeconds * fs);
+    gainTrace.assign(static_cast<std::size_t>(std::max(1, spec.maxBlockSize)), 1.0f);
+    panicTrace.assign(gainTrace.size(), 1.0f);
+    for (auto& d : extraDelay)
+        d.assign(static_cast<std::size_t>(std::max(1, limiter.getLatencySamples())), 0.0f);
+    for (auto& dc : extraDc)
+        dc.prepare(fs);
     reset();
 }
 
@@ -19,6 +25,11 @@ void MasterChain::reset() noexcept
     dcL.reset();
     dcR.reset();
     limiter.reset();
+    for (auto& d : extraDelay)
+        std::fill(d.begin(), d.end(), 0.0f);
+    for (auto& dc : extraDc)
+        dc.reset();
+    extraWrite = 0;
 }
 
 void MasterChain::setFadeSeconds(float seconds) noexcept
@@ -64,17 +75,26 @@ void MasterChain::resumeFromPanic() noexcept
     startFade(FadeState::FadingIn, fadeSeconds);
 }
 
-MasterChain::Events MasterChain::process(float* left, float* right, int n, float levelStart, float levelEnd) noexcept
+MasterChain::Events MasterChain::process(float* left, float* right, int n, float levelStart, float levelEnd, float* const* extra,
+                                         int numExtra) noexcept
 {
     Events events;
+    numExtra = extra != nullptr ? std::clamp(numExtra, 0, kMaxExtra) : 0;
+    if (numExtra > 0)
+        n = std::min(n, static_cast<int>(gainTrace.size()));
 
     bool finite = true;
     for (int i = 0; i < n && finite; ++i)
         finite = std::isfinite(left[i]) && std::isfinite(right[i]);
+    for (int c = 0; c < numExtra && finite; ++c)
+        for (int i = 0; i < n && finite; ++i)
+            finite = std::isfinite(extra[c][i]);
     if (! finite)
     {
         std::fill(left, left + n, 0.0f);
         std::fill(right, right + n, 0.0f);
+        for (int c = 0; c < numExtra; ++c)
+            std::fill(extra[c], extra[c] + n, 0.0f);
         reset();
         ++guardTrips;
         events.guardTripped = true;
@@ -107,9 +127,11 @@ MasterChain::Events MasterChain::process(float* left, float* right, int n, float
         const float g = (levelStart + levelStep * static_cast<float>(i + 1)) * fadeCurve(static_cast<float>(fadePosition));
         left[i] = dcL.process(left[i] * g);
         right[i] = dcR.process(right[i] * g);
+        for (int c = 0; c < numExtra; ++c)
+            extra[c][i] = extraDc[static_cast<std::size_t>(c)].process(extra[c][i] * g);
     }
 
-    limiter.process(left, right, n);
+    limiter.process(left, right, n, numExtra > 0 ? gainTrace.data() : nullptr);
 
     if (panicActive)
     {
@@ -118,7 +140,34 @@ MasterChain::Events MasterChain::process(float* left, float* right, int n, float
             panicGain = std::max(0.0f, panicGain - panicStep);
             left[i] *= panicGain;
             right[i] *= panicGain;
+            panicTrace[static_cast<std::size_t>(i)] = panicGain;
         }
+    }
+    else if (numExtra > 0)
+        std::fill_n(panicTrace.data(), n, 1.0f);
+
+    if (numExtra > 0)
+    {
+        const int length = static_cast<int>(extraDelay[0].size());
+        const float ceiling = limiter.getCeiling();
+        int w = extraWrite;
+        for (int i = 0; i < n; ++i)
+        {
+            const float gain = gainTrace[static_cast<std::size_t>(i)] * panicTrace[static_cast<std::size_t>(i)];
+            for (int c = 0; c < numExtra; ++c)
+            {
+                auto& line = extraDelay[static_cast<std::size_t>(c)];
+                const float delayed = line[static_cast<std::size_t>(w)];
+                line[static_cast<std::size_t>(w)] = extra[c][i];
+                extra[c][i] = std::clamp(delayed * gain, -ceiling, ceiling);
+            }
+            w = (w + 1) % length;
+        }
+        extraWrite = w;
+    }
+
+    if (panicActive)
+    {
         if (panicGain <= 0.0f && ! panicSilentReported)
         {
             panicSilentReported = true;

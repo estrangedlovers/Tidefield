@@ -17,12 +17,13 @@ inline constexpr unsigned kDiscrete = 1u << 4;
 
 #define TF_TB_ML (kTerrainBound | kMidiLearnable)
 
-#define TF_STRIP(X, Name, id, level, sendA, sendB)                                                                          \
+#define TF_STRIP(X, Name, id, level, sendA, sendB, azimuth)                                                                 \
     X(Name##Level, id ".level", "Level",       -60.0f, 6.0f, level, Decibel, Linear, 0.05f, "dB", TF_TB_ML | kPerformance) \
     X(Name##Pan,   id ".pan",   "Pan",          -1.0f, 1.0f,  0.0f, Linear,  Linear, 0.05f, "",   TF_TB_ML)                 \
     X(Name##Width, id ".width", "Width",         0.0f, 2.0f,  1.0f, Linear,  Linear, 0.05f, "",   TF_TB_ML)                 \
     X(Name##SendA, id ".sendA", "Reverb Send", -60.0f, 0.0f, sendA, Decibel, Linear, 0.05f, "dB", TF_TB_ML)                 \
-    X(Name##SendB, id ".sendB", "Delay Send",  -60.0f, 0.0f, sendB, Decibel, Linear, 0.05f, "dB", TF_TB_ML)
+    X(Name##SendB, id ".sendB", "Delay Send",  -60.0f, 0.0f, sendB, Decibel, Linear, 0.05f, "dB", TF_TB_ML)                 \
+    X(Name##Azimuth, id ".azimuth", "Direction", -180.0f, 180.0f, azimuth, Linear, Exponential, 0.3f, "deg", TF_TB_ML)
 
 #define TF_FX_SLOT(X, Name, id)                                                                               \
     X(Name##P1,  id ".p1",  "Control 1", 0.0f, 1.0f, 0.5f, Linear, Exponential, 0.08f, "", TF_TB_ML)          \
@@ -110,15 +111,15 @@ inline constexpr unsigned kDiscrete = 1u << 4;
     X(DroneEvolve,      "drone.evolve",       "Evolve",            0.0f,   1.0f,    0.3f, Linear,  Exponential,    0.5f,  "",   TF_TB_ML) \
     X(DroneSpread,      "drone.spread",       "Spread",            0.0f,   1.0f,    0.7f, Linear,  Exponential,    0.3f,  "",   TF_TB_ML) \
     X(DroneGravity,     "drone.gravity",      "Gravity",           0.0f,   1.0f,    1.0f, Linear,  Exponential,    0.3f,  "",   TF_TB_ML) \
-    TF_STRIP(X, Drone,     "drone",     0.0f,  -14.0f, -60.0f) \
+    TF_STRIP(X, Drone,     "drone",     0.0f,  -14.0f, -60.0f, 0.0f) \
     TF_CLOUD(X, Cloud1, "cloud1") \
     TF_CLOUD(X, Cloud2, "cloud2") \
     TF_CLOUD(X, Cloud3, "cloud3") \
     TF_CLOUD(X, Cloud4, "cloud4") \
-    TF_STRIP(X, Cloud1,    "cloud1",    -3.0f, -10.0f, -24.0f) \
-    TF_STRIP(X, Cloud2,    "cloud2",    -3.0f, -10.0f, -24.0f) \
-    TF_STRIP(X, Cloud3,    "cloud3",    -3.0f, -10.0f, -24.0f) \
-    TF_STRIP(X, Cloud4,    "cloud4",    -3.0f, -10.0f, -24.0f) \
+    TF_STRIP(X, Cloud1,    "cloud1",    -3.0f, -10.0f, -24.0f, -60.0f) \
+    TF_STRIP(X, Cloud2,    "cloud2",    -3.0f, -10.0f, -24.0f, 60.0f) \
+    TF_STRIP(X, Cloud3,    "cloud3",    -3.0f, -10.0f, -24.0f, -120.0f) \
+    TF_STRIP(X, Cloud4,    "cloud4",    -3.0f, -10.0f, -24.0f, 120.0f) \
     X(ResRoot,          "res.root",           "Root Note",        24.0f,  84.0f,   50.0f, Linear,  Exponential,    0.8f,  "st", TF_TB_ML) \
     X(ResModes,         "res.modes",          "Modes",             1.0f,  24.0f,   16.0f, Linear,  Linear,         0.0f,  "",   TF_TB_ML | kDiscrete) \
     X(ResStructure,     "res.structure",      "Structure",         0.0f,   1.0f,    0.5f, Linear,  Exponential,    0.8f,  "",   TF_TB_ML | kPerformance) \
@@ -131,13 +132,13 @@ inline constexpr unsigned kDiscrete = 1u << 4;
     X(ResExciteInput,   "res.exciteInput",    "From Input",        0.0f,   1.0f,    0.0f, Linear,  Exponential,    0.1f,  "",   TF_TB_ML) \
     X(ResExciteDrone,   "res.exciteDrone",    "From Drone",        0.0f,   1.0f,    0.0f, Linear,  Exponential,    0.1f,  "",   TF_TB_ML) \
     X(ResExciteClouds,  "res.exciteClouds",   "From Clouds",       0.0f,   1.0f,    0.0f, Linear,  Exponential,    0.1f,  "",   TF_TB_ML) \
-    TF_STRIP(X, Res,       "res",       -4.0f,  -8.0f, -30.0f) \
+    TF_STRIP(X, Res,       "res",       -4.0f,  -8.0f, -30.0f, 180.0f) \
     X(InputChannel,     "input.channel",      "Channel",           0.0f,   2.0f,    0.0f, Linear,  Linear,         0.0f,  "",   kDiscrete) \
     X(InputGain,        "input.gain",         "Input Gain",      -24.0f,  24.0f,    0.0f, Linear,  Linear,         0.05f, "dB", kMidiLearnable) \
     X(InputHighPass,    "input.highPass",     "Low Cut",          20.0f, 400.0f,   40.0f, Log,     LogExponential, 0.1f,  "Hz", kMidiLearnable) \
     X(InputGate,        "input.gate",         "Gate",            -90.0f, -20.0f,  -70.0f, Linear,  Linear,         0.05f, "dB", kMidiLearnable) \
     X(InputArmed,       "input.armed",        "Monitor",           0.0f,   1.0f,    0.0f, Linear,  Linear,         0.03f, "",   kMidiLearnable | kDiscrete | kPerformance) \
-    TF_STRIP(X, Input,     "input",     0.0f, -14.0f, -18.0f) \
+    TF_STRIP(X, Input,     "input",     0.0f, -14.0f, -18.0f, -90.0f) \
     X(InputFreeze,      "input.freeze",       "Freeze",            0.0f,   1.0f,    0.0f, Linear,  Linear,         0.0f,  "",   kMidiLearnable | kDiscrete | kPerformance) \
     X(InputFreezeLevel, "input.freezeLevel",  "Freeze Level",    -24.0f,   6.0f,    0.0f, Linear,  Linear,         0.05f, "dB", TF_TB_ML) \
     X(InputFreezeDrift, "input.freezeDrift",  "Freeze Drift",      0.0f,   1.0f,    0.35f, Linear, Exponential,    0.2f,  "",   TF_TB_ML) \
@@ -154,23 +155,23 @@ inline constexpr unsigned kDiscrete = 1u << 4;
     X(BloomPosition,    "bloom.position",     "Position",          0.0f,   1.0f,    0.3f, Linear,  Exponential,    0.2f,  "",   TF_TB_ML) \
     X(BloomGravity,     "bloom.gravity",      "Gravity",           0.0f,   1.0f,    1.0f, Linear,  Exponential,    0.2f,  "",   TF_TB_ML) \
     X(ResExciteBloom,   "res.exciteBloom",    "From Bloom",        0.0f,   1.0f,    0.0f, Linear,  Exponential,    0.1f,  "",   TF_TB_ML) \
-    TF_STRIP(X, Bloom,     "bloom",     0.0f,  -6.0f, -14.0f) \
+    TF_STRIP(X, Bloom,     "bloom",     0.0f,  -6.0f, -14.0f, 30.0f) \
     X(LoopSource,       "loop.source",        "Source",            0.0f,   1.0f,    0.0f, Linear,  Linear,         0.0f,  "",   kMidiLearnable | kDiscrete) \
     X(LoopErosion,      "loop.erosion",       "Erosion",           0.0f,   1.0f,    0.4f, Linear,  Exponential,    0.2f,  "",   TF_TB_ML | kPerformance) \
     X(LoopFlakes,       "loop.flakes",        "Flakes",            0.0f,   1.0f,    0.3f, Linear,  Exponential,    0.2f,  "",   TF_TB_ML) \
     X(LoopOverdub,      "loop.overdub",       "Overdub",           0.0f,   1.0f,    0.7f, Linear,  Exponential,    0.1f,  "",   TF_TB_ML) \
-    TF_STRIP(X, Loop,      "loop",      0.0f, -10.0f, -60.0f) \
+    TF_STRIP(X, Loop,      "loop",      0.0f, -10.0f, -60.0f, -150.0f) \
     X(WeatherWind,      "weather.wind",       "Wind",              0.0f,   1.0f,    0.0f, Linear,  Exponential,    0.5f,  "",   TF_TB_ML | kPerformance) \
     X(WeatherRain,      "weather.rain",       "Rain",              0.0f,   1.0f,    0.0f, Linear,  Exponential,    0.5f,  "",   TF_TB_ML | kPerformance) \
     X(WeatherSurf,      "weather.surf",       "Surf",              0.0f,   1.0f,    0.0f, Linear,  Exponential,    0.5f,  "",   TF_TB_ML | kPerformance) \
     X(WeatherGust,      "weather.gust",       "Gusts",             0.0f,   1.0f,    0.5f, Linear,  Exponential,    0.5f,  "",   TF_TB_ML | kTideScaled) \
     X(WeatherTone,      "weather.tone",       "Tone",              0.0f,   1.0f,    0.5f, Linear,  Exponential,    0.3f,  "",   TF_TB_ML) \
     X(WeatherDistance,  "weather.distance",   "Distance",          0.0f,   1.0f,    0.3f, Linear,  Exponential,    0.5f,  "",   TF_TB_ML) \
-    TF_STRIP(X, Weather,   "weather",  -4.0f, -14.0f, -60.0f) \
+    TF_STRIP(X, Weather,   "weather",  -4.0f, -14.0f, -60.0f, 150.0f) \
     X(FreezeOn,         "freeze.on",          "Freeze All",        0.0f,   1.0f,    0.0f, Linear,  Linear,         0.0f,  "",   kMidiLearnable | kDiscrete | kPerformance) \
     X(FreezeDuck,       "freeze.duck",        "Duck the Mix",      0.0f,   1.0f,    0.6f, Linear,  Exponential,    0.1f,  "",   TF_TB_ML) \
     X(FreezeTexture,    "freeze.texture",     "Texture",           0.0f,   1.0f,    0.5f, Linear,  Exponential,    0.3f,  "",   TF_TB_ML) \
-    TF_STRIP(X, Freeze,    "freeze",    0.0f, -10.0f, -60.0f) \
+    TF_STRIP(X, Freeze,    "freeze",    0.0f, -10.0f, -60.0f, -30.0f) \
     TF_FX_SLOT(X, DroneFx1,  "drone.fx1")  TF_FX_SLOT(X, DroneFx2,  "drone.fx2")  \
     TF_FX_SLOT(X, Cloud1Fx1, "cloud1.fx1") TF_FX_SLOT(X, Cloud1Fx2, "cloud1.fx2") \
     TF_FX_SLOT(X, Cloud2Fx1, "cloud2.fx1") TF_FX_SLOT(X, Cloud2Fx2, "cloud2.fx2") \
@@ -216,7 +217,10 @@ inline constexpr unsigned kDiscrete = 1u << 4;
     X(ModRoute14Depth, "mod.route14.depth", "Depth", -1.0f, 1.0f, 0.0f, Linear, Linear, 0.05f, "", TF_TB_ML) \
     X(ModRoute15Depth, "mod.route15.depth", "Depth", -1.0f, 1.0f, 0.0f, Linear, Linear, 0.05f, "", TF_TB_ML) \
     X(ModRoute16Depth, "mod.route16.depth", "Depth", -1.0f, 1.0f, 0.0f, Linear, Linear, 0.05f, "", TF_TB_ML) \
-    X(SyncSource,       "sync.source",        "Follow",            0.0f,   1.0f,    0.0f, Linear,  Linear,         0.0f,  "",   kDiscrete)
+    X(SyncSource,       "sync.source",        "Follow",            0.0f,   1.0f,    0.0f, Linear,  Linear,         0.0f,  "",   kDiscrete) \
+    X(SpaceMode,        "space.mode",         "Output",            0.0f,   4.0f,    0.0f, Linear,  Linear,         0.0f,  "",   kMidiLearnable | kDiscrete) \
+    X(SpaceSpread,      "space.spread",       "Spread",            0.0f,   1.0f,    0.35f, Linear, Exponential,    0.3f,  "",   TF_TB_ML) \
+    X(SpaceRotate,      "space.rotate",       "Rotate",          -30.0f,  30.0f,    0.0f, Linear,  Exponential,    0.5f,  "deg/s", kMidiLearnable)
 
 enum class P : ParamIndex
 {

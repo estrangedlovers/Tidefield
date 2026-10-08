@@ -26,6 +26,7 @@ add_executable(tidefield_tests
     engine/GestureTests.cpp
     engine/ModulationTests.cpp
     engine/SyncTests.cpp
+    engine/SpatialTests.cpp
     engine/MonkeyTests.cpp
     engine/ControlAuditTests.cpp)
 

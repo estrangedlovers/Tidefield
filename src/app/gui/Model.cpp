@@ -120,6 +120,8 @@ juce::StringArray Model::choices(P p) const
         c = { "Auto", "Cloud 1", "Cloud 2", "Cloud 3", "Cloud 4" };
     else if (id == "input.channel")
         c = { "Input 1", "Input 2", "1 + 2" };
+    else if (id == "space.mode")
+        c = { "Stereo", "Headphones", "Quad", "6 speakers", "8 speakers" };
     else if (id == "loop.source")
         c = { "Live input", "The mix" };
     else if (id == "loops.target")

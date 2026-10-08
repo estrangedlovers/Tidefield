@@ -44,7 +44,7 @@ AudioHost::AudioHost(juce::PropertiesFile& s, bool nullAudio) : settings(s)
         return;
     }
     const auto saved = settings.getXmlValue(kDeviceStateKey);
-    const auto error = deviceManager.initialise(2, 2, saved.get(), true);
+    const auto error = deviceManager.initialise(2, 8, saved.get(), true);
     if (error.isNotEmpty())
         juce::Logger::writeToLog("Audio device error: " + error);
 

@@ -6,6 +6,7 @@
 #include "../PluginHost.h"
 
 #include <dsp/core/TempoSync.h>
+#include <dsp/spatial/Spatial.h>
 #include <engine/mix/Layout.h>
 
 #include <map>
@@ -382,6 +383,176 @@ private:
     juce::String summary;
     juce::Rectangle<int> summaryArea;
     int frames = 0;
+};
+
+class SpaceView final : public juce::Component, public Animated
+{
+public:
+    explicit SpaceView(Model& m) : model(m) { model.add(this); }
+    ~SpaceView() override { model.remove(this); }
+
+    void tick() override
+    {
+        float sig = model.frame().spaceRotation + 1000.0f * static_cast<float>(model.frame().spaceMode) + 7.0f * static_cast<float>(model.frame().spaceChannels)
+                    + 3.0f * model.value(P::SpaceSpread) + static_cast<float>(model.value(P::SpaceMode));
+        for (const auto& s : engine::kStrips)
+            sig += model.value(s.azimuth) * 0.01f + (model.value(s.level) > -59.0f ? 0.37f : 0.0f);
+        if (std::abs(sig - shown) > 0.05f)
+        {
+            shown = sig;
+            repaint();
+        }
+    }
+
+    void paint(juce::Graphics& g) override
+    {
+        auto bounds = getLocalBounds().toFloat();
+        drawWell(g, bounds);
+        const auto circle = ring();
+        const auto centre = circle.getCentre();
+        const float radius = circle.getWidth() * 0.5f;
+        g.setColour(display::wellLine());
+        g.drawEllipse(circle, 1.0f);
+        g.drawEllipse(circle.reduced(radius * 0.45f), 1.0f);
+
+        const int wanted = juce::roundToInt(model.value(P::SpaceMode));
+        const int speakers = wanted == 2 ? 4 : wanted == 3 ? 6 : wanted == 4 ? 8 : 0;
+        g.setFont(font(9.5f, 600));
+        if (speakers > 0)
+            for (int k = 0; k < speakers; ++k)
+            {
+                const auto p = pointAt(dsp::speakerAzimuth(k, speakers), 1.0f);
+                g.setColour(display::textDim());
+                g.fillRect(juce::Rectangle<float>(9.0f, 9.0f).withCentre(p));
+                int label = k + 1;
+                if (speakers == 4 && k >= 2)
+                    label = k == 2 ? 4 : 3;
+                g.setColour(display::textFaint());
+                g.drawText(juce::String(label), juce::Rectangle<float>(16.0f, 12.0f).withCentre(pointAt(dsp::speakerAzimuth(k, speakers), 1.13f)),
+                           juce::Justification::centred, false);
+            }
+        else if (wanted == 1)
+        {
+            g.setColour(display::textDim());
+            g.drawEllipse(juce::Rectangle<float>(18.0f, 22.0f).withCentre(centre), 1.2f);
+            g.fillEllipse(juce::Rectangle<float>(4.0f, 7.0f).withCentre(centre.translated(-10.0f, 0.0f)));
+            g.fillEllipse(juce::Rectangle<float>(4.0f, 7.0f).withCentre(centre.translated(10.0f, 0.0f)));
+        }
+        else
+            for (float az : { -30.0f, 30.0f })
+            {
+                g.setColour(display::textDim());
+                g.fillRect(juce::Rectangle<float>(9.0f, 9.0f).withCentre(pointAt(az, 1.0f)));
+            }
+
+        const float spread = model.value(P::SpaceSpread) * 90.0f;
+        for (int s = 0; s < engine::kNumStrips; ++s)
+        {
+            const auto& info = engine::kStrips[static_cast<std::size_t>(s)];
+            const bool heard = model.value(info.level) > -59.0f;
+            const float az = model.value(info.azimuth) + rotation();
+            const auto tint = display::forScene(s).withMultipliedAlpha(heard ? 1.0f : 0.3f);
+            if (spread > 1.0f && speakers + wanted > 0)
+            {
+                juce::Path arc;
+                arc.addCentredArc(centre.x, centre.y, radius * kSourceRadius, radius * kSourceRadius, 0.0f, juce::degreesToRadians(az - spread),
+                                  juce::degreesToRadians(az + spread), true);
+                g.setColour(tint.withMultipliedAlpha(0.45f));
+                g.strokePath(arc, juce::PathStrokeType(3.0f, juce::PathStrokeType::curved, juce::PathStrokeType::rounded));
+            }
+            const auto p = pointAt(az, kSourceRadius);
+            g.setColour(tint);
+            g.fillEllipse(juce::Rectangle<float>(s == dragging ? 13.0f : 10.0f, s == dragging ? 13.0f : 10.0f).withCentre(p));
+            g.setColour(display::text().withMultipliedAlpha(heard ? 0.85f : 0.35f));
+            g.setFont(font(9.5f));
+            g.drawText(info.name, juce::Rectangle<float>(70.0f, 12.0f).withCentre(pointAt(az, kLabelRadius)), juce::Justification::centred, false);
+        }
+
+        g.setFont(font(10.5f));
+        const auto& f = model.frame();
+        juce::String note;
+        if (speakers > 0 && f.spaceChannels == 0 && f.outputChannels < speakers)
+            note = "This output has " + juce::String(f.outputChannels) + " channels; " + juce::String(speakers)
+                   + " are needed. Enable more in Audio settings. Playing stereo meanwhile.";
+        else if (wanted == 0)
+            note = "Stereo: Direction only matters in the headphone and speaker ring modes.";
+        g.setColour(speakers > 0 && f.spaceChannels == 0 ? display::warn() : display::textFaint());
+        g.drawFittedText(note, getLocalBounds().reduced(8, 4).removeFromBottom(28), juce::Justification::bottomLeft, 2);
+    }
+
+    void mouseDown(const juce::MouseEvent& e) override
+    {
+        dragging = -1;
+        float best = 14.0f;
+        for (int s = 0; s < engine::kNumStrips; ++s)
+        {
+            const float d = pointAt(model.value(engine::kStrips[static_cast<std::size_t>(s)].azimuth) + rotation(), kSourceRadius).getDistanceFrom(e.position);
+            if (d < best)
+            {
+                best = d;
+                dragging = s;
+            }
+        }
+        if (dragging >= 0)
+        {
+            const auto p = engine::kStrips[static_cast<std::size_t>(dragging)].azimuth;
+            if (e.mods.isPopupMenu())
+            {
+                model.showParamMenu(p, this);
+                dragging = -1;
+                return;
+            }
+            model.beginTouch(p);
+        }
+    }
+
+    void mouseDrag(const juce::MouseEvent& e) override
+    {
+        if (dragging < 0)
+            return;
+        const auto c = ring().getCentre();
+        const float az = juce::radiansToDegrees(std::atan2(e.position.x - c.x, c.y - e.position.y)) - rotation();
+        model.set(engine::kStrips[static_cast<std::size_t>(dragging)].azimuth, dsp::wrapDegrees(az));
+        repaint();
+    }
+
+    void mouseUp(const juce::MouseEvent&) override
+    {
+        if (dragging >= 0)
+            model.endTouch(engine::kStrips[static_cast<std::size_t>(dragging)].azimuth);
+        dragging = -1;
+        repaint();
+    }
+
+    void mouseMove(const juce::MouseEvent&) override
+    {
+        if (model.onHover)
+            model.onHover("Space: drag a source around the circle to choose where it sounds from. Up is in front of the listener.");
+    }
+
+private:
+    static constexpr float kSourceRadius = 0.62f, kLabelRadius = 0.86f;
+
+    juce::Rectangle<float> ring() const
+    {
+        auto r = getLocalBounds().toFloat().reduced(14.0f).withTrimmedBottom(20.0f);
+        const float side = std::min(r.getWidth(), r.getHeight());
+        return r.withSizeKeepingCentre(side, side);
+    }
+
+    float rotation() const { return model.frame().spaceRotation; }
+
+    juce::Point<float> pointAt(float azimuthDeg, float fraction) const
+    {
+        const auto c = ring();
+        const float rad = juce::degreesToRadians(azimuthDeg);
+        const float r = c.getWidth() * 0.5f * fraction;
+        return { c.getCentreX() + r * std::sin(rad), c.getCentreY() - r * std::cos(rad) };
+    }
+
+    Model& model;
+    int dragging = -1;
+    float shown = -1.0f;
 };
 
 class AutoMasterView final : public juce::Component, public Animated
@@ -1834,6 +2005,9 @@ void DeviceView::build()
             auto& d = device("Master", colour::accent());
             d.add(std::make_unique<FaderMeter>(model, P::MasterLevel, -1, "Master"), 64, 0);
             params(d, { P::MasterFadeSecs, P::MasterCeiling });
+            auto& sp = device("Space", colour::tide());
+            sp.add(std::make_unique<SpaceView>(model), 300, 0);
+            params(sp, { P::SpaceMode, P::SpaceSpread, P::SpaceRotate });
             auto& a = device("Auto master", colour::good());
             params(a, { P::MasterAuto, P::MasterAutoTarget, P::MasterAutoAmount });
             a.add(std::make_unique<AutoMasterView>(model), 250, 0);

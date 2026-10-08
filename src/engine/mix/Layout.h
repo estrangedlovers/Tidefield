@@ -13,22 +13,22 @@ struct StripInfo
 {
     const char* id;
     const char* name;
-    P level, pan, width, sendA, sendB;
+    P level, pan, width, sendA, sendB, azimuth;
     P fx1, fx2;
 };
 
 inline constexpr std::array<StripInfo, kNumStrips> kStrips { {
-    { "drone",  "Drone",     P::DroneLevel,  P::DronePan,  P::DroneWidth,  P::DroneSendA,  P::DroneSendB,  P::DroneFx1P1,  P::DroneFx2P1 },
-    { "cloud1", "Cloud 1",   P::Cloud1Level, P::Cloud1Pan, P::Cloud1Width, P::Cloud1SendA, P::Cloud1SendB, P::Cloud1Fx1P1, P::Cloud1Fx2P1 },
-    { "cloud2", "Cloud 2",   P::Cloud2Level, P::Cloud2Pan, P::Cloud2Width, P::Cloud2SendA, P::Cloud2SendB, P::Cloud2Fx1P1, P::Cloud2Fx2P1 },
-    { "cloud3", "Cloud 3",   P::Cloud3Level, P::Cloud3Pan, P::Cloud3Width, P::Cloud3SendA, P::Cloud3SendB, P::Cloud3Fx1P1, P::Cloud3Fx2P1 },
-    { "cloud4", "Cloud 4",   P::Cloud4Level, P::Cloud4Pan, P::Cloud4Width, P::Cloud4SendA, P::Cloud4SendB, P::Cloud4Fx1P1, P::Cloud4Fx2P1 },
-    { "res",    "Resonator", P::ResLevel,    P::ResPan,    P::ResWidth,    P::ResSendA,    P::ResSendB,    P::ResFx1P1,    P::ResFx2P1 },
-    { "input",  "Live Input", P::InputLevel, P::InputPan,  P::InputWidth,  P::InputSendA,  P::InputSendB,  P::InputFx1P1,  P::InputFx2P1 },
-    { "bloom",  "Bloom",     P::BloomLevel,  P::BloomPan,  P::BloomWidth,  P::BloomSendA,  P::BloomSendB,  P::BloomFx1P1,  P::BloomFx2P1 },
-    { "loop",   "Loop",      P::LoopLevel,   P::LoopPan,   P::LoopWidth,   P::LoopSendA,   P::LoopSendB,   P::LoopFx1P1,   P::LoopFx2P1 },
-    { "weather", "Weather",  P::WeatherLevel, P::WeatherPan, P::WeatherWidth, P::WeatherSendA, P::WeatherSendB, P::WeatherFx1P1, P::WeatherFx2P1 },
-    { "freeze", "Freeze",    P::FreezeLevel, P::FreezePan, P::FreezeWidth, P::FreezeSendA, P::FreezeSendB, P::FreezeFx1P1, P::FreezeFx2P1 },
+    { "drone",  "Drone",     P::DroneLevel,  P::DronePan,  P::DroneWidth,  P::DroneSendA,  P::DroneSendB,  P::DroneAzimuth, P::DroneFx1P1,  P::DroneFx2P1 },
+    { "cloud1", "Cloud 1",   P::Cloud1Level, P::Cloud1Pan, P::Cloud1Width, P::Cloud1SendA, P::Cloud1SendB, P::Cloud1Azimuth, P::Cloud1Fx1P1, P::Cloud1Fx2P1 },
+    { "cloud2", "Cloud 2",   P::Cloud2Level, P::Cloud2Pan, P::Cloud2Width, P::Cloud2SendA, P::Cloud2SendB, P::Cloud2Azimuth, P::Cloud2Fx1P1, P::Cloud2Fx2P1 },
+    { "cloud3", "Cloud 3",   P::Cloud3Level, P::Cloud3Pan, P::Cloud3Width, P::Cloud3SendA, P::Cloud3SendB, P::Cloud3Azimuth, P::Cloud3Fx1P1, P::Cloud3Fx2P1 },
+    { "cloud4", "Cloud 4",   P::Cloud4Level, P::Cloud4Pan, P::Cloud4Width, P::Cloud4SendA, P::Cloud4SendB, P::Cloud4Azimuth, P::Cloud4Fx1P1, P::Cloud4Fx2P1 },
+    { "res",    "Resonator", P::ResLevel,    P::ResPan,    P::ResWidth,    P::ResSendA,    P::ResSendB,    P::ResAzimuth, P::ResFx1P1,    P::ResFx2P1 },
+    { "input",  "Live Input", P::InputLevel, P::InputPan,  P::InputWidth,  P::InputSendA,  P::InputSendB,  P::InputAzimuth, P::InputFx1P1,  P::InputFx2P1 },
+    { "bloom",  "Bloom",     P::BloomLevel,  P::BloomPan,  P::BloomWidth,  P::BloomSendA,  P::BloomSendB,  P::BloomAzimuth, P::BloomFx1P1,  P::BloomFx2P1 },
+    { "loop",   "Loop",      P::LoopLevel,   P::LoopPan,   P::LoopWidth,   P::LoopSendA,   P::LoopSendB,   P::LoopAzimuth, P::LoopFx1P1,   P::LoopFx2P1 },
+    { "weather", "Weather",  P::WeatherLevel, P::WeatherPan, P::WeatherWidth, P::WeatherSendA, P::WeatherSendB, P::WeatherAzimuth, P::WeatherFx1P1, P::WeatherFx2P1 },
+    { "freeze", "Freeze",    P::FreezeLevel, P::FreezePan, P::FreezeWidth, P::FreezeSendA, P::FreezeSendB, P::FreezeAzimuth, P::FreezeFx1P1, P::FreezeFx2P1 },
 } };
 
 struct FxSlotInfo

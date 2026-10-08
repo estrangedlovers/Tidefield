@@ -6,7 +6,9 @@
 #include <dsp/filters/DcBlocker.h>
 #include <dsp/fx/Limiter.h>
 
+#include <array>
 #include <cstdint>
+#include <vector>
 
 namespace tf::engine {
 class MasterChain
@@ -34,7 +36,8 @@ public:
     void panic() noexcept;
     void resumeFromPanic() noexcept;
 
-    Events process(float* left, float* right, int numSamples, float levelStart, float levelEnd) noexcept;
+    Events process(float* left, float* right, int numSamples, float levelStart, float levelEnd, float* const* extra = nullptr,
+                   int numExtra = 0) noexcept;
 
     FadeState getFadeState() const noexcept { return fadeState; }
     float getFadeGain() const noexcept { return fadeCurve(static_cast<float>(fadePosition)); }
@@ -63,5 +66,11 @@ private:
     float panicStep = 0.0f;
 
     std::uint32_t guardTrips = 0;
+
+    static constexpr int kMaxExtra = 8;
+    std::vector<float> gainTrace, panicTrace;
+    std::array<std::vector<float>, kMaxExtra> extraDelay;
+    std::array<dsp::DcBlocker, kMaxExtra> extraDc;
+    int extraWrite = 0;
 };
 }

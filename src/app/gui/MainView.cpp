@@ -1539,7 +1539,7 @@ void MainView::showAudioSettings()
     auto* devices = core.host.getDeviceManager();
     if (devices == nullptr)
         return;
-    auto selector = std::make_unique<juce::AudioDeviceSelectorComponent>(*devices, 0, 2, 2, 2, false, false, true, false);
+    auto selector = std::make_unique<juce::AudioDeviceSelectorComponent>(*devices, 0, 2, 2, 8, false, false, false, false);
     selector->setSize(540, 440);
     juce::DialogWindow::LaunchOptions options;
     options.content.setOwned(selector.release());

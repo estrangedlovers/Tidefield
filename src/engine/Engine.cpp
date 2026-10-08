@@ -134,6 +134,23 @@ void Engine::prepare(double newSampleRate, int maxBlockSize)
         stemL[k].assign(n, 0.0f);
         stemR[k].assign(n, 0.0f);
     }
+    for (std::size_t k = 0; k < speakerOut.size(); ++k)
+    {
+        speakerOut[k].assign(n, 0.0f);
+        speakerPtrs[k] = speakerOut[k].data();
+    }
+    for (int s = 0; s < kNumStrips; ++s)
+    {
+        postL[static_cast<std::size_t>(s)].assign(n, 0.0f);
+        postR[static_cast<std::size_t>(s)].assign(n, 0.0f);
+    }
+    spaceDummyL.assign(n, 0.0f);
+    spaceDummyR.assign(n, 0.0f);
+    for (auto& b : binaural)
+        b.prepare(sampleRate);
+    spaceMode = std::clamp(static_cast<int>(std::lround(params.current(P::SpaceMode))), 0, 4);
+    spaceSwitchGain = 1.0f;
+    resetSpace();
     recordTap.prepare(sampleRate);
     recordStride = 0;
     guard.reset();
@@ -161,6 +178,18 @@ void Engine::release()
         stemL[k].clear();
         stemR[k].clear();
     }
+    for (std::size_t k = 0; k < speakerOut.size(); ++k)
+    {
+        speakerOut[k].clear();
+        speakerPtrs[k] = nullptr;
+    }
+    for (int s = 0; s < kNumStrips; ++s)
+    {
+        postL[static_cast<std::size_t>(s)].clear();
+        postR[static_cast<std::size_t>(s)].clear();
+    }
+    spaceDummyL.clear();
+    spaceDummyR.clear();
     for (int s = 0; s < kNumStrips; ++s)
     {
         stripL[static_cast<std::size_t>(s)].clear();
@@ -263,6 +292,11 @@ void Engine::mixPreview(int n) noexcept
         const float edge = static_cast<float>(std::min({ 1.0, previewPos / fadeLength, (size - previewPos) / fadeLength }));
         masterL[static_cast<std::size_t>(i)] += 0.5f * edge * l;
         masterR[static_cast<std::size_t>(i)] += 0.5f * edge * r;
+        if (ringCount > 0)
+        {
+            speakerOut[0][static_cast<std::size_t>(i)] += 0.5f * edge * l;
+            speakerOut[1][static_cast<std::size_t>(i)] += 0.5f * edge * r;
+        }
         previewPos += step;
     }
 }
@@ -1059,6 +1093,7 @@ void Engine::controlTick() noexcept
 
     updateModulation(tickSeconds);
     params.advance(kControlInterval);
+    updateSpace(tickSeconds);
     tide = params.current(P::TideRate);
 
     harmony.setTarget(scaleFrom(params.current(P::HarmonyRoot), params.current(P::HarmonyScale)));
@@ -1591,9 +1626,110 @@ void Engine::processChunk(const float* const* inputs, int numInputs, int inputOf
         }
         const bool stems = recordStride > 2;
         const auto us = static_cast<std::size_t>(s);
-        strips[us].processAdd(L(sid), R(sid), masterL.data() + o, masterR.data() + o, busAL.data() + o, busAR.data() + o,
-                              busBL.data() + o, busBR.data() + o, n, tickPos, kControlInterval,
-                              stems ? stemL[us].data() + o : nullptr, stems ? stemR[us].data() + o : nullptr);
+        const bool spatial = ringCount > 0 || spaceMode == 1;
+        if (! spatial)
+        {
+            strips[us].processAdd(L(sid), R(sid), masterL.data() + o, masterR.data() + o, busAL.data() + o, busAR.data() + o,
+                                  busBL.data() + o, busBR.data() + o, n, tickPos, kControlInterval,
+                                  stems ? stemL[us].data() + o : nullptr, stems ? stemR[us].data() + o : nullptr);
+            continue;
+        }
+        float* pl = postL[us].data() + o;
+        float* pr = postR[us].data() + o;
+        if (strips[us].isSilent())
+        {
+            std::fill_n(pl, n, 0.0f);
+            std::fill_n(pr, n, 0.0f);
+            continue;
+        }
+        const bool binauralOut = spaceMode == 1;
+        strips[us].processAdd(L(sid), R(sid), binauralOut ? spaceDummyL.data() + o : masterL.data() + o,
+                              binauralOut ? spaceDummyR.data() + o : masterR.data() + o, busAL.data() + o, busAR.data() + o, busBL.data() + o,
+                              busBR.data() + o, n, tickPos, kControlInterval, pl, pr);
+        if (stems)
+        {
+            std::copy_n(pl, n, stemL[us].data() + o);
+            std::copy_n(pr, n, stemR[us].data() + o);
+        }
+    }
+    if (ringCount > 0 || spaceMode == 1)
+        spatialiseChunk(offset, n, tickPos);
+}
+
+void Engine::resetSpace() noexcept
+{
+    for (auto& b : binaural)
+        b.reset();
+    for (auto& g : ringPrev)
+        g.fill(0.0f);
+    for (auto& g : ringTarget)
+        g.fill(0.0f);
+    updateSpace(0.0f);
+    ringPrev = ringTarget;
+    for (auto& b : binaural)
+        b.snap();
+}
+
+void Engine::updateSpace(float tickSeconds) noexcept
+{
+    spaceRotation = dsp::wrapDegrees(spaceRotation + params.current(P::SpaceRotate) * tickSeconds);
+    if (ringCount == 0 && spaceMode != 1)
+        return;
+    const float spread = params.current(P::SpaceSpread) * 90.0f;
+    ringPrev = ringTarget;
+    for (int s = 0; s < kNumStrips; ++s)
+    {
+        const float az = params.current(kStrips[static_cast<std::size_t>(s)].azimuth) + spaceRotation;
+        const auto left = static_cast<std::size_t>(2 * s), right = left + 1;
+        if (ringCount > 0)
+        {
+            dsp::ringGains(az - spread, ringCount, ringTarget[left].data());
+            dsp::ringGains(az + spread, ringCount, ringTarget[right].data());
+        }
+        else
+        {
+            binaural[left].setAzimuth(az - spread);
+            binaural[right].setAzimuth(az + spread);
+        }
+    }
+}
+
+void Engine::spatialiseChunk(int offset, int n, int tickPos) noexcept
+{
+    const auto o = static_cast<std::size_t>(offset);
+    if (spaceMode == 1 && ringCount == 0)
+    {
+        constexpr float kBinauralScale = 0.7071f;
+        for (int s = 0; s < kNumStrips; ++s)
+        {
+            const auto us = static_cast<std::size_t>(s);
+            if (strips[us].isSilent())
+                continue;
+            binaural[2 * us].processAdd(postL[us].data() + o, masterL.data() + o, masterR.data() + o, n, kBinauralScale);
+            binaural[2 * us + 1].processAdd(postR[us].data() + o, masterL.data() + o, masterR.data() + o, n, kBinauralScale);
+        }
+        return;
+    }
+    const float invTick = 1.0f / static_cast<float>(kControlInterval);
+    for (int s = 0; s < kNumStrips; ++s)
+    {
+        const auto us = static_cast<std::size_t>(s);
+        if (strips[us].isSilent())
+            continue;
+        for (int side = 0; side < 2; ++side)
+        {
+            const auto v = 2 * us + static_cast<std::size_t>(side);
+            const float* src = (side == 0 ? postL[us] : postR[us]).data() + o;
+            for (int k = 0; k < ringCount; ++k)
+            {
+                const float a = ringPrev[v][static_cast<std::size_t>(k)], b = ringTarget[v][static_cast<std::size_t>(k)];
+                if (a == 0.0f && b == 0.0f)
+                    continue;
+                float* dst = speakerOut[static_cast<std::size_t>(k)].data() + o;
+                for (int i = 0; i < n; ++i)
+                    dst[i] += src[i] * dsp::lerp(a, b, static_cast<float>(tickPos + i + 1) * invTick);
+            }
+        }
     }
 }
 
@@ -1668,6 +1804,27 @@ void Engine::process(const float* const* inputs, int numInputs, float* const* ou
         const int block = std::min(numSamples - done, maxBlock);
         for (auto* v : { &masterL, &masterR, &busAL, &busAR, &busBL, &busBR })
             std::fill_n(v->data(), block, 0.0f);
+
+        const int wantedSpace = std::clamp(static_cast<int>(std::lround(params.current(P::SpaceMode))), 0, 4);
+        const float switchFrom = spaceSwitchGain;
+        const int wantedRing = speakersFor(wantedSpace) <= numOutputs ? speakersFor(wantedSpace) : 0;
+        if ((wantedSpace != spaceMode || wantedRing != ringCount) && spaceSwitchGain <= 0.0f)
+        {
+            spaceMode = wantedSpace;
+            ringCount = wantedRing;
+            resetSpace();
+        }
+        const float switchStep = static_cast<float>(block) / static_cast<float>(0.04 * sampleRate);
+        spaceSwitchGain = wantedSpace != spaceMode || wantedRing != ringCount ? std::max(0.0f, spaceSwitchGain - switchStep)
+                                                                               : std::min(1.0f, spaceSwitchGain + switchStep);
+        deviceOutputs = numOutputs;
+        for (int k = 0; k < ringCount; ++k)
+            std::fill_n(speakerOut[static_cast<std::size_t>(k)].data(), block, 0.0f);
+        if (spaceMode == 1)
+        {
+            std::fill_n(spaceDummyL.data(), block, 0.0f);
+            std::fill_n(spaceDummyR.data(), block, 0.0f);
+        }
         recordStride = recordTap.beginBlock();
         if (recordStride > 2)
             for (std::size_t k = 0; k < stemL.size(); ++k)
@@ -1676,7 +1833,7 @@ void Engine::process(const float* const* inputs, int numInputs, float* const* ou
                 std::fill_n(stemR[k].data(), block, 0.0f);
             }
 
-        const float levelStart = faderGain(params.current(P::MasterLevel));
+        const float levelStart = faderGain(params.current(P::MasterLevel)) * switchFrom;
         const float busAStart = faderGain(params.current(P::BusALevel));
         const float busBStart = faderGain(params.current(P::BusBLevel));
 
@@ -1709,6 +1866,17 @@ void Engine::process(const float* const* inputs, int numInputs, float* const* ou
                 const float g = startGain + step * static_cast<float>(i + 1);
                 masterL[static_cast<std::size_t>(i)] += bl[static_cast<std::size_t>(i)] * g;
                 masterR[static_cast<std::size_t>(i)] += br[static_cast<std::size_t>(i)] * g;
+            }
+            if (ringCount > 0)
+            {
+                const float diffuse = std::sqrt(2.0f / static_cast<float>(ringCount));
+                for (int k = 0; k < ringCount; ++k)
+                {
+                    const auto& src = (k % 2 == 0) ? bl : br;
+                    float* dst = speakerOut[static_cast<std::size_t>(k)].data();
+                    for (int i = 0; i < block; ++i)
+                        dst[i] += src[static_cast<std::size_t>(i)] * (startGain + step * static_cast<float>(i + 1)) * diffuse;
+                }
             }
             if (recordStride > 2)
             {
@@ -1748,8 +1916,8 @@ void Engine::process(const float* const* inputs, int numInputs, float* const* ou
         medium.process(masterL.data(), masterR.data(), block);
         autoMaster.process(masterL.data(), masterR.data(), block);
 
-        const float levelEnd = faderGain(params.current(P::MasterLevel));
-        const auto ev = master.process(masterL.data(), masterR.data(), block, levelStart, levelEnd);
+        const float levelEnd = faderGain(params.current(P::MasterLevel)) * spaceSwitchGain;
+        const auto ev = master.process(masterL.data(), masterR.data(), block, levelStart, levelEnd, speakerPtrs.data(), ringCount);
 
         if (ev.guardTripped)
         {
@@ -1766,7 +1934,20 @@ void Engine::process(const float* const* inputs, int numInputs, float* const* ou
         if (ev.fadeOutCompleted)
             notify(EngineNotice::Type::FadeOutComplete);
 
-        if (numOutputs == 1)
+        if (ringCount > 0)
+        {
+            for (int ch = 0; ch < numOutputs; ++ch)
+            {
+                int k = ch;
+                if (ringCount == 4 && ch >= 2 && ch < 4)
+                    k = ch == 2 ? 3 : 2;
+                if (ch < ringCount)
+                    std::copy_n(speakerOut[static_cast<std::size_t>(k)].data(), block, outputs[ch] + done);
+                else
+                    std::fill_n(outputs[ch] + done, block, 0.0f);
+            }
+        }
+        else if (numOutputs == 1)
         {
             for (int i = 0; i < block; ++i)
                 outputs[0][done + i] = 0.5f * (masterL[static_cast<std::size_t>(i)] + masterR[static_cast<std::size_t>(i)]);
@@ -1864,6 +2045,10 @@ void Engine::accumulateTelemetry(const float* l, const float* r, int n) noexcept
     f.bpm = bpm;
     f.gestureState = gestureState;
     f.performanceState = static_cast<std::uint8_t>(performanceRecording ? 1 : (performancePlaying ? 2 : 0));
+    f.spaceMode = static_cast<std::uint8_t>(spaceMode);
+    f.spaceChannels = static_cast<std::uint8_t>(ringCount);
+    f.outputChannels = static_cast<std::uint8_t>(std::clamp(deviceOutputs, 0, 255));
+    f.spaceRotation = spaceRotation;
     f.performanceSeconds = performanceRecording || performancePlaying ? static_cast<float>(static_cast<double>(sampleTime - performanceStart) / sampleRate) : 0.0f;
     f.gestureSeconds = gestureState == GestureState::Idle ? 0.0f : static_cast<float>(static_cast<double>(sampleTime - gestureStart) / sampleRate);
     if (const auto* take = gestureChannel.current(); take != nullptr && take->sampleRate > 0.0)

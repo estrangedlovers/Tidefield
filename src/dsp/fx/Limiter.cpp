@@ -100,7 +100,7 @@ float Limiter::pushMin(float g) noexcept
     return dequeValue[static_cast<size_t>(dequeHead)];
 }
 
-void Limiter::process(float* left, float* right, int numSamples) noexcept
+void Limiter::process(float* left, float* right, int numSamples, float* gainOut) noexcept
 {
     const auto w = static_cast<size_t>(window);
 
@@ -144,6 +144,8 @@ void Limiter::process(float* left, float* right, int numSamples) noexcept
         left[i] = std::clamp(outL, -ceiling, ceiling);
         right[i] = std::clamp(outR, -ceiling, ceiling);
         lastGain = gain;
+        if (gainOut != nullptr)
+            gainOut[i] = gain;
     }
 }
 }

@@ -71,6 +71,8 @@ struct TelemetryFrame
 
     GestureState gestureState = GestureState::Idle;
     std::uint8_t performanceState = 0;
+    std::uint8_t spaceMode = 0, spaceChannels = 0, outputChannels = 2;
+    float spaceRotation = 0.0f;
     float performanceSeconds = 0.0f;
     float gestureSeconds = 0.0f, gestureLength = 0.0f;
 

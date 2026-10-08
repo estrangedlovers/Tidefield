@@ -33,6 +33,7 @@
 #include <dsp/sources/input/LiveInput.h>
 #include <dsp/sources/looper/Disintegrator.h>
 #include <dsp/sources/weather/WeatherBed.h>
+#include <dsp/spatial/Spatial.h>
 #include <dsp/spectral/SpectralFreeze.h>
 #include <dsp/sources/resonator/ResonatorBank.h>
 
@@ -282,6 +283,22 @@ private:
     float freezeGain = 0.0f;
     void captureFreeze() noexcept;
     void processFreeze(int offset, int numSamples) noexcept;
+
+    static int speakersFor(int mode) noexcept { return mode == 2 ? 4 : mode == 3 ? 6 : mode == 4 ? 8 : 0; }
+    void updateSpace(float tickSeconds) noexcept;
+    void spatialiseChunk(int offset, int numSamples, int tickPos) noexcept;
+    void resetSpace() noexcept;
+    int spaceMode = 0;
+    int ringCount = 0;
+    int deviceOutputs = 2;
+    float spaceSwitchGain = 1.0f;
+    float spaceRotation = 0.0f;
+    std::array<std::vector<float>, dsp::kMaxSpeakers> speakerOut;
+    std::array<float*, dsp::kMaxSpeakers> speakerPtrs {};
+    std::array<std::vector<float>, kNumStrips> postL, postR;
+    std::vector<float> spaceDummyL, spaceDummyR;
+    std::array<std::array<float, dsp::kMaxSpeakers>, kNumStrips * 2> ringPrev {}, ringTarget {};
+    std::array<dsp::BinauralSource, kNumStrips * 2> binaural;
 
     float swellEnv = 0.0f, hushEnv = 0.0f, slowEnv = 0.0f;
     std::array<float, kMaxSeasons> seasonPhase {}, seasonValue {};

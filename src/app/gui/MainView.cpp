@@ -21,6 +21,7 @@ constexpr int kMacroW = 244;
 constexpr int kPadsH = 78;
 std::vector<MainView*> openViews;
 constexpr const char* kThemeKey = "theme";
+constexpr int kThemeMenuBase = 100;
 
 void gestureToggle(AppCore& core, bool recordNew)
 {
@@ -342,8 +343,13 @@ public:
             menu.addSeparator();
             menu.addItem(5, "Projector window (Cmd+P)", true, view.isProjectorOpen());
             juce::PopupMenu appearance;
-            appearance.addItem(6, "Slate", true, theme() == Theme::slate);
-            appearance.addItem(7, "Paper", true, theme() == Theme::paper);
+            for (bool light : { false, true })
+            {
+                appearance.addSectionHeader(light ? "Light" : "Dark");
+                for (std::size_t i = 0; i < kThemes.size(); ++i)
+                    if (themeIsLight(kThemes[i]) == light)
+                        appearance.addItem(kThemeMenuBase + static_cast<int>(i), themeName(kThemes[i]), true, theme() == kThemes[i]);
+            }
             menu.addSubMenu("Appearance", appearance);
             showMenu(menu, this, [this](int r) {
                 auto& s = model.core.session;
@@ -352,7 +358,8 @@ public:
                 else if (r == 3) s.save();
                 else if (r == 4) s.saveAs();
                 else if (r == 5) view.toggleProjector();
-                else if (r == 6 || r == 7) MainView::switchTheme(model.core, r == 7 ? Theme::paper : Theme::slate);
+                else if (r >= kThemeMenuBase && r < kThemeMenuBase + static_cast<int>(kThemes.size()))
+                    MainView::switchTheme(model.core, kThemes[static_cast<std::size_t>(r - kThemeMenuBase)]);
             });
         };
         fade.setHelp(&model, "fade the whole instrument in or out over the fade length (Space)");
@@ -930,7 +937,7 @@ MainView::MainView(AppCore& c) : core(c), model(c)
 {
     if (openViews.empty())
     {
-        setTheme(core.host.getSettings().getValue(kThemeKey) == "paper" ? Theme::paper : Theme::slate);
+        setTheme(themeFromId(core.host.getSettings().getValue(kThemeKey)));
         lookAndFeel->applyPalette();
     }
     openViews.push_back(this);
@@ -1014,7 +1021,7 @@ void MainView::switchTheme(AppCore& core, Theme t)
 {
     if (t == theme())
         return;
-    core.host.getSettings().setValue(kThemeKey, t == Theme::paper ? "paper" : "slate");
+    core.host.getSettings().setValue(kThemeKey, themeId(t));
     core.host.getSettings().saveIfNeeded();
     setTheme(t);
     if (openViews.empty())

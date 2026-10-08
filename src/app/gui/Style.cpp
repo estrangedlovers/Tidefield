@@ -16,21 +16,130 @@ const Palette kSlate {
         C(0xffe2a0b9), C(0xffa8c99b), C(0xffe4907e), C(0xffa6dbe3), C(0xffc8a587) } },
 };
 
+const Palette kNightSwim {
+    C(0xff10171d), C(0xff18222a), C(0xff23303a), C(0xff1d2830), C(0xff070c10), C(0xff16222a), C(0xff0b1116), C(0xff070c10),
+    C(0xffe6f1f2), C(0xffa7bcc2), C(0xff6f8790), C(0xffe6f1f2), C(0xff8aa3aa),
+    C(0xff4fe0d2), C(0xff7fb8ff), C(0xfff2e27a), C(0xffff8ac6), C(0xffff6f61), C(0xff8fe39a),
+    { { C(0xff4fe0d2), C(0xff7fb8ff), C(0xffb49cff), C(0xfff2e27a), C(0xff5fd3ff),
+        C(0xffff8ac6), C(0xff8fe39a), C(0xffff9a6b), C(0xffa8f0ff), C(0xffd6b98a) } },
+};
+
+const Palette kKelp {
+    C(0xff232a22), C(0xff2e372c), C(0xff3c4739), C(0xff354033), C(0xff131911), C(0xff24301f), C(0xff1c2219), C(0xff131911),
+    C(0xffeef0e2), C(0xffc3c9b2), C(0xff8f977f), C(0xffeef0e2), C(0xffa5ae94),
+    C(0xffe0a84f), C(0xff8fcfb0), C(0xfff0d77a), C(0xffe79bb5), C(0xffe2735f), C(0xffb6d77a),
+    { { C(0xffe0a84f), C(0xff8fcfb0), C(0xffc0a6d6), C(0xffe6d27f), C(0xff8db8cf),
+        C(0xffe3a0a6), C(0xffb6d77a), C(0xffe08c63), C(0xffa5d8c4), C(0xffc7a77a) } },
+};
+
+const Palette kEmber {
+    C(0xff2b2523), C(0xff37302d), C(0xff463d39), C(0xff3f3633), C(0xff171210), C(0xff2c2320), C(0xff211b19), C(0xff171210),
+    C(0xfff3ebe2), C(0xffcbbdb0), C(0xff978a7e), C(0xfff3ebe2), C(0xffb1a294),
+    C(0xfff08a4b), C(0xffe7c27a), C(0xfff5d67a), C(0xffe98fa8), C(0xfff0604f), C(0xffc3cf78),
+    { { C(0xfff08a4b), C(0xffe7c27a), C(0xffd99a8f), C(0xfff5d67a), C(0xffc9a98a),
+        C(0xffe98fa8), C(0xffc3cf78), C(0xffff7a5c), C(0xfff2b48a), C(0xffb89a7a) } },
+};
+
+const Palette kGraphite {
+    C(0xff3e3e3e), C(0xff4b4b4b), C(0xff5a5a5a), C(0xff545454), C(0xff1e1e1e), C(0xff313131), C(0xff333333), C(0xff1e1e1e),
+    C(0xfff0f0f0), C(0xffc4c4c4), C(0xff969696), C(0xfff0f0f0), C(0xffababab),
+    C(0xffffa64d), C(0xff5fc9e0), C(0xffffd75e), C(0xffff7ab6), C(0xffff5f57), C(0xff9be05a),
+    { { C(0xffffa64d), C(0xff5fc9e0), C(0xffb08cff), C(0xffffd75e), C(0xff59b7ff),
+        C(0xffff7ab6), C(0xff9be05a), C(0xffff6b5e), C(0xff7fe6ff), C(0xffe6b37f) } },
+};
+
+const Palette kHeather {
+    C(0xff352f3b), C(0xff413a48), C(0xff504858), C(0xff494151), C(0xff1a161e), C(0xff2d2733), C(0xff2a2530), C(0xff1a161e),
+    C(0xfff1edf3), C(0xffc9c0cf), C(0xff978d9e), C(0xfff1edf3), C(0xffada3b4),
+    C(0xffe9a3c9), C(0xffa7b8e8), C(0xfff0d690), C(0xffd8a6ff), C(0xffec7b74), C(0xffb4d39a),
+    { { C(0xffe9a3c9), C(0xffa7b8e8), C(0xffc4a9ef), C(0xfff0d690), C(0xff9ec9e6),
+        C(0xfff2a6a0), C(0xffb4d39a), C(0xffe8a07e), C(0xffb8e0e0), C(0xffcbae94) } },
+};
+
 const Palette kPaper {
     C(0xffdfe2dd), C(0xffeef0eb), C(0xffd8ddd7), C(0xffe5e8e3), C(0xff1b2528), C(0xff2c3a3e), C(0xffc6ccc7), C(0xffc3cac5),
     C(0xff20333a), C(0xff4c6064), C(0xff7b8b8c), C(0xfff4f3ed), C(0xffa9b8b6),
     C(0xffc0843f), C(0xff3d8c84), C(0xffbf9431), C(0xffbf5c8b), C(0xffc65445), C(0xff63904a),
     { { C(0xffc98d4c), C(0xff4a9d94), C(0xff8573bf), C(0xffb9a043), C(0xff4f88bd),
         C(0xffc0688d), C(0xff6f9a5f), C(0xffc7664f), C(0xff4ca2b0), C(0xffa27b5a) } },
+    true,
 };
+
+const Palette kDune {
+    C(0xffe6ddd0), C(0xfff3ece2), C(0xffe2d6c6), C(0xffece3d7), C(0xff171210), C(0xff2c2320), C(0xffd3c7b7), C(0xffd6cab9),
+    C(0xff3a2c22), C(0xff6b5848), C(0xff9a8775), C(0xfff3ebe2), C(0xffb1a294),
+    C(0xffc2643c), C(0xff3f8a83), C(0xffb88d2c), C(0xffb85a83), C(0xffc0473b), C(0xff6a8b42),
+    { { C(0xffc2643c), C(0xff3f8a83), C(0xff8a6bb0), C(0xffb88d2c), C(0xff4c7fae),
+        C(0xffb85a83), C(0xff6a8b42), C(0xffa35a3a), C(0xff3c95a0), C(0xff8f6d4f) } },
+    true,
+};
+
+const Palette kSeaGlass {
+    C(0xffd7e6e2), C(0xffe8f2ef), C(0xffcfe1dc), C(0xffddeae7), C(0xff070c10), C(0xff16222a), C(0xffbdd2cd), C(0xffbfd4cf),
+    C(0xff163a3a), C(0xff3f6463), C(0xff6f908e), C(0xffe6f1f2), C(0xff8aa3aa),
+    C(0xff1f8f86), C(0xff3a72b0), C(0xffb38f20), C(0xffb0508a), C(0xffc4503f), C(0xff4f8f45),
+    { { C(0xff1f8f86), C(0xff3a72b0), C(0xff7b62b8), C(0xffb38f20), C(0xff2e86b8),
+        C(0xffb0508a), C(0xff4f8f45), C(0xffc06a3f), C(0xff2f9fb0), C(0xff8d7350) } },
+    true,
+};
+
+const Palette kDaylight {
+    C(0xffe9e9e6), C(0xffffffff), C(0xffe4e4e0), C(0xfff2f2ef), C(0xff1e1e1e), C(0xff313131), C(0xffb8b8b2), C(0xffc8c8c2),
+    C(0xff0d0d0d), C(0xff333333), C(0xff5c5c5c), C(0xfff0f0f0), C(0xffababab),
+    C(0xffc25700), C(0xff006d77), C(0xff8a6a00), C(0xffa3006b), C(0xffc4001a), C(0xff2f7a00),
+    { { C(0xffc25700), C(0xff006d77), C(0xff5b3fb0), C(0xff8a6a00), C(0xff005fae),
+        C(0xffa3006b), C(0xff2f7a00), C(0xffb3261e), C(0xff00808f), C(0xff7a5230) } },
+    true,
+};
+
+struct ThemeInfo
+{
+    Theme theme;
+    const char* id;
+    const char* name;
+    const Palette& ui;
+    const Palette& display;
+};
+
+const std::array<ThemeInfo, kThemes.size()> kThemeInfo { {
+    { Theme::slate, "slate", "Slate", kSlate, kSlate },
+    { Theme::nightSwim, "nightSwim", "Night swim", kNightSwim, kNightSwim },
+    { Theme::kelp, "kelp", "Kelp", kKelp, kKelp },
+    { Theme::ember, "ember", "Ember", kEmber, kEmber },
+    { Theme::graphite, "graphite", "Graphite", kGraphite, kGraphite },
+    { Theme::heather, "heather", "Heather", kHeather, kHeather },
+    { Theme::paper, "paper", "Paper", kPaper, kSlate },
+    { Theme::dune, "dune", "Dune", kDune, kEmber },
+    { Theme::seaGlass, "seaGlass", "Sea glass", kSeaGlass, kNightSwim },
+    { Theme::daylight, "daylight", "Daylight", kDaylight, kGraphite },
+} };
+
+const ThemeInfo& info(Theme t)
+{
+    for (const auto& i : kThemeInfo)
+        if (i.theme == t)
+            return i;
+    return kThemeInfo.front();
+}
 
 Theme current = Theme::slate;
 }
 
-const Palette& palette() { return current == Theme::paper ? kPaper : kSlate; }
-const Palette& displayPalette() { return kSlate; }
+const Palette& palette() { return info(current).ui; }
+const Palette& displayPalette() { return info(current).display; }
 Theme theme() { return current; }
 void setTheme(Theme t) { current = t; }
+juce::String themeName(Theme t) { return info(t).name; }
+juce::String themeId(Theme t) { return info(t).id; }
+bool themeIsLight(Theme t) { return info(t).ui.light; }
+
+Theme themeFromId(const juce::String& id)
+{
+    for (const auto& i : kThemeInfo)
+        if (id == i.id)
+            return i.theme;
+    return Theme::slate;
+}
 
 juce::Font font(float size, int weight)
 {

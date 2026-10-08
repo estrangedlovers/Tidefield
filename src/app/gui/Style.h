@@ -7,7 +7,9 @@
 #include <functional>
 
 namespace tf::app::gui {
-enum class Theme { slate, paper };
+enum class Theme { slate, nightSwim, kelp, ember, graphite, heather, paper, dune, seaGlass, daylight };
+inline constexpr std::array<Theme, 10> kThemes { Theme::slate, Theme::nightSwim, Theme::kelp, Theme::ember, Theme::graphite,
+                                                Theme::heather, Theme::paper, Theme::dune, Theme::seaGlass, Theme::daylight };
 
 struct Palette
 {
@@ -15,12 +17,17 @@ struct Palette
     juce::Colour text, textDim, textFaint, wellText, wellTextDim;
     juce::Colour accent, tide, live, learn, warn, good;
     std::array<juce::Colour, 10> scenes;
+    bool light = false;
 };
 
 const Palette& palette();
 const Palette& displayPalette();
 Theme theme();
 void setTheme(Theme t);
+juce::String themeName(Theme t);
+juce::String themeId(Theme t);
+Theme themeFromId(const juce::String& id);
+bool themeIsLight(Theme t);
 
 namespace colour {
 inline juce::Colour window() { return palette().window; }
@@ -43,7 +50,7 @@ inline juce::Colour live() { return palette().live; }
 inline juce::Colour learn() { return palette().learn; }
 inline juce::Colour warn() { return palette().warn; }
 inline juce::Colour good() { return palette().good; }
-inline juce::Colour lift(juce::Colour c, float amount) { return theme() == Theme::paper ? c.darker(amount * 0.6f) : c.brighter(amount); }
+inline juce::Colour lift(juce::Colour c, float amount) { return palette().light ? c.darker(amount * 0.6f) : c.brighter(amount); }
 inline juce::Colour forScene(int i) { return palette().scenes[static_cast<std::size_t>(((i % 10) + 10) % 10)]; }
 }
 

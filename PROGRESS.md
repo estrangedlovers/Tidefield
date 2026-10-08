@@ -431,6 +431,15 @@ CI; every macOS CI run green on Apple Silicon.
 whether the auto master's target shape suits your material, how the new gestures
 feel, CPU on the M1 Pro under real load, and the app on your interface and controller.
 
+### Themes (after 1.2.0)
+
+- Ten themes under Appearance: dark Slate, Night swim, Kelp, Ember, Graphite, Heather;
+  light Paper, Dune, Sea glass, Daylight. Each light theme borrows a dark palette for
+  its displays (Paper/Slate, Dune/Ember, Sea glass/Night swim, Daylight/Graphite), and
+  the terrain's gradient now follows the display palette. Saved by id in settings.
+- `--ui-test` steps through every theme with the projector open. Screenshots of all ten
+  checked under Xvfb; not seen on a Mac.
+
 ### Design pass (after 1.2.0)
 
 - Palette taken from the mark: Slate (default) and Paper themes, chosen under the

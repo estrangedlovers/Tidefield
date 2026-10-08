@@ -86,8 +86,9 @@ Native JUCE drawing in C++, one typeface (Inter, embedded), palette and metrics 
 `gui/Style.h`. The logo lives in `gui/Logo.h` (Quicksand for the wordmark only);
 after changing it, regenerate the icons with `tidefield_icon resources/icon
 resources/fonts/Quicksand-Medium.ttf`.
-- Two themes, Slate and Paper (`Palette` in `gui/Style.cpp`, switched from the session
-  menu). Panel colours come from `colour::`; anything drawn inside a dark display (the
+- Ten themes, six dark and four light (`kThemeInfo` in `gui/Style.cpp`, switched from the
+  session menu's Appearance). A new theme is one `Palette` and one row there; a light
+  one names the dark palette its displays use. Panel colours come from `colour::`; anything drawn inside a dark display (the
   terrain, meters, waveforms, faders, readouts) uses `display::`, which stays the same in
   both themes. Hover and press states use `colour::lift`, never `brighter()` directly.
 - Playable tiles (pads) use the mark's corner ratio (`tileCorner`); panels stay square. Shared by the app and the plugin (`tidefield_app_core`).

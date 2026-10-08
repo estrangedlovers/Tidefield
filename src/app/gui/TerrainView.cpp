@@ -181,7 +181,7 @@ void TerrainView::renderBackdrop()
     juce::Graphics g(backdrop);
     g.addTransform(juce::AffineTransform::scale(scale));
     const auto f = field();
-    g.setGradientFill(juce::ColourGradient(juce::Colour(0xff26383e), f.getX(), f.getY(), juce::Colour(0xff141c1f), f.getX(), f.getBottom(), false));
+    g.setGradientFill(juce::ColourGradient(display::well().interpolatedWith(display::panel(), 0.45f), f.getX(), f.getY(), display::well().darker(0.25f), f.getX(), f.getBottom(), false));
     g.fillRoundedRectangle(f, metric::radius + 2.0f);
 
     const auto inner = f.reduced(kInset);

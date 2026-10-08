@@ -184,15 +184,14 @@ public:
                         v->toggleProjector();
             });
             const auto original = gui::theme();
-            const auto other = original == gui::Theme::slate ? gui::Theme::paper : gui::Theme::slate;
-            juce::Timer::callAfterDelay(800 + (gui::DeviceView::NumPages / 2) * 250 + 125, [this, other] {
-                if (core != nullptr)
-                    gui::MainView::switchTheme(*core, other);
-            });
-            juce::Timer::callAfterDelay(800 + (gui::DeviceView::NumPages + 1) * 250 + 125, [this, original] {
-                if (core != nullptr)
-                    gui::MainView::switchTheme(*core, original);
-            });
+            for (std::size_t i = 0; i <= gui::kThemes.size(); ++i)
+            {
+                const auto t = i < gui::kThemes.size() ? gui::kThemes[i] : original;
+                juce::Timer::callAfterDelay(800 + static_cast<int>(i) * 250 + 125, [this, t] {
+                    if (core != nullptr)
+                        gui::MainView::switchTheme(*core, t);
+                });
+            }
             for (int p = 0; p <= gui::DeviceView::NumPages; ++p)
                 juce::Timer::callAfterDelay(800 + p * 250, [this, p] {
                     if (window == nullptr)
@@ -204,7 +203,7 @@ public:
                 if (auto* v = window != nullptr ? dynamic_cast<gui::MainView*>(window->getContentComponent()) : nullptr)
                     if (v->isProjectorOpen())
                         v->toggleProjector();
-                std::cout << "UI test passed: every page shown, both themes, projector opened and closed" << std::endl;
+                std::cout << "UI test passed: every page shown, every theme, projector opened and closed" << std::endl;
                 systemRequestedQuit();
             });
         }

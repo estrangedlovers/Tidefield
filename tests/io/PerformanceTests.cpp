@@ -104,7 +104,7 @@ TEST_CASE("A performance round-trips through a session file", "[performance]")
     p.setMuted({ io::Performance::LaneKind::Notes, 0 }, true);
     auto data = p.start;
     data.performance = io::performanceToJson(p, e.getRegistry());
-    const auto file = juce::File::createTempFile(".tidefield");
+    const auto file = juce::File::createTempFile(".tide");
     juce::String error;
     REQUIRE(io::saveSession(data, file, error));
     auto loaded = io::loadSession(file, error);

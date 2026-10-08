@@ -248,7 +248,7 @@ them can be added without changing the core.
   lapped region, fades, normalises and loads the target cloud.
 - **Samples** travel inside `SampleHandle`s (a `shared_ptr` the audio thread only
   reads through a raw pointer); the message thread keeps references for saving.
-- **Session**: one `.tidefield` zip (`session.json` + `audio/*.flac`), schema version
+- **Session**: one `.tide` zip (`.tidefield` before 1.4, still read) (`session.json` + `audio/*.flac`), schema version
   plus a migration per version step. Loads on the worker; swap is crossfaded via the
   master fade.
 - **Recording** (phase 7): the engine pushes the master (post-Medium, post-limiter)

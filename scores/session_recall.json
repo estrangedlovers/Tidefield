@@ -3,7 +3,7 @@
   "sampleRate": 48000,
   "blockSize": 512,
   "seed": 22,
-  "session": "out/bloom_catch.tidefield",
+  "session": "out/bloom_catch.tide",
   "events": [
     { "t": 0, "param": "master.fadeSeconds", "value": 2 },
     { "t": 0, "cmd": "fadeIn" },

@@ -106,7 +106,7 @@ Gravity, reverb return, Cloud 1 density and master level.
 - **Undo and redo** for controls, scenes, routes, seasons, effects and timeline edits.
 - **Safety**: lookahead true-peak limiter, DC blocker, NaN guard, panic, CPU guardrails
   that lighten the load before it glitches.
-- **Sessions**: one `.tidefield` file with every setting, scene, season, route, path,
+- **Sessions**: one `.tide` project file with every setting, scene, season, route, path,
   mapping, plugin state and sample inside.
 - **Sounds**: original factory sounds in five groups (tonal, pads, drones, textures and
   one-shots), all synthesised by `tools/scripts/make_samples.py`, with search, preview

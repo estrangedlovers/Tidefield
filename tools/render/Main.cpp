@@ -32,7 +32,7 @@ struct Options
 
 void printUsage()
 {
-    std::cerr << "usage: tidefield_render <score.json> [-o out.wav] [--report out.json] [--seed N] [--strict] [--save-session out.tidefield]\n"
+    std::cerr << "usage: tidefield_render <score.json> [-o out.wav] [--report out.json] [--seed N] [--strict] [--save-session out.tide]\n"
                  "                       [--stems dir]\n";
 }
 

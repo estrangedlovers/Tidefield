@@ -1,3 +1,7 @@
+set(_tf_project_type "<dict><key>UTTypeIdentifier</key><string>com.tidefield.project</string><key>UTTypeDescription</key><string>Tidefield Project</string><key>UTTypeIconFile</key><string>Icon</string><key>UTTypeConformsTo</key><array><string>public.data</string><string>public.content</string></array><key>UTTypeTagSpecification</key><dict><key>public.filename-extension</key><array><string>tide</string></array></dict></dict>")
+set(_tf_legacy_type "<dict><key>UTTypeIdentifier</key><string>com.tidefield.session</string><key>UTTypeDescription</key><string>Tidefield Session (1.3 and earlier)</string><key>UTTypeIconFile</key><string>Icon</string><key>UTTypeConformsTo</key><array><string>public.data</string><string>public.content</string></array><key>UTTypeTagSpecification</key><dict><key>public.filename-extension</key><array><string>tidefield</string></array></dict></dict>")
+set(TIDEFIELD_DOCUMENT_TYPES "<key>UTExportedTypeDeclarations</key><array>${_tf_project_type}${_tf_legacy_type}</array><key>CFBundleDocumentTypes</key><array><dict><key>CFBundleTypeName</key><string>Tidefield Project</string><key>CFBundleTypeRole</key><string>Editor</string><key>LSHandlerRank</key><string>Owner</string><key>CFBundleTypeIconFile</key><string>Icon</string><key>LSItemContentTypes</key><array><string>com.tidefield.project</string><string>com.tidefield.session</string></array></dict></array>")
+
 juce_add_gui_app(Tidefield
     PRODUCT_NAME "Tidefield"
     COMPANY_NAME "Tidefield"
@@ -9,7 +13,7 @@ juce_add_gui_app(Tidefield
     MICROPHONE_PERMISSION_TEXT "Tidefield uses audio input for the live input channel."
     HARDENED_RUNTIME_ENABLED TRUE
     HARDENED_RUNTIME_OPTIONS com.apple.security.device.audio-input
-    PLIST_TO_MERGE "<plist><dict><key>LSMinimumSystemVersion</key><string>${CMAKE_OSX_DEPLOYMENT_TARGET}</string></dict></plist>")
+    PLIST_TO_MERGE "<plist><dict><key>LSMinimumSystemVersion</key><string>${CMAKE_OSX_DEPLOYMENT_TARGET}</string>${TIDEFIELD_DOCUMENT_TYPES}</dict></plist>")
 
 file(GLOB _library_samples CONFIGURE_DEPENDS ${CMAKE_SOURCE_DIR}/resources/samples/library/*.wav)
 juce_add_binary_data(TidefieldBinaryData SOURCES

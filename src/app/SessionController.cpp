@@ -5,7 +5,7 @@
 namespace tf::app {
 namespace {
 constexpr float kSwapFadeSeconds = 1.5f;
-const char* const kWildcard = "*.tidefield";
+const char* const kWildcard = io::kSessionWildcard;
 }
 
 SessionController::SessionController(engine::Engine& e, engine::SceneManager& s, engine::FxManager& f, engine::MidiManager* m,
@@ -119,13 +119,15 @@ void SessionController::save()
     if (current == juce::File())
         saveAs();
     else
-        saveTo(current);
+        saveTo(current.withFileExtension(io::kSessionExtension));
 }
 
 void SessionController::saveAs()
 {
-    chooser = std::make_unique<juce::FileChooser>("Save session", current == juce::File() ? juce::File::getSpecialLocation(juce::File::userDocumentsDirectory) : current,
-                                                  kWildcard);
+    chooser = std::make_unique<juce::FileChooser>("Save project",
+                                                  current == juce::File() ? juce::File::getSpecialLocation(juce::File::userDocumentsDirectory)
+                                                                          : current.withFileExtension(io::kSessionExtension),
+                                                  "*.tide");
     chooser->launchAsync(juce::FileBrowserComponent::saveMode | juce::FileBrowserComponent::canSelectFiles
                              | juce::FileBrowserComponent::warnAboutOverwriting,
                          [this, token = alive](const juce::FileChooser& fc) {

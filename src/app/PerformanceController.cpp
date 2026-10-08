@@ -205,7 +205,7 @@ void PerformanceController::save()
         core.status("Record a performance first.", true);
         return;
     }
-    chooser = std::make_unique<juce::FileChooser>("Save performance", core.getRecordingsFolder().getChildFile("Performance.tidefield"), "*.tidefield");
+    chooser = std::make_unique<juce::FileChooser>("Save performance", core.getRecordingsFolder().getChildFile("Performance.tide"), "*.tide");
     chooser->launchAsync(juce::FileBrowserComponent::saveMode | juce::FileBrowserComponent::canSelectFiles | juce::FileBrowserComponent::warnAboutOverwriting,
                          [this, token = std::weak_ptr<bool>(alive)](const juce::FileChooser& fc) {
                              if (token.expired() || fc.getResult() == juce::File())

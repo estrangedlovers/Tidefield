@@ -739,17 +739,21 @@ Right-click Rec for:
 
 ### Sessions
 
-A session is one `.tidefield` file holding everything:
+A session is saved as one `.tide` project file holding everything:
 
 - every setting;
-- the scenes and seasons;
-- the drawn path;
-- the take;
+- the scenes, seasons and modulation routes;
+- the drawn path and the take;
+- the effects, including any plug-in's own state;
 - your MIDI mappings;
 - the sounds themselves.
 
-Copy the file to another Mac and it opens complete. Use the session menu or
-Cmd+N, Cmd+O, Cmd+S and Shift+Cmd+S. Opening a session crossfades to it.
+Copy the file to another Mac and it opens complete. Double-click a `.tide` file in
+Finder to open it in Tidefield, or use the File menu, the session menu, or Cmd+N,
+Cmd+O, Cmd+S and Shift+Cmd+S. Opening a session crossfades to it.
+
+Sessions saved by Tidefield 1.3 and earlier end in `.tidefield`. They still open, and
+pressing Save writes a `.tide` copy beside the original, which is left untouched.
 
 ### Sounds
 

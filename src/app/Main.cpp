@@ -9,6 +9,7 @@
 #include <engine/Engine.h>
 #include <engine/mix/FxManager.h>
 #include <io/AudioFileIO.h>
+#include <io/Session.h>
 
 #include <juce_gui_extra/juce_gui_extra.h>
 
@@ -398,6 +399,7 @@ public:
         gui::setInterfaceScale(*core, gui::interfaceScale(*core));
         auto* view = new gui::MainView(*core);
         window = std::make_unique<MainWindow>(getApplicationName() + " - " + core->session.getName(), view);
+        openProjectsIn(commandLine);
         menu = std::make_unique<AppMenu>(*core, [this]() -> gui::MainView* {
             return window != nullptr ? dynamic_cast<gui::MainView*>(window->getContentComponent()) : nullptr;
         });
@@ -455,6 +457,43 @@ public:
                 systemRequestedQuit();
             });
         }
+    }
+
+    void anotherInstanceStarted(const juce::String& commandLine) override
+    {
+        if (window != nullptr)
+        {
+            window->setMinimised(false);
+            window->toFront(true);
+        }
+        openProjectsIn(commandLine);
+    }
+
+    void openProjectsIn(const juce::String& commandLine)
+    {
+        juce::StringArray tokens;
+        tokens.addTokens(commandLine, true);
+        for (auto token : tokens)
+        {
+            token = token.unquoted().trim();
+            if (! juce::File::isAbsolutePath(token))
+                continue;
+            const juce::File file(token);
+            if (file.existsAsFile() && io::isSessionFile(file))
+                openWhenFree(file, 0);
+        }
+    }
+
+    void openWhenFree(const juce::File& file, int attempts)
+    {
+        if (core == nullptr)
+            return;
+        if (core->session.isBusy() && attempts < 50)
+        {
+            juce::Timer::callAfterDelay(200, [this, file, attempts] { openWhenFree(file, attempts + 1); });
+            return;
+        }
+        core->session.openFile(file);
     }
 
     void shutdown() override

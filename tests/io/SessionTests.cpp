@@ -73,7 +73,7 @@ juce::File tempFile(const juce::String& name)
 }
 }
 
-TEST_CASE("A session round-trips through a .tidefield file with its audio")
+TEST_CASE("A session round-trips through a .tide file with its audio")
 {
     Rig a;
     a.fx.loadDefaultLayout();
@@ -95,11 +95,11 @@ TEST_CASE("A session round-trips through a .tidefield file with its audio")
 
     auto session = io::captureSession(a.engine, a.last, a.scenes, a.fx);
     session.name = "Round trip";
-    const auto file = tempFile("roundtrip.tidefield");
+    const auto file = tempFile("roundtrip.tide");
     file.getParentDirectory().createDirectory();
     juce::String error;
     REQUIRE(io::saveSession(session, file, error));
-    REQUIRE_FALSE(file.getSiblingFile("roundtrip.tidefield.saving").exists());
+    REQUIRE_FALSE(file.getSiblingFile("roundtrip.tide.saving").exists());
 
     const auto loaded = io::loadSession(file, error);
     REQUIRE(loaded.has_value());
@@ -202,7 +202,7 @@ TEST_CASE("Sessions from the future are refused; unknown IDs become warnings")
 
 TEST_CASE("Damaged or foreign files fail with a message, not a crash")
 {
-    const auto file = tempFile("garbage.tidefield");
+    const auto file = tempFile("garbage.tide");
     file.getParentDirectory().createDirectory();
     file.replaceWithText("this is not a zip");
     juce::String error;
@@ -522,7 +522,7 @@ TEST_CASE("Bloom's keyboard of sounds round-trips through a session file", "[ses
 
     engine::TelemetryFrame frame;
     auto data = io::captureSession(e, frame, scenes, fx);
-    const auto file = juce::File::createTempFile(".tidefield");
+    const auto file = juce::File::createTempFile(".tide");
     juce::String error;
     REQUIRE(io::saveSession(data, file, error));
     auto loaded = io::loadSession(file, error);
@@ -540,4 +540,24 @@ TEST_CASE("Bloom's keyboard of sounds round-trips through a session file", "[ses
     CHECK(zones[1].root == 69.0f);
     CHECK(zones[2].root == 81.0f);
     CHECK(zones[2].buffer->size() == 24000);
+}
+
+TEST_CASE("Projects saved as .tidefield by 1.3 and earlier still open")
+{
+    Rig a;
+    a.fx.loadDefaultLayout();
+    a.engine.setParam(engine::P::DroneCutoff, 1234.0f);
+    a.run(0.2);
+    auto session = io::captureSession(a.engine, a.last, a.scenes, a.fx);
+    const auto legacy = tempFile("old project.tidefield");
+    legacy.getParentDirectory().createDirectory();
+    juce::String error;
+    REQUIRE(io::saveSession(session, legacy, error));
+    REQUIRE(io::isSessionFile(legacy));
+    REQUIRE(io::isSessionFile(legacy.withFileExtension(io::kSessionExtension)));
+    REQUIRE_FALSE(io::isSessionFile(legacy.withFileExtension(".wav")));
+    const auto loaded = io::loadSession(legacy, error);
+    REQUIRE(loaded.has_value());
+    REQUIRE(loaded->params.at("drone.cutoff") == Approx(1234.0f));
+    REQUIRE(juce::String(io::kSessionExtension) == ".tide");
 }

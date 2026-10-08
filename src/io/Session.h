@@ -87,5 +87,12 @@ std::optional<SessionData> readSession(const void* data, std::size_t size, juce:
 juce::var sessionToJson(const SessionData& session);
 std::optional<SessionData> sessionFromJson(const juce::var& json, juce::String& error);
 
-inline constexpr const char* kSessionExtension = ".tidefield";
+inline constexpr const char* kSessionExtension = ".tide";
+inline constexpr const char* kLegacySessionExtension = ".tidefield";
+inline constexpr const char* kSessionWildcard = "*.tide;*.tidefield";
+
+inline bool isSessionFile(const juce::File& file)
+{
+    return file.hasFileExtension(kSessionExtension) || file.hasFileExtension(kLegacySessionExtension);
+}
 }

@@ -81,14 +81,20 @@ TimelineView::~TimelineView() { model.remove(this); }
 void TimelineView::showRenderMenu()
 {
     juce::PopupMenu m;
+    const bool has = ! perf.get().empty();
     m.addSectionHeader("Render the performance");
-    m.addItem(1, "Master");
-    m.addItem(2, "Master and stems");
+    m.addItem(1, "Master", has);
+    m.addItem(2, "Master and stems", has);
+    m.addItem(3, "Seamless loop, 2 s crossfade", has);
+    m.addItem(4, "Seamless loop, 8 s crossfade", has);
     m.addSeparator();
-    m.addSectionHeader("Seamless loop");
-    m.addItem(3, "Loop with a 2 s crossfade");
-    m.addItem(4, "Loop with an 8 s crossfade");
+    m.addSectionHeader("Seamless loop of the sound as it is now");
+    m.addItem(5, "1 minute");
+    m.addItem(6, "5 minutes");
+    m.addItem(7, "15 minutes");
     showMenu(m, this, [this](int r) {
+        if (r >= 5 && r <= 7)
+            return perf.renderSoundAsLoop(r == 5 ? 60.0 : r == 6 ? 300.0 : 900.0, 8.0);
         if (r == 1 || r == 2)
             perf.render(r == 2, 0.0);
         else if (r == 3 || r == 4)
@@ -107,7 +113,7 @@ void TimelineView::refreshButtons()
     const bool editable = has && state != State::Recording;
     for (auto* b : { &eraseButton, &muteButton, &smoothButton, &trimButton, &clearButton, &saveButton })
         b->setEnabled(editable);
-    renderButton.setEnabled(editable || perf.isRendering());
+    renderButton.setEnabled(state != State::Recording);
     renderButton.setButtonText(perf.isRendering() ? "Cancel " + juce::String(juce::roundToInt(perf.getRenderProgress() * 100.0f)) + "%" : juce::String("Render"));
     muteButton.setToggleState(perf.selection.lane && perf.get().isMuted(*perf.selection.lane), juce::dontSendNotification);
 }

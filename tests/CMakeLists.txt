@@ -36,7 +36,7 @@ catch_discover_tests(tidefield_tests)
 
 if(TARGET juce::juce_core)
     juce_add_console_app(tidefield_io_tests PRODUCT_NAME "tidefield_io_tests")
-    target_sources(tidefield_io_tests PRIVATE io/PerformanceTests.cpp io/UndoTests.cpp io/SessionTests.cpp io/UiProtocolTests.cpp io/RecorderTests.cpp io/JuceEffectTests.cpp)
+    target_sources(tidefield_io_tests PRIVATE io/PerformanceTests.cpp io/UndoTests.cpp io/SessionTests.cpp io/UiProtocolTests.cpp io/RecorderTests.cpp io/JuceEffectTests.cpp io/ScheduleTests.cpp)
     target_include_directories(tidefield_io_tests PRIVATE ${CMAKE_CURRENT_SOURCE_DIR})
     target_compile_definitions(tidefield_io_tests PRIVATE JUCE_WEB_BROWSER=0 JUCE_USE_CURL=0 JUCE_STANDALONE_APPLICATION=1)
     target_link_libraries(tidefield_io_tests PRIVATE

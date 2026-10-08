@@ -1,6 +1,7 @@
 #pragma once
 
 #include "Host.h"
+#include "Installation.h"
 #include "MidiInputs.h"
 #include "PerformanceController.h"
 #include "PluginHost.h"
@@ -48,6 +49,7 @@ public:
     std::unique_ptr<MidiClockOut> clockOut;
     std::unique_ptr<OscRemote> osc;
     PerformanceController performance { *this };
+    std::unique_ptr<Installation> installation;
 
     const engine::TelemetryFrame& latest() const noexcept { return lastFrame; }
 

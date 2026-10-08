@@ -238,24 +238,40 @@ void PerformanceController::render(bool stems, double loopCrossfadeSeconds)
         core.status("Record a performance first.", true);
         return;
     }
+    chooseFolderAndRender(std::make_shared<io::Performance>(performance), stems, loopCrossfadeSeconds);
+}
+
+void PerformanceController::renderSoundAsLoop(double seconds, double crossfadeSeconds)
+{
+    if (rendering)
+        return;
+    auto still = std::make_shared<io::Performance>();
+    still->start = io::captureSession(core.engine, core.latest(), core.scenes, core.fx, &core.midi, &core.seasons, &core.paths, &core.gestures, &core.mod);
+    still->sampleRate = 48000.0;
+    still->length = static_cast<std::uint64_t>(std::max(1.0, seconds) * still->sampleRate);
+    still->startedOpen = true;
+    chooseFolderAndRender(std::move(still), false, crossfadeSeconds);
+}
+
+void PerformanceController::chooseFolderAndRender(std::shared_ptr<const io::Performance> source, bool stems, double loopCrossfadeSeconds)
+{
     chooser = std::make_unique<juce::FileChooser>("Render into which folder?", core.getRecordingsFolder());
     chooser->launchAsync(juce::FileBrowserComponent::openMode | juce::FileBrowserComponent::canSelectDirectories,
-                         [this, stems, loopCrossfadeSeconds, token = std::weak_ptr<bool>(alive)](const juce::FileChooser& fc) {
+                         [this, source, stems, loopCrossfadeSeconds, token = std::weak_ptr<bool>(alive)](const juce::FileChooser& fc) {
                              if (token.expired() || fc.getResult() == juce::File())
                                  return;
-                             startRender(io::Recorder::makeFolder(fc.getResult(), loopCrossfadeSeconds > 0.0 ? "Loop" : "Performance"), stems,
+                             startRender(source, io::Recorder::makeFolder(fc.getResult(), loopCrossfadeSeconds > 0.0 ? "Loop" : "Performance"), stems,
                                          loopCrossfadeSeconds);
                          });
 }
 
-void PerformanceController::startRender(const juce::File& folder, bool stems, double loopCrossfadeSeconds)
+void PerformanceController::startRender(std::shared_ptr<const io::Performance> copy, const juce::File& folder, bool stems, double loopCrossfadeSeconds)
 {
     if (rendering)
         return;
     rendering = true;
     cancel.store(false);
     progress.store(0.0f);
-    auto copy = std::make_shared<io::Performance>(performance);
     core.status(loopCrossfadeSeconds > 0.0 ? "Rendering a seamless loop..." : "Rendering the performance...");
     core.workers.addJob([this, copy, folder, stems, loopCrossfadeSeconds, token = std::weak_ptr<bool>(alive)] {
         io::RenderOptions options;

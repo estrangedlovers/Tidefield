@@ -44,13 +44,15 @@ public:
 
     void save();
     void render(bool stems, double loopCrossfadeSeconds);
+    void renderSoundAsLoop(double seconds, double crossfadeSeconds);
     void cancelRender() { cancel.store(true); }
     bool isRendering() const noexcept { return rendering; }
     float getRenderProgress() const noexcept { return progress.load(); }
 
 private:
     void stopRecording();
-    void startRender(const juce::File& folder, bool stems, double loopCrossfadeSeconds);
+    void chooseFolderAndRender(std::shared_ptr<const io::Performance> source, bool stems, double loopCrossfadeSeconds);
+    void startRender(std::shared_ptr<const io::Performance> source, const juce::File& folder, bool stems, double loopCrossfadeSeconds);
 
     AppCore& core;
     io::Performance performance;

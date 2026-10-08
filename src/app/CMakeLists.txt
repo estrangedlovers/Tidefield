@@ -26,6 +26,7 @@ juce_add_binary_data(TidefieldBinaryData SOURCES
 add_library(tidefield_app_core INTERFACE)
 target_sources(tidefield_app_core INTERFACE
     ${CMAKE_CURRENT_SOURCE_DIR}/AppCore.cpp
+    ${CMAKE_CURRENT_SOURCE_DIR}/Installation.cpp
     ${CMAKE_CURRENT_SOURCE_DIR}/PerformanceController.cpp
     ${CMAKE_CURRENT_SOURCE_DIR}/FactoryContent.cpp
     ${CMAKE_CURRENT_SOURCE_DIR}/MidiInputs.cpp

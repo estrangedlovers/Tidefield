@@ -35,6 +35,7 @@ public:
 
     juce::String getName() const { return current == juce::File() ? juce::String("Untitled") : current.getFileNameWithoutExtension(); }
     bool isBusy() const noexcept { return busy; }
+    juce::File getFile() const { return current; }
 
     std::function<void(const juce::String&)> onStatus;
     std::function<void()> onSessionChanged;

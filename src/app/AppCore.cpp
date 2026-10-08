@@ -77,6 +77,8 @@ AppCore::AppCore(Host& h)
             engine.setParam(engine::P::TerrainX, list[static_cast<std::size_t>(index)].position.x);
             engine.setParam(engine::P::TerrainY, list[static_cast<std::size_t>(index)].position.y);
         };
+        installation = std::make_unique<Installation>(*this);
+        installation->launch();
     }
     startTimerHz(30);
 }
@@ -85,6 +87,7 @@ AppCore::~AppCore()
 {
     stopTimer();
     performance.cancelRender();
+    installation.reset();
     osc.reset();
     clockOut.reset();
     fx.setExternal(nullptr);

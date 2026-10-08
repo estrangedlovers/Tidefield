@@ -2,6 +2,7 @@
 #include "Timeline.h"
 
 #include "../LinkSync.h"
+#include "../Installation.h"
 #include "../PluginHost.h"
 
 #include <dsp/core/TempoSync.h>
@@ -260,6 +261,127 @@ public:
 private:
     Fader fader;
     Meter meter;
+};
+
+class InstallationView final : public juce::Component, public Animated
+{
+public:
+    explicit InstallationView(Model& m) : model(m), inst(*m.core.installation)
+    {
+        model.add(this);
+        for (auto* b : { &onButton, &scheduleButton, &awakeButton })
+            b->setClickingTogglesState(true);
+        onButton.setHelp(&model, "for galleries and long runs: open a chosen session at launch, fade in by itself, recover from a lost audio device or a panic and log what happened");
+        sessionButton.setHelp(&model, "open the session you have open now whenever Tidefield starts (save it first)");
+        scheduleButton.setHelp(&model, "fade in and out at the same times every day");
+        awakeButton.setHelp(&model, "stop the computer and display from sleeping while installation mode is on");
+        logButton.setHelp(&model, "show the installation log: starts, fades, device losses and recoveries");
+        onButton.onClick = [this] { inst.setEnabled(onButton.getToggleState()); };
+        scheduleButton.onClick = [this] { inst.setSchedule(scheduleButton.getToggleState()); };
+        awakeButton.onClick = [this] { inst.setKeepAwake(awakeButton.getToggleState()); };
+        sessionButton.onClick = [this] {
+            const auto file = model.core.session.getFile();
+            if (file == juce::File())
+                return model.core.status("Save this session first, then choose it for the installation.", true);
+            inst.setSessionFile(file);
+            model.core.status("The installation will open " + file.getFileName() + " at launch.");
+        };
+        logButton.onClick = [this] {
+            if (inst.getLogFile().existsAsFile())
+                inst.getLogFile().revealToUser();
+            else
+                model.core.status("Nothing has been logged yet.");
+        };
+        for (auto* e : { &startTime, &stopTime })
+        {
+            e->setJustification(juce::Justification::centred);
+            e->setFont(font(12.0f));
+            e->setInputRestrictions(5, "0123456789:");
+            e->onReturnKey = [this] { commitTimes(); };
+            e->onFocusLost = [this] { commitTimes(); };
+            addAndMakeVisible(*e);
+        }
+        const auto w = inst.getWindow();
+        startTime.setText(formatClock(w.start), false);
+        stopTime.setText(formatClock(w.stop), false);
+        for (auto* b : { &onButton, &sessionButton, &scheduleButton, &awakeButton, &logButton })
+            addAndMakeVisible(*b);
+        tick();
+    }
+    ~InstallationView() override { model.remove(this); }
+
+    void tick() override
+    {
+        onButton.setToggleState(inst.isEnabled(), juce::dontSendNotification);
+        scheduleButton.setToggleState(inst.hasSchedule(), juce::dontSendNotification);
+        awakeButton.setToggleState(inst.getKeepAwake(), juce::dontSendNotification);
+        if (++frames % 15 == 0 || summary.isEmpty())
+        {
+            const auto text = inst.describe();
+            if (text != summary)
+            {
+                summary = text;
+                repaint();
+            }
+        }
+    }
+
+    void resized() override
+    {
+        auto r = getLocalBounds();
+        onButton.setBounds(r.removeFromTop(24));
+        r.removeFromTop(6);
+        sessionButton.setBounds(r.removeFromTop(24));
+        r.removeFromTop(6);
+        auto row = r.removeFromTop(24);
+        scheduleButton.setBounds(row.removeFromLeft(110));
+        row.removeFromLeft(6);
+        startTime.setBounds(row.removeFromLeft((row.getWidth() - 14) / 2));
+        row.removeFromLeft(14);
+        stopTime.setBounds(row);
+        r.removeFromTop(6);
+        row = r.removeFromTop(24);
+        awakeButton.setBounds(row.removeFromLeft(row.getWidth() / 2 - 3));
+        row.removeFromLeft(6);
+        logButton.setBounds(row);
+        r.removeFromTop(6);
+        summaryArea = r;
+    }
+
+    void paint(juce::Graphics& g) override
+    {
+        g.setFont(font(11.0f));
+        g.setColour(colour::textFaint());
+        g.drawText("to", startTime.getBounds().withX(startTime.getRight()).withWidth(14), juce::Justification::centred);
+        g.setColour(colour::textDim());
+        g.drawFittedText(summary, summaryArea, juce::Justification::topLeft, 3);
+    }
+
+private:
+    void commitTimes()
+    {
+        const auto a = parseClock(startTime.getText()), b = parseClock(stopTime.getText());
+        if (! a || ! b)
+        {
+            model.core.status("Write times as HH:MM, for example 09:30 and 18:00.", true);
+            const auto w = inst.getWindow();
+            startTime.setText(formatClock(w.start), false);
+            stopTime.setText(formatClock(w.stop), false);
+            return;
+        }
+        inst.setWindow({ *a, *b });
+        startTime.setText(formatClock(*a), false);
+        stopTime.setText(formatClock(*b), false);
+    }
+
+    Model& model;
+    Installation& inst;
+    FlatButton onButton { "Installation mode", colour::good() }, sessionButton { "Open this session at launch" }, scheduleButton { "Daily", colour::tide() },
+        awakeButton { "Keep awake", colour::tide() }, logButton { "Show log" };
+    juce::TextEditor startTime, stopTime;
+    juce::String summary;
+    juce::Rectangle<int> summaryArea;
+    int frames = 0;
 };
 
 class AutoMasterView final : public juce::Component, public Animated
@@ -1725,6 +1847,11 @@ void DeviceView::build()
             auto del = std::make_unique<FlatButton>("Delay bus");
             del->onClick = [this] { later(this, [this] { showEffectsFor(engine::kNumStrips + 1); }); };
             fx.add(std::move(del), 2 * metric::knobW, 26);
+            if (model.core.installation != nullptr)
+            {
+                auto& i = device("Installation", colour::good());
+                i.add(std::make_unique<InstallationView>(model), 280, 0);
+            }
             break;
         }
         case Midi:

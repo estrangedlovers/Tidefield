@@ -2,6 +2,7 @@
 
 #include "Host.h"
 #include "MidiInputs.h"
+#include "PluginHost.h"
 #include "SessionController.h"
 
 #include <engine/capture/CatchManager.h>
@@ -28,6 +29,7 @@ public:
 
     Host& host;
     engine::Engine& engine;
+    std::unique_ptr<PluginHost> plugins;
     engine::SceneManager scenes;
     engine::FxManager fx;
     engine::CatchManager catcher;

@@ -1,5 +1,7 @@
 #include "Pages.h"
 
+#include "../PluginHost.h"
+
 #include <dsp/core/TempoSync.h>
 #include <engine/mix/Layout.h>
 
@@ -77,73 +79,155 @@ public:
     {
         model.add(this);
         menu = setTop(std::make_unique<juce::ComboBox>(), 24, 4 * metric::knobW);
-        menu->addItem("Empty", 1);
-        const auto& entries = dsp::ProcessorFactory::instance().entries();
-        for (std::size_t k = 0; k < entries.size(); ++k)
-            menu->addItem(entries[k].info->name, static_cast<int>(k) + 2);
-        menu->onChange = [this] {
-            const int id = menu->getSelectedId();
-            const auto& e = dsp::ProcessorFactory::instance().entries();
-            model.core.fx.setType(slot, id <= 1 ? std::string() : std::string(e[static_cast<std::size_t>(id - 2)].info->typeId));
-        };
+        menu->onChange = [this] { chosen(menu->getSelectedId()); };
         const auto first = engine::idx(engine::kFxSlots[static_cast<std::size_t>(s)].firstParam);
         for (int k = 0; k < 7; ++k)
             knobs[static_cast<std::size_t>(k)] = static_cast<Knob*>(addKnob(static_cast<P>(first + static_cast<engine::ParamIndex>(k))));
+        auto open = std::make_unique<FlatButton>("Plugin window");
+        open->setHelp(&model, "open the plugin's own controls");
+        open->onClick = [this] {
+            if (model.core.plugins != nullptr)
+                model.core.plugins->openEditor(slot);
+        };
+        openButton = add(std::move(open), 2 * metric::knobW, 24);
+        fillMenu();
         refresh();
     }
     ~FxDevice() override { model.remove(this); }
 
     void tick() override
     {
+        const int version = model.core.plugins != nullptr ? model.core.plugins->getListVersion() : 0;
+        if (version != shownListVersion)
+            fillMenu();
         if (model.core.fx.getType(slot) != shownType)
             refresh();
+        if (model.core.plugins != nullptr && model.core.fx.isExternal(slot) && ++syncFrames % 6 == 0)
+            followPluginWindow();
     }
 
 private:
+    static constexpr int kScanId = 900, kPluginBase = 1000;
+
+    void followPluginWindow()
+    {
+        const auto first = engine::idx(engine::kFxSlots[static_cast<std::size_t>(slot)].firstParam);
+        for (int k = 0; k < 6; ++k)
+        {
+            const float pluginValue = model.core.plugins->parameterValue(slot, k);
+            const auto p = static_cast<P>(first + static_cast<engine::ParamIndex>(k));
+            if (pluginValue >= 0.0f && std::abs(pluginValue - model.value(p)) > 0.01f && std::abs(model.modulation(p)) < 1.0e-4f
+                && ! knobs[static_cast<std::size_t>(k)]->isMouseButtonDown())
+                model.set(p, pluginValue);
+        }
+    }
+
+    void fillMenu()
+    {
+        auto* plugins = model.core.plugins.get();
+        shownListVersion = plugins != nullptr ? plugins->getListVersion() : 0;
+        pluginList = plugins != nullptr ? plugins->effects() : std::vector<juce::PluginDescription> {};
+        menu->clear(juce::dontSendNotification);
+        auto* root = menu->getRootMenu();
+        root->addItem(1, "Empty");
+        root->addSectionHeader("Tidefield");
+        const auto& entries = dsp::ProcessorFactory::instance().entries();
+        for (std::size_t k = 0; k < entries.size(); ++k)
+            root->addItem(static_cast<int>(k) + 2, entries[k].info->name);
+        if (plugins != nullptr)
+        {
+            root->addSectionHeader("Plugins");
+            std::map<juce::String, juce::PopupMenu> byMaker;
+            for (std::size_t k = 0; k < pluginList.size(); ++k)
+            {
+                const auto& d = pluginList[k];
+                const auto maker = d.manufacturerName.isNotEmpty() ? d.manufacturerName : juce::String("Other");
+                byMaker[maker].addItem(kPluginBase + static_cast<int>(k), d.name + "  (" + d.pluginFormatName + ")");
+            }
+            for (auto& [maker, sub] : byMaker)
+                root->addSubMenu(maker, sub);
+            root->addItem(kScanId, plugins->hasScanned() ? "Scan for new plugins" : "Find my plugins...");
+        }
+        refresh();
+    }
+
+    void chosen(int id)
+    {
+        if (id == kScanId)
+        {
+            menu->setSelectedId(selectedId, juce::dontSendNotification);
+            if (model.core.plugins != nullptr)
+                model.core.plugins->startScan();
+            return;
+        }
+        std::string type;
+        if (id >= kPluginBase && id - kPluginBase < static_cast<int>(pluginList.size()))
+            type = PluginHost::typeIdFor(pluginList[static_cast<std::size_t>(id - kPluginBase)]);
+        else if (id >= 2 && id < kScanId)
+            type = dsp::ProcessorFactory::instance().entries()[static_cast<std::size_t>(id - 2)].info->typeId;
+        model.core.fx.setType(slot, type);
+    }
+
     void refresh()
     {
         shownType = model.core.fx.getType(slot);
         const auto* info = model.core.fx.getInfo(slot);
-        int selected = 1;
+        const bool isPlugin = model.core.fx.isExternal(slot);
+        selectedId = 1;
         const auto& entries = dsp::ProcessorFactory::instance().entries();
         for (std::size_t k = 0; k < entries.size(); ++k)
             if (shownType == entries[k].info->typeId)
-                selected = static_cast<int>(k) + 2;
-        menu->setSelectedId(selected, juce::dontSendNotification);
+                selectedId = static_cast<int>(k) + 2;
+        for (std::size_t k = 0; k < pluginList.size(); ++k)
+            if (shownType == PluginHost::typeIdFor(pluginList[k]))
+                selectedId = kPluginBase + static_cast<int>(k);
+        menu->setSelectedId(selectedId, juce::dontSendNotification);
         for (int k = 0; k < 6; ++k)
         {
             auto* kn = knobs[static_cast<std::size_t>(k)];
             const bool used = info != nullptr && info->controls[static_cast<std::size_t>(k)].display.curve != dsp::DisplayMap::Curve::Hidden
                               && info->controls[static_cast<std::size_t>(k)].name[0] != '\0';
             kn->setVisible(used);
-            if (used)
-            {
-                kn->setLabel(info->controls[static_cast<std::size_t>(k)].name);
-                kn->formatter = fxFormatter(info->controls[static_cast<std::size_t>(k)]);
-                if (k == 0 && (shownType == "tf.delay" || shownType == "tf.wornEcho"))
-                    kn->formatter = [this, free = kn->formatter, control = info->controls[0]](float v) {
-                        const auto& f = model.frame();
-                        if (! f.syncOn)
-                            return free(v);
-                        const int d = dsp::nearestDivision(control.display.value(v) * 0.001f, 60.0f / std::max(20.0f, f.bpm), 2.0f);
-                        return d < 0 ? free(v) : juce::String(dsp::kBeatDivisions[static_cast<std::size_t>(d)].name);
-                    };
-            }
+            if (! used)
+                continue;
+            kn->setLabel(info->controls[static_cast<std::size_t>(k)].name);
+            kn->formatter = fxFormatter(info->controls[static_cast<std::size_t>(k)]);
+            if (isPlugin)
+                kn->formatter = [this, k, fallback = kn->formatter](float v) {
+                    const auto text = model.core.plugins != nullptr ? model.core.plugins->parameterText(slot, k, v) : juce::String();
+                    return text.isNotEmpty() ? text : fallback(v);
+                };
+            else if (k == 0 && (shownType == "tf.delay" || shownType == "tf.wornEcho"))
+                kn->formatter = [this, free = kn->formatter, control = info->controls[0]](float v) {
+                    const auto& f = model.frame();
+                    if (! f.syncOn)
+                        return free(v);
+                    const int d = dsp::nearestDivision(control.display.value(v) * 0.001f, 60.0f / std::max(20.0f, f.bpm), 2.0f);
+                    return d < 0 ? free(v) : juce::String(dsp::kBeatDivisions[static_cast<std::size_t>(d)].name);
+                };
         }
         knobs[6]->setVisible(info != nullptr);
+        openButton->setVisible(isPlugin);
         const auto first = engine::idx(engine::kFxSlots[static_cast<std::size_t>(slot)].firstParam);
         std::vector<P> ps;
         for (engine::ParamIndex k = 0; k < 7; ++k)
             ps.push_back(static_cast<P>(first + k));
-        setPresets(shownType.empty() ? std::string() : "fx:" + shownType, std::string(engine::kFxSlots[static_cast<std::size_t>(slot)].id) + ".", ps);
+        setPresets(shownType.empty() || isPlugin ? std::string() : "fx:" + shownType, std::string(engine::kFxSlots[static_cast<std::size_t>(slot)].id) + ".",
+                   ps);
         title = info != nullptr ? juce::String(info->name) : juce::String(engine::kFxSlots[static_cast<std::size_t>(slot)].name);
+        resized();
         repaint();
     }
 
     int slot;
     juce::ComboBox* menu = nullptr;
+    FlatButton* openButton = nullptr;
     std::array<Knob*, 7> knobs {};
     std::string shownType = "\x01";
+    std::vector<juce::PluginDescription> pluginList;
+    int shownListVersion = -1;
+    int selectedId = 1;
+    int syncFrames = 0;
 };
 
 class FaderMeter final : public juce::Component

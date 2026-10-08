@@ -11,7 +11,26 @@ const dsp::ProcessorInfo* FxManager::getInfo(int slot) const noexcept
 {
     if (slot < 0 || slot >= kNumFxSlots)
         return nullptr;
+    if (isExternal(slot))
+        return externalEffects->find(types[static_cast<std::size_t>(slot)]);
     return dsp::ProcessorFactory::instance().find(types[static_cast<std::size_t>(slot)]);
+}
+
+bool FxManager::isExternal(int slot) const
+{
+    return slot >= 0 && slot < kNumFxSlots && externalEffects != nullptr && externalEffects->handles(types[static_cast<std::size_t>(slot)]);
+}
+
+bool FxManager::knows(std::string_view typeId) const
+{
+    if (externalEffects != nullptr && externalEffects->handles(typeId))
+        return externalEffects->find(typeId) != nullptr;
+    return dsp::ProcessorFactory::instance().find(typeId) != nullptr;
+}
+
+std::string FxManager::getState(int slot) const
+{
+    return isExternal(slot) ? externalEffects->captureState(slot) : std::string();
 }
 
 int FxManager::findSlot(std::string_view slotId) noexcept
@@ -22,12 +41,13 @@ int FxManager::findSlot(std::string_view slotId) noexcept
     return -1;
 }
 
-void FxManager::setType(int slot, std::string_view typeId, bool applyDefaults)
+void FxManager::setType(int slot, std::string_view typeId, bool applyDefaults, std::string state)
 {
     if (slot < 0 || slot >= kNumFxSlots)
         return;
     const auto s = static_cast<std::size_t>(slot);
     types[s] = std::string(typeId);
+    states[s] = std::move(state);
     pending[s] = ! trySend(slot);
 
     if (applyDefaults)
@@ -45,9 +65,15 @@ bool FxManager::trySend(int slot)
     const auto s = static_cast<std::size_t>(slot);
     if (inFlight[s] >= static_cast<int>(FxSlot::kQueueSize))
         return false;
-    auto processor = dsp::ProcessorFactory::instance().create(types[s]);
-    if (processor != nullptr)
-        processor->prepare(engine.getProcessSpec());
+    dsp::ProcessorPtr processor;
+    if (isExternal(slot))
+        processor = externalEffects->create(slot, types[s], states[s], engine.getProcessSpec());
+    else
+    {
+        processor = dsp::ProcessorFactory::instance().create(types[s]);
+        if (processor != nullptr)
+            processor->prepare(engine.getProcessSpec());
+    }
     const bool isReal = processor != nullptr;
     if (! engine.sendProcessor(slot, std::move(processor)))
         return false;

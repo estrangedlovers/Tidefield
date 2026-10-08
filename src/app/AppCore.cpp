@@ -52,12 +52,19 @@ AppCore::AppCore(Host& h)
         if (onSessionChanged)
             onSessionChanged();
     };
+    if (! host.isPlugin())
+    {
+        plugins = std::make_unique<PluginHost>(host.getSettings(), host.getSettings().getFile().getSiblingFile("PluginScanCrashes.txt"));
+        plugins->onStatus = [this](const juce::String& m, bool warning) { status(m, warning); };
+        fx.setExternal(plugins.get());
+    }
     startTimerHz(30);
 }
 
 AppCore::~AppCore()
 {
     stopTimer();
+    fx.setExternal(nullptr);
     recorder.onFinished = nullptr;
     saveRigMidi();
 }

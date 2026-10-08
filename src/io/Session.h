@@ -41,6 +41,7 @@ struct SessionData
     std::vector<SceneData> scenes;
     std::vector<std::string> pins;
     std::map<std::string, std::string> fx;
+    std::map<std::string, std::string> fxState;
     juce::var midi;
     juce::var seasons;
     juce::var modRoutes;

@@ -28,6 +28,7 @@ target_sources(tidefield_app_core INTERFACE
     ${CMAKE_CURRENT_SOURCE_DIR}/AppCore.cpp
     ${CMAKE_CURRENT_SOURCE_DIR}/FactoryContent.cpp
     ${CMAKE_CURRENT_SOURCE_DIR}/MidiInputs.cpp
+    ${CMAKE_CURRENT_SOURCE_DIR}/PluginHost.cpp
     ${CMAKE_CURRENT_SOURCE_DIR}/SessionController.cpp
     ${CMAKE_CURRENT_SOURCE_DIR}/gui/Controls.cpp
     ${CMAKE_CURRENT_SOURCE_DIR}/gui/MainView.cpp
@@ -43,6 +44,8 @@ target_sources(Tidefield PRIVATE
     AudioHost.cpp)
 
 target_compile_definitions(Tidefield PRIVATE
+    JUCE_PLUGINHOST_VST3=1
+    JUCE_PLUGINHOST_AU=$<IF:$<BOOL:${APPLE}>,1,0>
     JUCE_WEB_BROWSER=0
     JUCE_USE_CURL=0
     JUCE_APPLICATION_NAME_STRING="$<TARGET_PROPERTY:Tidefield,JUCE_PRODUCT_NAME>"
@@ -99,3 +102,6 @@ if(TIDEFIELD_BUILD_PLUGIN)
 endif()
 
 add_subdirectory(${CMAKE_SOURCE_DIR}/tools/icon ${CMAKE_BINARY_DIR}/tools/icon)
+
+add_subdirectory(${CMAKE_SOURCE_DIR}/tools/testfx ${CMAKE_BINARY_DIR}/tools/testfx)
+add_subdirectory(${CMAKE_SOURCE_DIR}/tools/hostcheck ${CMAKE_BINARY_DIR}/tools/hostcheck)

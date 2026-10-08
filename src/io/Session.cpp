@@ -333,7 +333,11 @@ SessionData captureSession(const engine::Engine& engine, const engine::Telemetry
         s.pins.push_back(reg.spec(p).id);
 
     for (int slot = 0; slot < engine::kNumFxSlots; ++slot)
+    {
         s.fx[engine::kFxSlots[static_cast<std::size_t>(slot)].id] = fx.getType(slot);
+        if (fx.isExternal(slot))
+            s.fxState[engine::kFxSlots[static_cast<std::size_t>(slot)].id] = fx.getState(slot);
+    }
 
     for (int k = 0; k < engine::kNumClouds; ++k)
         if (auto b = engine.getCloudSample(k))
@@ -383,13 +387,18 @@ std::vector<std::string> applySession(const SessionData& session, engine::Engine
         const int slot = engine::FxManager::findSlot(slotId);
         if (slot < 0)
             warnings.push_back("Unknown FX slot '" + slotId + "'");
-        else if (! type.empty() && dsp::ProcessorFactory::instance().find(type) == nullptr)
+        else if (! type.empty() && ! fx.knows(type))
         {
-            warnings.push_back("Unknown processor '" + type + "' in " + slotId + " (left empty)");
+            warnings.push_back(juce::String(type).startsWith("plugin:")
+                                   ? "The plugin in " + slotId + " is not available here (left empty)"
+                                   : "Unknown processor '" + type + "' in " + slotId + " (left empty)");
             fx.setType(slot, "", false);
         }
         else
-            fx.setType(slot, type, false);
+        {
+            const auto state = session.fxState.find(slotId);
+            fx.setType(slot, type, false, state != session.fxState.end() ? state->second : std::string());
+        }
     }
 
     engine.command(engine::Command::ReleaseLiveLayer);
@@ -489,6 +498,13 @@ juce::var sessionToJson(const SessionData& s)
     for (const auto& [slot, type] : s.fx)
         fx->setProperty(juce::Identifier(juce::String(slot)), juce::String(type));
     root->setProperty("fx", juce::var(fx));
+    if (! s.fxState.empty())
+    {
+        auto* states = new juce::DynamicObject();
+        for (const auto& [slot, state] : s.fxState)
+            states->setProperty(juce::Identifier(juce::String(slot)), juce::String(state));
+        root->setProperty("fxState", juce::var(states));
+    }
 
     root->setProperty("midi", s.midi);
     if (s.seasons.isArray())
@@ -560,6 +576,9 @@ std::optional<SessionData> sessionFromJson(const juce::var& json, juce::String& 
     if (const auto* fx = root->getProperty("fx").getDynamicObject())
         for (const auto& prop : fx->getProperties())
             s.fx[prop.name.toString().toStdString()] = prop.value.toString().toStdString();
+    if (const auto* states = root->getProperty("fxState").getDynamicObject())
+        for (const auto& prop : states->getProperties())
+            s.fxState[prop.name.toString().toStdString()] = prop.value.toString().toStdString();
     s.midi = root->getProperty("midi");
     s.seasons = root->getProperty("seasons");
     s.modRoutes = root->getProperty("modRoutes");

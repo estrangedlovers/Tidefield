@@ -92,6 +92,11 @@ jobs:
           sleep 3
           auval -v aumu Tdfl Tdfd
           "$CHECK" "AudioUnit:Synths/aumu,Tdfl,Tdfd"
+          # The app hosts other people's effects: scan, load, control, save and
+          # reopen a small test effect.
+          HOSTCHECK=$(find build/release -name tidefield_hostcheck -type f -perm -u+x | head -1)
+          TESTFX=$(dirname "$(find build/release -name 'Tidefield Test Gain.vst3' -maxdepth 8 | head -1)")
+          "$HOSTCHECK" "$TESTFX"
           mkdir -p dist/plugins
           cp -R "$VST3" "$AU" dist/plugins/
           cp resources/plugins-README.txt dist/plugins/README.txt

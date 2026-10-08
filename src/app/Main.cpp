@@ -48,15 +48,37 @@ int runSelfTest()
     {
         io::PresetLibrary library(juce::File::getSpecialLocation(juce::File::tempDirectory).getChildFile("tidefield-selftest-presets"));
         addFactoryPresets(library);
-        int presets = 0, unknown = 0;
-        for (const char* kind : { "drone", "cloud", "resonator", "bloom", "weather", "medium", "loops" })
+        int presets = 0, unknown = 0, outside = 0;
+        for (const char* kind : { "drone", "cloud", "resonator", "bloom", "weather", "medium", "loops", "looper", "input" })
             for (const auto& p : library.list(kind))
             {
                 ++presets;
                 for (const auto& [key, value] : p.values)
-                    unknown += engine.getRegistry().find(presetPrefix(kind) + key).has_value() ? 0 : 1;
+                {
+                    const auto index = engine.getRegistry().find(presetPrefix(kind) + key);
+                    unknown += index.has_value() ? 0 : 1;
+                    if (index.has_value())
+                    {
+                        const auto& spec = engine.getRegistry().spec(*index);
+                        outside += value < spec.minValue || value > spec.maxValue ? 1 : 0;
+                    }
+                }
             }
-        check(presets >= 25 && unknown == 0, "factory presets: " + juce::String(presets) + ", every value names a parameter");
+        int effectPresets = 0;
+        for (const auto& entry : dsp::ProcessorFactory::instance().entries())
+            for (const auto& p : library.list("fx:" + std::string(entry.info->typeId)))
+            {
+                ++effectPresets;
+                for (const auto& [key, value] : p.values)
+                {
+                    const bool known = key == "mix" || (key.size() == 2 && key[0] == 'p' && key[1] >= '1' && key[1] <= '6');
+                    unknown += known ? 0 : 1;
+                    outside += value < 0.0f || value > 1.0f ? 1 : 0;
+                }
+            }
+        check(presets >= 25 && unknown == 0 && outside == 0,
+              "factory presets: " + juce::String(presets) + " for instruments and " + juce::String(effectPresets)
+                  + " for effects, every value names a parameter and sits in its range");
     }
     check(starter.samples.count("cloud1") == 1 && starter.samples.count("bloom") == 1, "starter session loads its sounds");
     engine::FxManager fx(engine);

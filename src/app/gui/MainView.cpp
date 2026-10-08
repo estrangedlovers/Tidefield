@@ -479,6 +479,21 @@ public:
         viewport.setScrollBarsShown(true, false);
         addAndMakeVisible(viewport);
         list.owner = this;
+        search.setTextToShowWhenEmpty("Search sounds", colour::textFaint());
+        search.setFont(font(12.0f));
+        search.setColour(juce::TextEditor::backgroundColourId, colour::panelHi());
+        search.setColour(juce::TextEditor::outlineColourId, juce::Colours::transparentBlack);
+        search.setColour(juce::TextEditor::textColourId, colour::text());
+        search.setIndents(8, 5);
+        search.onTextChange = [this] { layout(); };
+        search.onEscapeKey = [this] {
+            search.clear();
+            layout();
+            unfocusAllComponents();
+        };
+        addAndMakeVisible(search);
+        favourites.addTokens(model.core.host.getSettings().getValue(kFavouritesKey), "\n", {});
+        favourites.removeEmptyStrings();
     }
     ~Browser() override { model.remove(this); }
 
@@ -503,7 +518,10 @@ public:
 
     void resized() override
     {
-        viewport.setBounds(getLocalBounds().withTrimmedTop(metric::header).reduced(2, 4));
+        auto r = getLocalBounds().withTrimmedTop(metric::header).reduced(2, 4);
+        search.setBounds(r.removeFromTop(24).reduced(4, 0));
+        r.removeFromTop(4);
+        viewport.setBounds(r);
         layout();
     }
 
@@ -546,17 +564,46 @@ private:
         for (std::size_t k = 0; k < scenes.size(); ++k)
             rows.push_back({ Row::Scene, static_cast<int>(k), juce::String(scenes[k].name), k < 9 ? juce::String(static_cast<int>(k) + 1) : juce::String() });
         rows.push_back({ Row::Capture, -1, "+ Capture what you hear", "C" });
-        const char* category = "";
         const auto& sounds = factorySounds();
-        for (std::size_t k = 0; k < sounds.size(); ++k)
+        const auto query = search.getText().trim();
+        auto soundRow = [&](std::size_t k) {
+            return Row { Row::Sound, static_cast<int>(k), sounds[k].name,
+                         sounds[k].rootNote >= 0 ? Model::noteName(static_cast<float>(sounds[k].rootNote)) : juce::String() };
+        };
+        if (query.isNotEmpty())
         {
-            if (juce::String(sounds[k].category) != category)
+            rows.push_back({ Row::Header, -1, "MATCHING SOUNDS", {} });
+            int found = 0;
+            for (std::size_t k = 0; k < sounds.size(); ++k)
+                if (juce::String(sounds[k].name).containsIgnoreCase(query) || juce::String(sounds[k].category).containsIgnoreCase(query))
+                {
+                    rows.push_back(soundRow(k));
+                    ++found;
+                }
+            if (found == 0)
+                rows.push_back({ Row::Header, -1, "NOTHING MATCHES", {} });
+        }
+        else
+        {
+            bool anyFavourite = false;
+            for (std::size_t k = 0; k < sounds.size(); ++k)
+                if (favourites.contains(sounds[k].name))
+                {
+                    if (! anyFavourite)
+                        rows.push_back({ Row::Header, -1, "FAVOURITES", {} });
+                    anyFavourite = true;
+                    rows.push_back(soundRow(k));
+                }
+            const char* category = "";
+            for (std::size_t k = 0; k < sounds.size(); ++k)
             {
-                category = sounds[k].category;
-                rows.push_back({ Row::Header, -1, juce::String(category).toUpperCase() + " SOUNDS", {} });
+                if (juce::String(sounds[k].category) != category)
+                {
+                    category = sounds[k].category;
+                    rows.push_back({ Row::Header, -1, juce::String(category).toUpperCase() + " SOUNDS", {} });
+                }
+                rows.push_back(soundRow(k));
             }
-            rows.push_back({ Row::Sound, static_cast<int>(k), sounds[k].name,
-                             sounds[k].rootNote >= 0 ? Model::noteName(static_cast<float>(sounds[k].rootNote)) : juce::String() });
         }
         rows.push_back({ Row::Header, -1, "YOUR SOUNDS", {} });
         rows.push_back({ Row::Disk, -1, "Load from disk...", {} });
@@ -620,9 +667,27 @@ private:
                     g.setColour(colour::tide().withAlpha(0.8f));
                     g.fillPath(note);
                     r.removeFromLeft(8.0f);
+                    const bool playing = row.index == previewing;
+                    auto play = r.removeFromRight(kPlayW);
+                    if (hover || playing)
+                    {
+                        juce::Path p;
+                        const auto box = play.withSizeKeepingCentre(9.0f, 9.0f);
+                        if (playing)
+                            p.addRectangle(box);
+                        else
+                            p.addTriangle(box.getX(), box.getY(), box.getX(), box.getBottom(), box.getRight(), box.getCentreY());
+                        g.setColour(playing ? colour::accent() : colour::textDim());
+                        g.fillPath(p);
+                    }
                     g.setColour(colour::textFaint());
                     g.setFont(font(10.5f, 500));
                     g.drawText(row.detail, r.removeFromRight(30.0f), juce::Justification::centredRight);
+                    if (favourites.contains(row.text))
+                    {
+                        g.setColour(colour::accent());
+                        g.drawText(juce::String::fromUTF8("\xe2\x98\x85"), r.removeFromRight(14.0f), juce::Justification::centred);
+                    }
                     g.setColour(colour::text());
                     g.setFont(font(12.5f, 500));
                     g.drawText(row.text, r, juce::Justification::centredLeft, true);
@@ -640,7 +705,8 @@ private:
         if (row.kind == Row::Scene)
             model.onHover("Scene \"" + row.text + "\": click to glide there (or press " + row.detail + "), double-click to rename, right-click for more");
         else if (row.kind == Row::Sound)
-            model.onHover(row.text + ": click to load it into a cloud or Bloom" + (row.detail.isNotEmpty() ? " (sounds at " + row.detail + ")" : juce::String()));
+            model.onHover(row.text + ": click to load it into a cloud or Bloom, the triangle to preview, right-click to favourite"
+                          + (row.detail.isNotEmpty() ? " (sounds at " + row.detail + ")" : juce::String()));
         else if (row.kind == Row::Capture)
             model.onHover("Capture: store everything you hear now as a scene at the cursor (C)");
     }
@@ -660,6 +726,26 @@ private:
         }
         else if (row.kind == Row::Capture)
             model.core.captureSceneAtCursor();
+        else if (row.kind == Row::Sound && e.mods.isPopupMenu())
+        {
+            juce::PopupMenu m;
+            m.addSectionHeader(row.text);
+            const bool fav = favourites.contains(row.text);
+            m.addItem(1, fav ? "Remove from favourites" : "Add to favourites");
+            m.addItem(2, row.index == previewing ? "Stop preview" : "Preview");
+            showMenu(m, this, [this, row, fav](int r) {
+                if (r == 1)
+                {
+                    fav ? favourites.removeString(row.text) : favourites.add(row.text);
+                    model.core.host.getSettings().setValue(kFavouritesKey, favourites.joinIntoString("\n"));
+                    layout();
+                }
+                else if (r == 2)
+                    togglePreview(row.index);
+            });
+        }
+        else if (row.kind == Row::Sound && e.x >= list.getWidth() - 8 - static_cast<int>(kPlayW))
+            togglePreview(row.index);
         else if (row.kind == Row::Sound || row.kind == Row::Disk)
         {
             juce::PopupMenu m;
@@ -688,8 +774,46 @@ private:
             showSceneMenu(model, rows[static_cast<std::size_t>(i)].index, this);
     }
 
+    void togglePreview(int soundIndex)
+    {
+        if (soundIndex == previewing)
+        {
+            model.engine.previewSample(nullptr);
+            previewing = -1;
+            list.repaint();
+            return;
+        }
+        previewing = soundIndex;
+        const int token = ++previewToken;
+        list.repaint();
+        juce::Component::SafePointer<Browser> safe(this);
+        const auto sound = factorySounds()[static_cast<std::size_t>(soundIndex)];
+        model.core.workers.addJob([safe, sound, token] {
+            auto buffer = loadFactorySound(sound);
+            juce::MessageManager::callAsync([safe, buffer, token] {
+                if (safe == nullptr || token != safe->previewToken || buffer == nullptr)
+                    return;
+                safe->model.engine.previewSample(buffer);
+                juce::Timer::callAfterDelay(static_cast<int>(buffer->seconds() * 1000.0) + 50, [safe, token] {
+                    if (safe != nullptr && token == safe->previewToken)
+                    {
+                        safe->previewing = -1;
+                        safe->list.repaint();
+                    }
+                });
+            });
+        });
+    }
+
+    static constexpr float kPlayW = 18.0f;
+    static constexpr const char* kFavouritesKey = "favouriteSounds";
+
     Model& model;
     MainView& view;
+    juce::TextEditor search;
+    juce::StringArray favourites;
+    int previewing = -1;
+    int previewToken = 0;
     juce::Viewport viewport;
     List list;
     std::vector<Row> rows;

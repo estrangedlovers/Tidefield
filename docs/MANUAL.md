@@ -705,23 +705,27 @@ Cmd+N, Cmd+O, Cmd+S and Shift+Cmd+S. Opening a session crossfades to it.
 
 ### Sounds
 
-The **Browser** lists 59 factory sounds in five groups. Every one is synthesised, so
+The **Browser** lists 90 factory sounds in five groups. Every one is synthesised, so
 none of them is a recording of anyone else's instrument.
 
-- **Tonal** (18): Glass, Singing bowl, Kalimba, Felt piano, Marimba, Bell, Pluck,
+- **Tonal** (25): Glass, Singing bowl, Kalimba, Felt piano, Marimba, Bell, Pluck,
   Vibraphone, Glass harmonica, Music box, Celesta, Harp, Koto, Tongue drum, Electric
-  piano, Bonang, Temple bell, Crystal bowl.
-- **Pads** (14): Chord, Choir, Bowed strings, Harmonium, Sub organ, Shimmer, Warm
+  piano, Bonang, Temple bell, Crystal bowl, Hang drum, Glockenspiel, Dulcimer, Prepared
+  piano, Gong, Lyre, Bowed vibraphone.
+- **Pads** (19): Chord, Choir, Bowed strings, Harmonium, Sub organ, Shimmer, Warm
   analog, String ensemble, Airy voices, Reed organ, Glass pad, Cello section, Chamber
-  choir, Warped tape.
-- **Drones** (5): Tanpura, Cello drone, Bowed metal, Organ pedal, Sub hum. Each one
-  loops seamlessly, so a cloud can sit anywhere in it.
-- **Textures** (15): Wind chimes, Breath, Ocean, Rain on leaves, Tape dust, Forest at
+  choir, Warped tape, Drifting pad, Frost, Hollow fifths, Vowel morph, Midnight pad.
+- **Drones** (12): Tanpura, Cello drone, Bowed metal, Organ pedal, Sub hum, Shruti box,
+  Bowed glass, Low brass, Overtone choir, Granular hum, Hurdy-gurdy, Analog drone. Each
+  one loops seamlessly, so a cloud can sit anywhere in it.
+- **Textures** (22): Wind chimes, Breath, Ocean, Rain on leaves, Tape dust, Forest at
   dawn, Stream, Distant thunder, Radio static, Vinyl crackle, Fire, Night insects, Wind
-  in wires, Rain on a tin roof, Underwater. The new textures loop seamlessly too.
-- **One-shots** (7): Wood knock, Bowl strike, Piano harmonic, Metal scrape, Breath
-  swell, Vocal swell, Felt mallet. They are made for Bloom: try Ghost or Constellation
-  on the struck ones and Swell on the voices.
+  in wires, Rain on a tin roof, Underwater, Snowfall, Cave drips, Harbour, Distant bells,
+  Rain on glass, Pine wind, Frozen lake. All but the first five loop seamlessly.
+- **One-shots** (12): Wood knock, Bowl strike, Piano harmonic, Metal scrape, Breath
+  swell, Vocal swell, Felt mallet, Reverse bell, Bowed cymbal, Rain stick, Breath flute,
+  Sub bloom. They are made for Bloom: try Ghost or Constellation on the struck ones,
+  Swell on the voices and Freeze on Bowed cymbal.
 
 Pitched sounds show their note in the Browser, and loading one into Bloom sets the
 Sample Root so it plays in tune.
@@ -740,7 +744,7 @@ load a WAV, AIFF, FLAC, Ogg or MP3 file from disk the same way.
 ### Presets
 
 Every device has a **Presets** menu in its title bar, and so does every effect. There
-are 34 factory presets to start from. **Save as preset** keeps the device's current
+are 94 factory presets to start from, including the tape looper and the live input. **Save as preset** keeps the device's current
 settings under a name. Your presets live in `~/Music/Tidefield/Presets`, one folder per
 kind of device, and can be copied between machines.
 

@@ -48,15 +48,24 @@ int runSelfTest()
     {
         io::PresetLibrary library(juce::File::getSpecialLocation(juce::File::tempDirectory).getChildFile("tidefield-selftest-presets"));
         addFactoryPresets(library);
-        int presets = 0, unknown = 0;
-        for (const char* kind : { "drone", "cloud", "resonator", "bloom", "weather", "medium", "loops" })
+        int presets = 0, unknown = 0, outOfRange = 0;
+        for (const char* kind : { "drone", "cloud", "resonator", "bloom", "weather", "medium", "loops", "looper", "input" })
             for (const auto& p : library.list(kind))
             {
                 ++presets;
                 for (const auto& [key, value] : p.values)
-                    unknown += engine.getRegistry().find(presetPrefix(kind) + key).has_value() ? 0 : 1;
+                {
+                    const auto index = engine.getRegistry().find(presetPrefix(kind) + key);
+                    unknown += index.has_value() ? 0 : 1;
+                    if (index.has_value())
+                    {
+                        const auto& spec = engine.getRegistry().spec(*index);
+                        outOfRange += value >= spec.minValue && value <= spec.maxValue ? 0 : 1;
+                    }
+                }
             }
-        check(presets >= 25 && unknown == 0, "factory presets: " + juce::String(presets) + ", every value names a parameter");
+        check(presets >= 25 && unknown == 0 && outOfRange == 0,
+              "factory presets: " + juce::String(presets) + ", every value names a parameter and lies in its range");
     }
     check(starter.samples.count("cloud1") == 1 && starter.samples.count("bloom") == 1, "starter session loads its sounds");
     engine::FxManager fx(engine);

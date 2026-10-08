@@ -40,7 +40,7 @@ and glass in Bloom.
   **Draw path** (or **P**), draw a loop, and the sound travels it.
 - Press **M** and the letter rows play Bloom like a keyboard (Z/X octave), or open the
   **Bloom** tab and play the keys there, or a MIDI keyboard.
-- Load other sounds from the **Browser** on the left: 59 factory sounds (tonal,
+- Load other sounds from the **Browser** on the left: 90 factory sounds (tonal,
   pads, drones, textures and one-shots) or your own files.
 - Shape a sound you like, then double-click the terrain to save it as a new scene.
 - Move **Tide** to speed up or slow down every drift at once, and **Gravity** to pull
@@ -94,7 +94,7 @@ Gravity, reverb return, Cloud 1 density and master level.
   lighten the load before it glitches.
 - **Sessions**: one `.tidefield` file with every setting, scene, season, path, mapping
   and sample inside.
-- **Sounds**: 59 original factory sounds in five groups (tonal, pads, drones, textures
+- **Sounds**: 90 original factory sounds in five groups (tonal, pads, drones, textures
   and one-shots), all synthesised by `tools/scripts/make_samples.py`, and anything you
   load from disk.
 - **Tempo sync**: the loops lock to the beat and the delays to note lengths, following

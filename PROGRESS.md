@@ -458,6 +458,25 @@ feel, CPU on the M1 Pro under real load, and the app on your interface and contr
   self-test (59 sounds decode, 34 presets) and all 143 ctest tests pass on Linux.
   Not yet heard on speakers.
 
+### Second factory sounds expansion and device presets
+
+- 31 more original sounds, 90 in all, appended to `expansion()` so every older file
+  still regenerates bit for bit (all 59 checked by SHA-256): Tonal (hang drum,
+  glockenspiel, dulcimer, prepared piano, gong, lyre, bowed vibraphone), Pad (drifting
+  pad, frost, hollow fifths, vowel morph, midnight pad), Drone (shruti box, bowed glass,
+  low brass, overtone choir, granular hum, hurdy-gurdy, analog drone), Texture
+  (snowfall, cave drips, harbour, distant bells, rain on glass, pine wind, frozen lake)
+  and One-shot (reverse bell, bowed cymbal, rain stick, breath flute, sub bloom).
+  Drones and textures are seamless loops built the same way as the first expansion.
+- Adds 25.4 MB (24.2 MiB) of 16-bit 48 kHz WAV, mono except Harbour and Rain on glass.
+- 60 more factory presets, 94 in all: 9 cloud, 8 resonator, 8 Bloom, 8 weather, 8
+  medium, 7 cycles, and the first ones for the tape looper (6) and the live input (6,
+  whose device now has a Presets menu). The self-test now also covers the looper and
+  input kinds and checks every preset value lies in its parameter's range.
+- Verified: each pitched sound's strongest partial sits on its root (or an octave or
+  fifth of it for chords), loop seams no larger than a normal sample step, self-test
+  passes on Linux (90 sounds decode, 94 presets). Not yet heard on speakers.
+
 ### Themes (after 1.2.0)
 
 - Ten themes under Appearance: dark Slate, Night swim, Control room (after Logic Pro:

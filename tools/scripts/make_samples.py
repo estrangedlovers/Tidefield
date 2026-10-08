@@ -966,6 +966,411 @@ def expansion():
     felt += burst(rng, t, 0.03, lambda f: lowpass(f, 200.0), 0.2)
     oneshot("felt_mallet.wav", felt, 0.4)
 
+    rng = rng_for("hang drum")
+    t = axis(6.0)
+    f0 = hz(57)
+    hang = modal(t, f0, [(1.0, 1.0, 3.4), (1.0, 0.3, 3.4, 0.45), (2.0, 0.42, 2.3), (2.0, 0.18, 2.3, 0.8), (3.0, 0.2, 1.4), (3.0, 0.08, 1.4, 1.2),
+                         (4.08, 0.05, 0.45)])
+    hang = hang * ramp(t, 0.004) + 0.12 * np.exp(-t / 0.7) * np.sin(TAU * 92.0 * t) * ramp(t, 0.01)
+    hang += burst(rng, t, 0.006, lambda f: lowpass(f, 900.0), 0.07)
+    oneshot("hang_drum.wav", hang, 0.4)
+
+    rng = rng_for("glockenspiel")
+    t = axis(4.0)
+    f0 = hz(84)
+    glock = modal(t, f0, [(1.0, 1.0, 2.6), (1.0, 0.15, 2.6, 0.6), (2.71, 0.32, 0.8), (5.15, 0.16, 0.3), (8.43, 0.05, 0.1)]) * ramp(t, 0.0004)
+    glock += burst(rng, t, 0.0012, lambda f: band(f, 2500.0, 10000.0), 0.1)
+    oneshot("glockenspiel.wav", glock, 0.3)
+
+    rng = rng_for("dulcimer")
+    t = axis(5.0)
+    course = sum(plucked(t, hz(62) * 2 ** (c / 1200), 0.11, 0.9, 3.2, 0.008, 2e-5) for c in (-1.6, 0.0, 1.9))
+    course = filt(course, lambda f: 0.5 + bump(f, 260.0, 70.0, 0.6) + bump(f, 700.0, 200.0, 0.5) + bump(f, 2600.0, 700.0, 0.3))
+    course += burst(rng, t, 0.0015, lambda f: band(f, 600.0, 6000.0), 0.12)
+    oneshot("dulcimer.wav", course * ramp(t, 0.0006), 0.4)
+
+    rng = rng_for("prepared piano")
+    t = axis(5.0)
+    f0 = hz(55)
+    B = 0.0025
+    strings = modal(t, f0, [(n * math.sqrt(1 + B * n * n), 0.9 / n ** 1.3, 2.2 / n ** 0.5) for n in range(1, 17)])
+    bolt = modal(t, f0, [(3.37, 0.3, 0.6), (5.81, 0.2, 0.35), (7.93, 0.12, 0.2), (11.4, 0.06, 0.1)])
+    rattle = 0.15 * noise(rng, len(t), lambda f: band(f, 2500.0, 7000.0)) * np.maximum(0, np.sin(TAU * f0 * t)) ** 4 * np.exp(-t / 0.5)
+    prepared = (strings + bolt) * ramp(t, 0.003) + rattle + burst(rng, t, 0.01, lambda f: lowpass(f, 600.0), 0.06)
+    oneshot("prepared_piano.wav", prepared, 0.4)
+
+    rng = rng_for("gong")
+    t = axis(9.0)
+    f0 = hz(45)
+    gong = modal(t, f0, [(1.0, 1.0, 7.5), (1.0, 0.5, 7.5, 0.35), (2.0, 0.32, 4.5), (2.0, 0.2, 4.5, 0.7), (2.93, 0.24, 3.2), (4.12, 0.14, 2.0)])
+    wash = np.zeros_like(t)
+    for ratio in np.sort(rng.uniform(5.0, 34.0, 16)):
+        wash += (ratio / 5.0) ** -0.8 * np.sin(TAU * f0 * ratio * t + rng.uniform(0, TAU))
+    gong += 0.35 * wash * (1 - np.exp(-t / 0.7)) * np.exp(-t / 2.4)
+    gong = gong * ramp(t, 0.006) + burst(rng, t, 0.05, lambda f: lowpass(f, 160.0), 0.3)
+    oneshot("gong.wav", gong, 1.8)
+
+    rng = rng_for("lyre")
+    t = axis(5.0)
+    lyre = plucked(t, hz(57), 0.28, 1.9, 3.8, 0.012, 8e-6)
+    lyre = filt(lyre, lambda f: 0.4 + bump(f, 240.0, 70.0, 0.7) + bump(f, 520.0, 140.0, 0.5) + bump(f, 1300.0, 400.0, 0.2))
+    lyre += burst(rng, t, 0.004, lambda f: lowpass(f, 1800.0), 0.04)
+    oneshot("lyre.wav", lyre * ramp(t, 0.003), 0.4)
+
+    rng = rng_for("bowed vibraphone")
+    t = axis(7.0)
+    f0 = hz(65)
+    pressure = 1 + 0.05 * slow(rng, len(t), 1.5)
+    bar = np.sin(TAU * f0 * t) + 0.07 * np.sin(TAU * 4 * f0 * t + 0.6) + 0.015 * np.sin(TAU * 10 * f0 * t + 1.3)
+    rosin = 0.04 * noise(rng, len(t), lambda f: bump(f, f0, 5.0, 1.0) + bump(f, 4 * f0, 12.0, 0.3))
+    rosin += 0.006 * noise(rng, len(t), lambda f: band(f, 2000.0, 6000.0))
+    oneshot("bowed_vibraphone.wav", (bar + rosin) * pressure * edge(t, 0.9, 2.4), 0.1)
+
+    rng = rng_for("drifting pad")
+    t = axis(7.0)
+    sweep = 700 + 2300 * (0.5 + 0.5 * slow(rng, len(t), 0.25)) * ramp(t, 3.0)
+    drifting = np.zeros_like(t)
+    for n in (48, 55, 62, 64):
+        for d in (-9.0, 0.0, 8.0):
+            f = hz(n) * 2 ** (d / 1200)
+            drifting += pad_voice(rng, t, f, 0.0, 0.0, lambda h, fh: lowpass(fh, sweep, 2) / h if fh < 10000 else 0.0, 0.0015)
+    drifting += 0.02 * rms(drifting) * noise(rng, len(t), lambda f: band(f, 3000.0, 9000.0))
+    sustained("drifting_pad.wav", drifting * edge(t, 1.8, 2.0))
+
+    rng = rng_for("frost")
+    t = axis(7.0)
+    frost = np.zeros_like(t)
+    for n in (64, 71, 76, 83):
+        f = detuned(rng, hz(n), 4.0)
+        index = 0.2 + 0.9 * (0.5 + 0.5 * slow(rng, len(t), 0.3))
+        ph = phase_of(f * (1 + 0.0008 * slow(rng, len(t), 0.5)))
+        frost += np.sin(ph + index * np.sin(2 * ph + rng.uniform(0, TAU))) * (0.6 + 0.4 * slow(rng, len(t), 0.2)) ** 2
+    sparkle = np.zeros_like(t)
+    gt = axis(0.25)
+    for _ in range(140):
+        n = (88, 95, 100, 107)[rng.integers(4)]
+        place(sparkle, rng.uniform(0.3, 6.5) * SR, np.sin(TAU * hz(n) * gt) * np.sin(math.pi * gt / 0.25) ** 2 * rng.uniform(0.1, 0.5))
+    frost += 0.25 * sparkle + 0.01 * noise(rng, len(t), lambda f: band(f, 6000.0, 12000.0))
+    sustained("frost.wav", frost * edge(t, 2.0, 2.0))
+
+    rng = rng_for("hollow fifths")
+    t = axis(7.0)
+    centre = 500 + 900 * (0.5 - 0.5 * np.cos(TAU * t / 7.0)) + 150 * slow(rng, len(t), 0.4)
+    hollow = np.zeros_like(t)
+    for n in (43, 50, 55, 62):
+        for d in (-5.0, 5.0):
+            f = hz(n) * 2 ** (d / 1200)
+            hollow += pad_voice(rng, t, f, 0.0, 0.0,
+                                lambda h, fh: (1.0 / h if h % 2 else 0.12 / h) * (0.25 + resonant(fh, centre, 2.5)) * lowpass(fh, 5000.0) if fh < 9000 else 0.0,
+                                0.001)
+    sustained("hollow_fifths.wav", hollow * edge(t, 1.5, 2.0))
+
+    rng = rng_for("vowel morph")
+    t = axis(7.0)
+    u = np.clip((t - 0.8) / 5.4, 0, 1)
+    shape = formants([(np.interp(u, [0, 0.5, 1], [320.0, 730.0, 290.0]), 70.0, 1.0),
+                      (np.interp(u, [0, 0.5, 1], [800.0, 1100.0, 2250.0]), 90.0, np.interp(u, [0, 0.5, 1], [0.35, 0.5, 0.3])),
+                      (np.interp(u, [0, 0.5, 1], [2300.0, 2500.0, 2950.0]), 130.0, 0.12), (3300.0, 200.0, 0.05)])
+    morphing = np.zeros_like(t)
+    for n in (52, 59, 64, 68):
+        for _ in range(3):
+            f = detuned(rng, hz(n), 6.0)
+            morphing += pad_voice(rng, t, f, rng.uniform(4.8, 5.6), 0.003, lambda h, fh: shape(fh) / h ** 0.7 if fh < 6000 else 0.0, 0.0012,
+                                  rng.uniform(0.6, 1.6))
+    morphing += 0.05 * rms(morphing) * noise(rng, len(t), lambda f: band(f, 500.0, 3500.0))
+    sustained("vowel_morph.wav", morphing * edge(t, 1.6, 1.8))
+
+    rng = rng_for("midnight pad")
+    t = axis(7.0)
+    glow = 650 + 450 * (0.5 + 0.5 * slow(rng, len(t), 0.2))
+    midnight = np.zeros_like(t)
+    for n in (45, 52, 60, 67, 71):
+        for d in (-6.0, 6.0):
+            f = hz(n) * 2 ** (d / 1200)
+            midnight += pad_voice(rng, t, f, 0.0, 0.0, lambda h, fh: (h ** -2.0 if h % 2 else 0.05 / h) * lowpass(fh, glow, 2) if fh < 5000 else 0.0, 0.0012)
+    midnight += 0.4 * rms(midnight) * np.sin(TAU * hz(33) * t)
+    midnight *= 1 + 0.1 * np.sin(TAU * 0.11 * t)
+    sustained("midnight_pad.wav", midnight * edge(t, 2.2, 2.2))
+
+    L = 10.0
+    t = axis(L)
+
+    rng = rng_for("shruti box")
+    pump = 1 + 0.12 * np.sin(TAU * snap(0.4, L) * t) + 0.04 * slow(rng, len(t), 0.6)
+    shruti = np.zeros_like(t)
+    for n, gain in [(48, 1.0), (55, 0.7), (60, 0.55)]:
+        for beat in (-0.15, 0.15):
+            f = snap(hz(n) + beat, L)
+            reed = lambda h, fh: h ** -0.8 * lowpass(fh, 2800.0) * (1 + bump(fh, 1100.0, 300.0, 0.6)) if fh < 9000 else 0.0
+            shruti += gain * harmonics(TAU * f * t + rng.uniform(0, TAU), f, reed)
+    shruti = shruti * pump + 0.02 * rms(shruti) * noise(rng, len(t), lambda f: band(f, 600.0, 5000.0)) * pump
+    sustained("shruti_box.wav", shruti)
+
+    rng = rng_for("bowed glass")
+    rubbed = np.zeros_like(t)
+    for n, gain in [(67, 1.0), (74, 0.55), (79, 0.3)]:
+        f = snap(hz(n), L)
+        swell = (0.55 + 0.45 * slow(rng, len(t), 0.2)) ** 2
+        tone = np.sin(TAU * f * t + rng.uniform(0, TAU)) + 0.1 * np.sin(TAU * 2 * f * t) + 0.03 * np.sin(TAU * 3 * f * t)
+        rubbed += gain * swell * (tone + 0.04 * noise(rng, len(t), lambda fr, f=f: bump(fr, f, 5.0, 1.0)))
+    flutter = 1 + 0.04 * np.sin(TAU * snap(0.5, L) * t) + 0.03 * slow(rng, len(t), 3.0)
+    rubbed = rubbed * flutter + 0.004 * noise(rng, len(t), lambda f: band(f, 5000.0, 11000.0))
+    sustained("bowed_glass.wav", rubbed)
+
+    rng = rng_for("overtone choir")
+    whistle = 700 + 500 * (0.5 - 0.5 * np.cos(TAU * snap(0.1, L) * t)) + 200 * slow(rng, len(t), 0.3)
+    vowel = formants([(600.0, 80.0, 1.0), (1000.0, 100.0, 0.4), (2400.0, 150.0, 0.15)])
+    overtone = np.zeros_like(t)
+    for k, (n, gain) in enumerate([(45, 1.0), (45, 0.8), (45, 0.7), (52, 0.5), (57, 0.35)]):
+        f = snap(hz(n) + 0.15 * k * (-1) ** k, L)
+        voice = lambda h, fh: h ** -0.8 * (vowel(fh) + 0.12 * resonant(fh, whistle, 14.0)) if fh < 5000 else 0.0
+        overtone += gain * harmonics(TAU * f * t + rng.uniform(0, TAU), f, voice)
+    overtone *= 1 + 0.05 * slow(rng, len(t), 0.5)
+    overtone += 0.04 * rms(overtone) * noise(rng, len(t), lambda f: vowel(f) * lowpass(f, 3000.0))
+    sustained("overtone_choir.wav", overtone)
+
+    rng = rng_for("granular hum")
+    f0 = snap(hz(40), L)
+    hum = harmonics(TAU * f0 * t, f0, lambda h, fh: h ** -1.4 if fh < 3000 else 0.0)
+    grains = np.zeros_like(t)
+    choices = (1, 2, 3, 4, 5, 6, 8, 10, 12)
+    for _ in range(int(140 * L)):
+        h = choices[rng.integers(len(choices))]
+        length = rng.uniform(0.04, 0.16)
+        gt = axis(length)
+        f = h * f0 * 2 ** (rng.normal(0, 6) / 1200)
+        grain = np.sin(TAU * f * gt + rng.uniform(0, TAU)) * np.sin(math.pi * gt / length) ** 2 * h ** -0.7 * rng.uniform(0.3, 1.0)
+        place(grains, rng.uniform(0, L) * SR, grain)
+    granular = (0.35 * hum / rms(hum) + 1.2 * grains / rms(grains)) * (1 + 0.15 * slow(rng, len(t), 0.3))
+    sustained("granular_hum.wav", granular)
+
+    rng = rng_for("hurdy gurdy")
+    wheel = 1 + 0.07 * slow(rng, len(t), 0.5) + 0.03 * np.sin(TAU * snap(1.3, L) * t)
+    gbody = lambda fh: (0.4 + bump(fh, 300.0, 90.0, 0.8) + bump(fh, 750.0, 180.0, 0.6) + bump(fh, 2100.0, 500.0, 0.4)) * lowpass(fh, 5000.0)
+    gurdy = np.zeros_like(t)
+    for n, gain in [(31, 0.8), (43, 1.0), (50, 0.6)]:
+        f = snap(hz(n), L)
+        gurdy += gain * harmonics(TAU * f * t + rng.uniform(0, TAU), f, lambda h, fh: gbody(fh) / h if fh < 8000 else 0.0)
+    gurdy *= wheel
+    f = snap(hz(43), L)
+    rattle = filt(np.tanh(6 * np.sin(TAU * f * t)), lambda fr: band(fr, 1200.0, 7000.0), circular=True)
+    gate = np.zeros_like(t)
+    strokes = 16
+    for k in range(strokes):
+        s = int(k * L / strokes * SR)
+        gate[s : s + int((0.14 if k % 2 == 0 else 0.07) * SR)] = 1.0 if k % 2 == 0 else 0.6
+    gate = filt(gate, lambda fr: lowpass(fr, 40.0, 1), circular=True)
+    gurdy += 0.25 * rms(gurdy) / rms(rattle) * rattle * gate * wheel
+    sustained("hurdy_gurdy.wav", gurdy)
+
+    rng = rng_for("analog drone")
+    cutoff = 400 + 1600 * (0.5 - 0.5 * np.cos(TAU * snap(0.1, L) * t)) ** 1.5 + 200 * slow(rng, len(t), 0.3)
+    synth = np.zeros_like(t)
+    for n, gain in [(38, 1.0), (45, 0.7), (50, 0.55), (57, 0.35)]:
+        for d in (-0.2, 0.2):
+            f = snap(hz(n) + d, L)
+            saw = lambda h, fh: resonant(fh, cutoff, 1.8) * lowpass(fh, 1.5 * cutoff, 1) / h if fh < 6000 else 0.0
+            synth += gain * harmonics(TAU * f * t + rng.uniform(0, TAU), f, saw)
+    synth = np.tanh(1.2 * synth / (2.5 * rms(synth)))
+    sustained("analog_drone.wav", synth)
+
+    L = 12.0
+    t = axis(L)
+
+    rng = rng_for("low brass")
+    effort = 0.3 + 0.7 * (0.5 - 0.5 * np.cos(TAU * snap(1 / 6.0, L) * t)) ** 1.3 * (0.9 + 0.1 * slow(rng, len(t), 0.5))
+    brass = np.zeros_like(t)
+    for n, gain in [(34, 1.0), (41, 0.45), (46, 0.3)]:
+        for beat in (-0.1, 0.1):
+            f = snap(hz(n) + beat, L)
+            bell = lambda h, fh: h ** (-2.4 + 1.5 * effort) * lowpass(fh, 3500.0) * (1 + bump(fh, 600.0, 250.0, 0.8)) if fh < 7000 else 0.0
+            brass += gain * harmonics(TAU * f * t + rng.uniform(0, TAU), f, bell)
+    brass *= effort
+    brass += 0.015 * rms(brass) * noise(rng, len(t), lambda f: band(f, 200.0, 2500.0)) * effort
+    sustained("low_brass.wav", brass)
+
+    L = 10.0
+    t = axis(L)
+
+    rng = rng_for("snowfall")
+    hush = noise(rng, len(t), lambda f: band(f, 40.0, 500.0, 1)) * (0.6 + 0.4 * slow(rng, len(t), 0.1))
+    flakes = np.zeros_like(t)
+    ft = axis(0.004)
+    for _ in range(int(400 * L)):
+        place(flakes, rng.uniform(0, L) * SR, rng.standard_normal(len(ft)) * np.exp(-ft / 0.0006) * rng.uniform(0.02, 0.12))
+    flakes = filt(flakes, lambda f: band(f, 2500.0, 9000.0, 1), circular=True)
+    thumps = np.zeros_like(t)
+    bt = axis(0.9)
+    for _ in range(3):
+        fall = filt(rng.standard_normal(len(bt)) * np.exp(-bt / 0.18) * ramp(bt, 0.03), lambda f: lowpass(f, 350.0, 2))
+        place(thumps, rng.uniform(0, L) * SR, fall * rng.uniform(0.5, 1.0))
+    snow = 0.25 * hush + 0.05 * flakes / rms(flakes) + 0.6 * thumps / max(1e-9, float(np.max(np.abs(thumps))))
+    snow += 0.3 * convolve(snow, room(rng, 1.2, 3000.0), circular=True)
+    write_np("snowfall.wav", strip_dc_circular(snow))
+
+    rng = rng_for("cave drips")
+    cave = 0.02 * noise(rng, len(t), lambda f: band(f, 25.0, 140.0)) * (0.7 + 0.3 * slow(rng, len(t), 0.15))
+    du = axis(0.12)
+    for _ in range(5):
+        f0 = rng.uniform(700, 1900)
+        count = max(1, round(L / rng.uniform(0.9, 2.6)))
+        offset = rng.uniform(0, L)
+        for k in range(count):
+            drop = np.sin(phase_of(f0 * (1 + 1.2 * (1 - np.exp(-du / 0.015))))) * np.exp(-du / rng.uniform(0.02, 0.045)) * ramp(du, 0.0004)
+            place(cave, (offset + k * L / count + rng.normal(0, 0.03)) * SR, drop * rng.uniform(0.3, 0.8))
+    cave += 1.2 * convolve(cave, room(rng, 3.2, 2500.0, 0.04), circular=True)
+    write_np("cave_drips.wav", strip_dc_circular(tame(cave, 6.0)))
+
+    rng = rng_for("harbour")
+    waves = 0.5 + 0.5 * np.sin(TAU * snap(0.4, L) * t)
+    st = axis(0.6)
+    ct = axis(0.08)
+    timber = modal(ct, 1.0, [(420.0, 1.0, 0.02), (1130.0, 0.6, 0.012), (2400.0, 0.3, 0.006)])
+    harbour = []
+    for side in range(2):
+        lap = 0.3 * noise(rng, len(t), lambda f: band(f, 120.0, 1400.0, 1)) * (0.25 + 0.75 * np.roll(waves, side * 4000) ** 3)
+        for k in range(round(0.4 * L)):
+            slosh = filt(rng.standard_normal(len(st)) * np.exp(-st / 0.15) * ramp(st, 0.05), lambda f: band(f, 300.0, 2500.0))
+            place(lap, (k * 2.5 + 0.55 + 0.1 * side + rng.normal(0, 0.05)) * SR, 0.5 * slosh)
+        harbour.append(lap)
+    for _ in range(4):
+        length = rng.uniform(0.6, 1.2)
+        cu = axis(length)
+        rate = 25 + 50 * ramp(cu, length) + 6 * np.sin(TAU * 3.0 * cu)
+        pulses = np.diff(np.floor(np.cumsum(rate) / SR), prepend=0.0)
+        creak = convolve(pulses, timber) * edge(cu, 0.1, 0.2)
+        pan = rng.uniform(0.2, 0.8)
+        at = rng.uniform(0, L) * SR
+        place(harbour[0], at, 0.4 * creak * math.sqrt(1 - pan))
+        place(harbour[1], at, 0.4 * creak * math.sqrt(pan))
+    ring = axis(4.0)
+    buoy = filt(modal(ring, 610.0, [(1.0, 1.0, 1.8), (2.0, 0.3, 1.2), (2.76, 0.35, 0.9), (5.4, 0.12, 0.4)]) * ramp(ring, 0.001), lambda f: lowpass(f, 2000.0, 1))
+    for at in (1.7, 6.4):
+        place(harbour[0], at * SR, 0.08 * buoy)
+        place(harbour[1], at * SR, 0.18 * buoy)
+    harbour = [strip_dc_circular(c + 0.3 * convolve(c, room(rng, 1.5, 3000.0), circular=True)) for c in harbour]
+    write_np("harbour.wav", harbour[0], harbour[1])
+
+    rng = rng_for("rain on glass")
+    pane = np.exp(rng.uniform(math.log(1800), math.log(6000), 12))
+    outside = 0.12 * noise(rng, len(t), lambda f: band(f, 200.0, 2000.0, 1))
+    dt = axis(0.05)
+    window = []
+    for side in range(2):
+        taps = outside + 0.04 * noise(rng, len(t), lambda f: band(f, 300.0, 1500.0, 1))
+        for _ in range(int(35 * L)):
+            tap = np.zeros_like(dt)
+            for f in rng.choice(pane, 2, replace=False):
+                tap += np.sin(TAU * f * dt) * np.exp(-dt / rng.uniform(0.002, 0.006))
+            tap[:12] += rng.standard_normal(12) * 0.4
+            place(taps, rng.uniform(0, L) * SR, tap * min(3.0, rng.pareto(2.5) + 0.1) * 0.15)
+        for _ in range(3):
+            at = rng.uniform(0, L)
+            for j in range(rng.integers(8, 16)):
+                place(taps, (at + j * rng.uniform(0.03, 0.08)) * SR, bubble(rng, rng.uniform(1500, 3000), 0.004) * rng.uniform(0.05, 0.15))
+        window.append(taps)
+    window = [strip_dc_circular(c + 0.2 * convolve(c, room(rng, 0.5, 4000.0), circular=True)) for c in window]
+    write_np("rain_glass.wav", window[0], window[1])
+
+    rng = rng_for("pine wind")
+    gusts = 0.5 + 0.5 * slow(rng, len(t), 0.12)
+    needles = noise(rng, len(t), lambda f: band(f, 1500.0, 7000.0, 1) * (1 + bump(f, 3500.0, 1200.0, 0.6))) * (0.15 + gusts ** 2)
+    roar = noise(rng, len(t), lambda f: band(f, 60.0, 600.0, 1)) * (0.3 + 0.7 * gusts)
+    pine = 0.35 * needles * (1 + 0.25 * slow(rng, len(t), 6.0)) + 0.5 * roar
+    for _ in range(2):
+        length = rng.uniform(0.8, 1.6)
+        cu = axis(length)
+        pulses = np.diff(np.floor(np.cumsum(8 + 12 * ramp(cu, length)) / SR), prepend=0.0)
+        trunk = convolve(pulses, modal(axis(0.15), 1.0, [(rng.uniform(150, 300), 1.0, 0.04), (rng.uniform(500, 900), 0.4, 0.02)])) * edge(cu, 0.2, 0.3)
+        place(pine, rng.uniform(0, L) * SR, 0.6 * trunk)
+    write_np("pine_wind.wav", strip_dc_circular(pine))
+
+    rng = rng_for("frozen lake")
+    lake = 0.15 * noise(rng, len(t), lambda f: band(f, 100.0, 1200.0, 1)) * (0.6 + 0.4 * slow(rng, len(t), 0.2))
+    for _ in range(9):
+        length = rng.uniform(0.25, 0.7)
+        pu = axis(length)
+        ping = np.sin(phase_of(150 + rng.uniform(1500, 4500) * np.exp(-pu / (length / 4)))) * np.exp(-pu / (length / 3)) * ramp(pu, 0.001)
+        ping *= rng.uniform(0.4, 1.0)
+        at = rng.uniform(0, L)
+        for k in range(3):
+            place(lake, (at + k * 0.11) * SR, ping * 0.5 ** k)
+    for _ in range(2):
+        gl = axis(rng.uniform(1.5, 2.5))
+        fc = rng.uniform(60, 110)
+        place(lake, rng.uniform(0, L) * SR, 0.5 * noise(rng, len(gl), lambda f: bump(f, fc, 20.0, 1.0)) * edge(gl, 0.4, 0.8))
+    lake += 0.4 * convolve(lake, room(rng, 2.0, 3000.0), circular=True)
+    write_np("frozen_lake.wav", strip_dc_circular(tame(lake, 6.0)))
+
+    L = 12.0
+    t = axis(L)
+
+    rng = rng_for("distant bells")
+    peal = np.zeros_like(t)
+    tower = (64, 62, 60, 55)
+    bt = axis(6.0)
+    for r, row in enumerate([(0, 1, 2, 3), (0, 1, 2, 3), (1, 0, 3, 2), (1, 3, 0, 2)]):
+        for k, b in enumerate(row):
+            strike = modal(bt, hz(tower[b]), [(0.5, 0.6, 5.0), (1.0, 1.0, 3.0), (1.2, 0.5, 2.2), (1.5, 0.35, 1.8), (2.0, 0.45, 1.4), (2.5, 0.15, 0.8),
+                                              (3.0, 0.1, 0.6)])
+            place(peal, ((r * 4 + k) * 0.75 + rng.normal(0, 0.02)) * SR, strike * ramp(bt, 0.002) * rng.uniform(0.7, 1.0))
+    peal = filt(peal, lambda f: lowpass(f, 1800.0, 2) * highpass(f, 120.0), circular=True)
+    peal += 0.6 * convolve(peal, room(rng, 2.5, 1500.0, 0.05), circular=True)
+    air = noise(rng, len(t), lambda f: band(f, 60.0, 2500.0, 1)) * (0.6 + 0.4 * slow(rng, len(t), 0.15))
+    write_np("distant_bells.wav", strip_dc_circular(peal / rms(peal) + 0.35 * air))
+
+    rng = rng_for("reverse bell")
+    t = axis(4.0)
+    f0 = hz(69)
+    struck = modal(t, f0, [(1.0, 1.0, 1.6), (1.0, 0.4, 1.6, 0.8), (2.0, 0.3, 1.0), (2.76, 0.35, 0.7), (5.4, 0.15, 0.3), (8.9, 0.06, 0.15)])
+    struck = struck * ramp(t, 0.001) + burst(rng, t, 0.003, lambda f: band(f, 1500.0, 8000.0), 0.08)
+    oneshot("reverse_bell.wav", struck[::-1].copy(), 0.02)
+
+    rng = rng_for("bowed cymbal")
+    t = axis(6.0)
+    pressure = ramp(t, 1.2) * np.clip((5.0 - t) / 1.5, 0, 1)
+    ring = axis(2.0)
+    ir = sum(np.sin(TAU * f * ring + rng.uniform(0, TAU)) * np.exp(-ring / rng.uniform(0.4, 1.8)) * (500.0 / f) ** 0.4
+             for f in np.exp(rng.uniform(math.log(400), math.log(9000), 30)))
+    cymbal = convolve(noise(rng, len(t), lambda f: band(f, 300.0, 8000.0)) * pressure, ir)
+    sing = sum(a * np.sin(TAU * f * t + rng.uniform(0, TAU)) for f, a in [(1873.0, 1.0), (2931.0, 0.6), (4410.0, 0.3)])
+    sing *= np.clip((t - 1.0) / 2.0, 0, 1) ** 2 * pressure * (1 + 0.1 * slow(rng, len(t), 2.0))
+    oneshot("bowed_cymbal.wav", cymbal / rms(cymbal) + 0.8 * sing / rms(sing), 0.8)
+
+    rng = rng_for("rain stick")
+    t = axis(5.0)
+    flow = ramp(t, 0.4) * np.exp(-np.maximum(0, t - 0.6) / 1.4)
+    stick = np.zeros_like(t)
+    pt = axis(0.03)
+    for _ in range(2200):
+        at = rng.uniform(0, 4.6)
+        if rng.random() < flow[int(at * SR)]:
+            click = np.sin(TAU * rng.uniform(2000, 7000) * pt) * np.exp(-pt / rng.uniform(0.0015, 0.005)) * rng.uniform(0.2, 1.0)
+            place(stick, at * SR, click)
+    stick = filt(stick, lambda f: 0.4 + bump(f, 3200.0, 900.0, 0.8) + bump(f, 5500.0, 1200.0, 0.4))
+    stick += 0.04 * noise(rng, len(t), lambda f: band(f, 2000.0, 8000.0)) * flow
+    stick += 0.2 * convolve(stick, room(rng, 0.4, 6000.0))
+    oneshot("rain_stick.wav", stick, 0.5)
+
+    rng = rng_for("breath flute")
+    t = axis(4.5)
+    f0 = hz(67)
+    blow = np.clip(t / 0.8, 0, 1) ** 1.2 * np.clip((4.5 - t) / 1.4, 0, 1)
+    vibrato = 0.004 * np.clip((t - 1.0) / 1.0, 0, 1) * np.sin(TAU * 5.0 * t) + 0.001 * slow(rng, len(t), 4.0)
+    ph = phase_of(f0 * (1 + vibrato))
+    flute = np.sin(ph) + 0.25 * np.sin(2 * ph + 0.3) + 0.08 * np.sin(3 * ph + 0.9) + 0.03 * np.sin(4 * ph)
+    hiss = noise(rng, len(t), lambda f: bump(f, f0, 40.0, 0.6) + bump(f, 2 * f0, 60.0, 0.3) + 0.2 * band(f, 1500.0, 8000.0))
+    chiff = burst(rng, t, 0.05, lambda f: band(f, 1500.0, 6000.0), 0.15) * ramp(t, 0.01)
+    oneshot("breath_flute.wav", flute * blow + 0.12 * hiss * (0.3 + blow) * np.clip((4.5 - t) / 1.4, 0, 1) + chiff, 0.1)
+
+    rng = rng_for("sub bloom")
+    t = axis(5.0)
+    f0 = hz(36)
+    swell = np.clip(t / 1.6, 0, 1) ** 2 * np.exp(-np.maximum(0, t - 1.6) / 1.6)
+    sub = np.sin(TAU * f0 * t) + 0.3 * np.sin(TAU * 2 * f0 * t + 0.5) + 0.08 * np.sin(TAU * 3 * f0 * t + 1.0)
+    sub = np.tanh(1.5 * sub * swell) + 0.004 * noise(rng, len(t), lambda f: lowpass(f, 300.0)) * swell
+    oneshot("sub_bloom.wav", sub, 0.3)
+
 if __name__ == "__main__":
     import sys
 

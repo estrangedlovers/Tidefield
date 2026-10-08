@@ -1882,6 +1882,7 @@ void DeviceView::build()
             params(d, { P::InputArmed, P::InputChannel, P::InputGain, P::InputHighPass, P::InputGate });
             auto& f = device("Hold", sceneTint(4));
             params(f, { P::InputFreeze, P::InputFreezeLevel, P::InputFreezeDrift });
+            d.setPresets("input", "input.", { P::InputGain, P::InputHighPass, P::InputGate, P::InputFreezeLevel, P::InputFreezeDrift });
             auto& c = device("Catch", sceneTint(4));
             params(c, { P::CatchSource, P::CatchTarget, P::CatchSeconds });
             auto catchButton = std::make_unique<FlatButton>("Catch now", colour::accent());

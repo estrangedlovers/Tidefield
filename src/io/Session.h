@@ -46,6 +46,7 @@ struct SessionData
     juce::var seasons;
     juce::var modRoutes;
     std::vector<float> bloomRoots;
+    juce::var performance;
     std::vector<engine::Point2> path;
     juce::var gesture;
     std::map<std::string, std::shared_ptr<const dsp::SampleBuffer>> samples;

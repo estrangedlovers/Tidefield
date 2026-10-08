@@ -356,6 +356,7 @@ void Engine::collectGarbage()
     pathChannel.collectGarbage();
     modChannel.collectGarbage();
     gestureChannel.collectGarbage();
+    performanceChannel.collectGarbage();
     midiMapChannel.collectGarbage();
     bloomBuffers.collectGarbage();
     previewBuffers.collectGarbage();
@@ -390,6 +391,7 @@ void Engine::drainControl() noexcept
     pathChannel.acquire();
     modChannel.acquire();
     gestureChannel.acquire();
+    performanceChannel.acquire();
     if (midiMapChannel.acquire())
     {
         pickups.fill({});
@@ -603,6 +605,7 @@ void Engine::handleMidi(const RawMidi& m) noexcept
     if (m.isNoteOn())
     {
         trackNote(m.data1, static_cast<float>(m.data2) / 127.0f);
+        recordPerformance(ControlEvent::note(m.data1, static_cast<float>(m.data2) / 127.0f, ControlSource::Midi));
         if (member)
             bloom.setChannelExpression(ch, mpeBend[uc], mpePressure[uc], mpeTimbre[uc]);
         bloom.noteOn(m.data1, static_cast<float>(m.data2) / 127.0f, member ? ch : -1);
@@ -618,6 +621,7 @@ void Engine::handleMidi(const RawMidi& m) noexcept
     }
     else if (m.isNoteOff())
     {
+        recordPerformance(ControlEvent::note(m.data1, 0.0f, ControlSource::Midi));
         bloom.noteOff(m.data1);
     }
 }
@@ -725,9 +729,65 @@ void Engine::updateGesture() noexcept
     }
 }
 
+void Engine::recordPerformance(const ControlEvent& e) noexcept
+{
+    if (! performanceRecording || e.source == ControlSource::Score || e.source == ControlSource::Terrain || e.type == ControlEvent::Type::SnapParam)
+        return;
+    performanceOut.push({ sampleTime - performanceStart, e, 0 });
+}
+
+void Engine::updatePerformance() noexcept
+{
+    const bool wanted = performanceFlag.load(std::memory_order_acquire);
+    if (wanted != performanceRecording)
+    {
+        performanceRecording = wanted;
+        performanceStart = sampleTime;
+    }
+
+    const auto* take = performanceChannel.current();
+    if (take != nullptr && take->version != performanceVersion)
+    {
+        performanceVersion = take->version;
+        for (int n = 0; n < 128; ++n)
+            if (performanceHeld.test(static_cast<std::size_t>(n)))
+                bloom.noteOff(n);
+        performanceHeld.reset();
+        performancePlaying = take->length > 0;
+        performanceIndex = 0;
+        const double scale = take->sampleRate > 0.0 ? sampleRate / take->sampleRate : 1.0;
+        const auto from = static_cast<std::uint64_t>(static_cast<double>(take->startAt) * scale);
+        performanceStart = sampleTime - std::min(from, sampleTime);
+        while (performanceIndex < take->events.size()
+               && static_cast<std::uint64_t>(static_cast<double>(take->events[performanceIndex].time) * scale) < from)
+            ++performanceIndex;
+    }
+    if (! performancePlaying || take == nullptr)
+        return;
+    const double scale = take->sampleRate > 0.0 ? sampleRate / take->sampleRate : 1.0;
+    const auto pos = sampleTime - performanceStart;
+    while (performanceIndex < take->events.size() && static_cast<std::uint64_t>(static_cast<double>(take->events[performanceIndex].time) * scale) <= pos)
+    {
+        auto e = take->events[performanceIndex++].event;
+        e.source = ControlSource::Score;
+        if (e.type == ControlEvent::Type::Note)
+            performanceHeld.set(e.param & 127u, e.value > 0.0f);
+        applyEvent(e);
+    }
+    if (static_cast<double>(pos) >= static_cast<double>(take->length) * scale)
+    {
+        for (int n = 0; n < 128; ++n)
+            if (performanceHeld.test(static_cast<std::size_t>(n)))
+                bloom.noteOff(n);
+        performanceHeld.reset();
+        performancePlaying = false;
+    }
+}
+
 void Engine::applyEvent(const ControlEvent& e) noexcept
 {
     recordGesture(e);
+    recordPerformance(e);
     switch (e.type)
     {
         case ControlEvent::Type::SetParam:
@@ -1007,6 +1067,7 @@ void Engine::controlTick() noexcept
 
     updateSources(tide);
     updateGesture();
+    updatePerformance();
     updateTempo(tickSeconds);
     updateLoops(tickSeconds);
 
@@ -1802,6 +1863,8 @@ void Engine::accumulateTelemetry(const float* l, const float* r, int n) noexcept
     f.fadeState = master.getFadeState();
     f.bpm = bpm;
     f.gestureState = gestureState;
+    f.performanceState = static_cast<std::uint8_t>(performanceRecording ? 1 : (performancePlaying ? 2 : 0));
+    f.performanceSeconds = performanceRecording || performancePlaying ? static_cast<float>(static_cast<double>(sampleTime - performanceStart) / sampleRate) : 0.0f;
     f.gestureSeconds = gestureState == GestureState::Idle ? 0.0f : static_cast<float>(static_cast<double>(sampleTime - gestureStart) / sampleRate);
     if (const auto* take = gestureChannel.current(); take != nullptr && take->sampleRate > 0.0)
         f.gestureLength = static_cast<float>(static_cast<double>(take->length) / take->sampleRate);

@@ -22,6 +22,7 @@ struct GestureTake
     double sampleRate = 48000.0;
     bool loop = true;
     std::uint64_t version = 0;
+    std::uint64_t startAt = 0;
 };
 
 enum class GestureState : std::uint8_t { Idle, Recording, Playing };

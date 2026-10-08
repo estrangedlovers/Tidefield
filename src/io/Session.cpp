@@ -526,6 +526,8 @@ juce::var sessionToJson(const SessionData& s)
         root->setProperty("seasons", s.seasons);
     if (s.modRoutes.isArray())
         root->setProperty("modRoutes", s.modRoutes);
+    if (s.performance.isObject())
+        root->setProperty("performance", s.performance);
     if (s.bloomRoots.size() > 1 || (s.bloomRoots.size() == 1 && s.bloomRoots[0] >= 0.0f))
     {
         juce::Array<juce::var> roots;
@@ -604,6 +606,7 @@ std::optional<SessionData> sessionFromJson(const juce::var& json, juce::String& 
     s.midi = root->getProperty("midi");
     s.seasons = root->getProperty("seasons");
     s.modRoutes = root->getProperty("modRoutes");
+    s.performance = root->getProperty("performance");
     if (const auto* roots = root->getProperty("bloomRoots").getArray())
         for (const auto& r : *roots)
             s.bloomRoots.push_back(std::clamp(static_cast<float>(static_cast<double>(r)), -1.0f, 127.0f));

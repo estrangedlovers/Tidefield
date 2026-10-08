@@ -114,6 +114,9 @@ public:
     bool popMidiMonitor(RawMidi& out) noexcept { return midiMonitor.pop(out); }
 
     bool popGesture(GestureEvent& out) noexcept { return gestureOut.pop(out); }
+    void setPerformanceRecording(bool on) noexcept { performanceFlag.store(on, std::memory_order_release); }
+    bool popPerformance(GestureEvent& out) noexcept { return performanceOut.pop(out); }
+    bool publishPerformance(std::unique_ptr<GestureTake> performance) { return performanceChannel.publish(std::move(performance)); }
     bool publishGesture(std::unique_ptr<GestureTake> take) { return gestureChannel.publish(std::move(take)); }
 
     bool sendProcessor(int slot, dsp::ProcessorPtr processor);
@@ -210,6 +213,15 @@ private:
     void flushGestureEnd() noexcept;
     void releasePlayedNotes() noexcept;
     void updateGesture() noexcept;
+    std::atomic<bool> performanceFlag { false };
+    bool performanceRecording = false, performancePlaying = false;
+    std::uint64_t performanceStart = 0, performanceVersion = 0;
+    std::size_t performanceIndex = 0;
+    std::bitset<128> performanceHeld;
+    SpscQueue<GestureEvent> performanceOut { 65536 };
+    SnapshotChannel<GestureTake> performanceChannel { 4 };
+    void recordPerformance(const ControlEvent& e) noexcept;
+    void updatePerformance() noexcept;
     SnapshotChannel<MidiMap> midiMapChannel { 4 };
     struct Pickup
     {

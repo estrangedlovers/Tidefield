@@ -70,6 +70,8 @@ struct TelemetryFrame
     bool hostTempo = false;
 
     GestureState gestureState = GestureState::Idle;
+    std::uint8_t performanceState = 0;
+    float performanceSeconds = 0.0f;
     float gestureSeconds = 0.0f, gestureLength = 0.0f;
 
     std::array<float, 8> autoMaster {};

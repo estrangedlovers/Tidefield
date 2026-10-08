@@ -7,8 +7,8 @@
 #include <functional>
 
 namespace tf::app::gui {
-enum class Theme { slate, nightSwim, kelp, ember, graphite, heather, paper, dune, seaGlass, daylight };
-inline constexpr std::array<Theme, 10> kThemes { Theme::slate, Theme::nightSwim, Theme::kelp, Theme::ember, Theme::graphite,
+enum class Theme { slate, nightSwim, controlRoom, ember, graphite, heather, paper, dune, seaGlass, daylight };
+inline constexpr std::array<Theme, 10> kThemes { Theme::slate, Theme::nightSwim, Theme::controlRoom, Theme::ember, Theme::graphite,
                                                 Theme::heather, Theme::paper, Theme::dune, Theme::seaGlass, Theme::daylight };
 
 struct Palette

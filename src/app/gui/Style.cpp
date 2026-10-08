@@ -24,12 +24,12 @@ const Palette kNightSwim {
         C(0xffff8ac6), C(0xff8fe39a), C(0xffff9a6b), C(0xffa8f0ff), C(0xffd6b98a) } },
 };
 
-const Palette kKelp {
-    C(0xff232a22), C(0xff2e372c), C(0xff3c4739), C(0xff354033), C(0xff131911), C(0xff24301f), C(0xff1c2219), C(0xff131911),
-    C(0xffeef0e2), C(0xffc3c9b2), C(0xff8f977f), C(0xffeef0e2), C(0xffa5ae94),
-    C(0xffe0a84f), C(0xff8fcfb0), C(0xfff0d77a), C(0xffe79bb5), C(0xffe2735f), C(0xffb6d77a),
-    { { C(0xffe0a84f), C(0xff8fcfb0), C(0xffc0a6d6), C(0xffe6d27f), C(0xff8db8cf),
-        C(0xffe3a0a6), C(0xffb6d77a), C(0xffe08c63), C(0xffa5d8c4), C(0xffc7a77a) } },
+const Palette kControlRoom {
+    C(0xff1c1c1e), C(0xff262628), C(0xff353538), C(0xff2e2e31), C(0xff111113), C(0xff2a2a2d), C(0xff161618), C(0xff111113),
+    C(0xffe8e8ea), C(0xffb4b4b8), C(0xff808085), C(0xffe8e8ea), C(0xff9a9a9f),
+    C(0xff4aa3ff), C(0xff3fd17a), C(0xfff5c84c), C(0xffc879ff), C(0xffff453a), C(0xff32d74b),
+    { { C(0xff4aa3ff), C(0xff3fd17a), C(0xfff5c84c), C(0xffff9f0a), C(0xffbf5af2),
+        C(0xffff6482), C(0xff64d2ff), C(0xffff453a), C(0xff5e5ce6), C(0xffa2845e) } },
 };
 
 const Palette kEmber {
@@ -104,7 +104,7 @@ struct ThemeInfo
 const std::array<ThemeInfo, kThemes.size()> kThemeInfo { {
     { Theme::slate, "slate", "Slate", kSlate, kSlate },
     { Theme::nightSwim, "nightSwim", "Night swim", kNightSwim, kNightSwim },
-    { Theme::kelp, "kelp", "Kelp", kKelp, kKelp },
+    { Theme::controlRoom, "controlRoom", "Control room", kControlRoom, kControlRoom },
     { Theme::ember, "ember", "Ember", kEmber, kEmber },
     { Theme::graphite, "graphite", "Graphite", kGraphite, kGraphite },
     { Theme::heather, "heather", "Heather", kHeather, kHeather },
@@ -135,6 +135,8 @@ bool themeIsLight(Theme t) { return info(t).ui.light; }
 
 Theme themeFromId(const juce::String& id)
 {
+    if (id == "kelp")
+        return Theme::controlRoom;
     for (const auto& i : kThemeInfo)
         if (id == i.id)
             return i.theme;

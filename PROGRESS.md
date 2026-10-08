@@ -433,7 +433,8 @@ feel, CPU on the M1 Pro under real load, and the app on your interface and contr
 
 ### Themes (after 1.2.0)
 
-- Ten themes under Appearance: dark Slate, Night swim, Kelp, Ember, Graphite, Heather;
+- Ten themes under Appearance: dark Slate, Night swim, Control room (after Logic Pro:
+  near-black greys, blue selection, green and yellow states, Apple system colours), Ember, Graphite, Heather;
   light Paper, Dune, Sea glass, Daylight. Each light theme borrows a dark palette for
   its displays (Paper/Slate, Dune/Ember, Sea glass/Night swim, Daylight/Graphite), and
   the terrain's gradient now follows the display palette. Saved by id in settings.

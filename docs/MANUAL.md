@@ -549,6 +549,14 @@ slot. Every slot has six controls and a **Mix**.
 | Spectral Blur | Blur, Smear, Drift, Shimmer, Tone, Freeze |
 | Sympathetic Strings | Excite, Decay, Brightness, Register, Strings, Level (strings tuned to the key that ring along with the sound) |
 | Medium | Type, Age, Noise, Wobble, Drive |
+| Filter | Mode (low, band, high, notch), Cutoff, Resonance, Drive, Sweep, Rate (Sweep moves the cutoff with a slow LFO) |
+| Pitch Shimmer | Interval, Shimmer, Tone, Size, Detune, Low Cut (pitch-shifted repeats that climb with Shimmer) |
+| Phaser | Rate, Depth, Feedback, Stages, Centre, Stereo |
+| Tremolo | Rate, Depth, Shape, Stereo, Smooth, Wander (Stereo at 100% is an auto-pan) |
+| Saturator | Drive, Bias, Tone, Warmth, Compensate, Output (Compensate keeps the level steady as Drive rises) |
+| Grain Delay | Time, Size, Density, Pitch, Feedback, Jitter (grains read from a delay, scattered in time and pitch) |
+| Glue Compressor | Threshold, Ratio, Attack, Release, Makeup, SC High-pass |
+| Lo-fi | Bits, Rate, Noise, Wow, Filter, Drive |
 
 The reverb bus starts with Cloud Reverb and the delay bus with Tape Delay. Effects can
 be changed while playing; the change crossfades.

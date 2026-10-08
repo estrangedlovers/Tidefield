@@ -1412,6 +1412,94 @@ std::vector<Check> mediumFxChecks()
     return v;
 }
 
+void withControls(std::vector<Check>& checks, std::vector<std::pair<int, float>> values, const std::string& note)
+{
+    for (auto& c : checks)
+    {
+        const bool tone = c.context.find("2 kHz tone") != std::string::npos;
+        const int slot = tone ? kToneSlot : kClickSlot;
+        std::vector<std::pair<P, float>> snaps;
+        for (const auto& [control, value] : values)
+            if (slotParam(slot, control) != c.param)
+                snaps.emplace_back(slotParam(slot, control), value);
+        c.setup = then(c.setup, [snaps](Rig& r) {
+            for (const auto& [p, v] : snaps)
+                r.snap(p, v);
+        });
+        c.context += ", " + note;
+    }
+}
+
+std::vector<Check> filterChecks()
+{
+    auto v = effectChecks("tf.filter", { { 0, Metric::Any, 0, 0 }, { 1, Metric::Centroid, 1, 3.0f }, { 2, Metric::Any, 0, 0 }, { 3, Metric::Any, 0, 0 },
+                                         { 4, Metric::Any, 0, 0 }, { 6, Metric::Any, 0, 0 } });
+    auto rate = effectChecks("tf.filter", { { 5, Metric::Any, 0, 0 } });
+    withControls(rate, { { 4, 0.7f } }, "sweep 70%");
+    v.insert(v.end(), rate.begin(), rate.end());
+    return v;
+}
+
+std::vector<Check> pitchShimmerChecks()
+{
+    return effectChecks("tf.pitchShimmer", { { 0, Metric::Any, 0, 0 }, { 1, Metric::Rms, 1, 1.0f, FxSource::Tail }, { 2, Metric::Centroid, 1, 1.0f },
+                                             { 3, Metric::Any, 0, 0 }, { 4, Metric::Any, 0, 0 }, { 5, Metric::Centroid, 1, 0.5f },
+                                             { 6, Metric::Any, 0, 0 } });
+}
+
+std::vector<Check> phaserChecks()
+{
+    return effectChecks("tf.phaser", { { 0, Metric::Any, 0, 0 }, { 1, Metric::Any, 0, 0 }, { 2, Metric::Any, 0, 0 }, { 3, Metric::Any, 0, 0 },
+                                       { 4, Metric::Any, 0, 0 }, { 5, Metric::Side, 1, 3.0f }, { 6, Metric::Any, 0, 0 } });
+}
+
+std::vector<Check> tremoloChecks()
+{
+    auto v = effectChecks("tf.tremolo", { { 0, Metric::Any, 0, 0 }, { 1, Metric::Rms, -1, 1.0f }, { 3, Metric::Side, 1, 3.0f }, { 5, Metric::Any, 0, 0 },
+                                          { 6, Metric::Any, 0, 0 } });
+    auto shape = effectChecks("tf.tremolo", { { 2, Metric::Any, 0, 0 } });
+    withControls(shape, { { 1, 1.0f } }, "depth 100%");
+    auto smooth = effectChecks("tf.tremolo", { { 4, Metric::Any, 0, 0, FxSource::Tone } });
+    withControls(smooth, { { 1, 1.0f }, { 2, 0.5f } }, "depth 100%, square");
+    v.insert(v.end(), shape.begin(), shape.end());
+    v.insert(v.end(), smooth.begin(), smooth.end());
+    return v;
+}
+
+std::vector<Check> saturatorChecks()
+{
+    return effectChecks("tf.saturator", { { 0, Metric::Any, 0, 0 }, { 1, Metric::Any, 0, 0 }, { 2, Metric::Centroid, 1, 1.0f }, { 3, Metric::Any, 0, 0 },
+                                          { 4, Metric::Rms, -1, 1.0f }, { 5, Metric::Rms, 1, 6.0f }, { 6, Metric::Any, 0, 0 } });
+}
+
+std::vector<Check> grainDelayChecks()
+{
+    return effectChecks("tf.grainDelay", { { 0, Metric::Any, 0, 0 }, { 1, Metric::Any, 0, 0 }, { 2, Metric::Any, 0, 0 }, { 3, Metric::Any, 0, 0 },
+                                           { 4, Metric::Rms, 1, 2.0f, FxSource::Tail }, { 5, Metric::Any, 0, 0 }, { 6, Metric::Any, 0, 0 } });
+}
+
+std::vector<Check> compressorChecks()
+{
+    return effectChecks("tf.compressor", { { 0, Metric::Rms, 1, 2.0f }, { 1, Metric::Any, 0, 0 }, { 2, Metric::Any, 0, 0 }, { 3, Metric::Any, 0, 0 },
+                                           { 4, Metric::Rms, 1, 6.0f }, { 5, Metric::Any, 0, 0 }, { 6, Metric::Any, 0, 0 } });
+}
+
+std::vector<Check> lofiChecks()
+{
+    return effectChecks("tf.lofi", { { 0, Metric::Any, 0, 0 }, { 1, Metric::Any, 0, 0 }, { 2, Metric::Any, 0, 0 },
+                                     { 3, Metric::Custom, 1, 2.0f, FxSource::Tone }, { 4, Metric::Centroid, 1, 3.0f }, { 5, Metric::Any, 0, 0 },
+                                     { 6, Metric::Any, 0, 0 } });
+}
+
+std::vector<std::pair<std::string, std::vector<Check>>> builtinEffectGroups()
+{
+    return { { "tf.reverb", reverbChecks() },       { "tf.delay", delayChecks() },       { "tf.wornEcho", wornEchoChecks() },
+             { "tf.ensemble", ensembleChecks() },   { "tf.blur", blurChecks() },         { "tf.strings", stringsChecks() },
+             { "tf.medium", mediumFxChecks() },     { "tf.filter", filterChecks() },     { "tf.pitchShimmer", pitchShimmerChecks() },
+             { "tf.phaser", phaserChecks() },       { "tf.tremolo", tremoloChecks() },   { "tf.saturator", saturatorChecks() },
+             { "tf.grainDelay", grainDelayChecks() }, { "tf.compressor", compressorChecks() }, { "tf.lofi", lofiChecks() } };
+}
+
 Setup chainSource(int slot)
 {
     if (slot >= kMasterSlot)
@@ -1495,8 +1583,9 @@ std::vector<std::vector<Check>> allGroups()
 {
     std::vector<std::vector<Check>> g { masterChecks(), droneChecks(), resonatorChecks(), inputChecks(), bloomChecks(), bloomRootChecks(), looperChecks(),
                                         weatherChecks(), freezeChecks(), gestureChecks(), harmonyChecks(), mediumChecks(), terrainChecks(), cycleChecks(),
-                                        patternChecks(), reverbChecks(), delayChecks(), wornEchoChecks(), ensembleChecks(), blurChecks(), stringsChecks(),
-                                        mediumFxChecks() };
+                                        patternChecks() };
+    for (auto& [type, checks] : builtinEffectGroups())
+        g.push_back(std::move(checks));
     for (int k = 0; k < kNumClouds; ++k)
         g.push_back(cloudChecks(k));
     for (int s = 0; s < kNumStrips; ++s)
@@ -1538,6 +1627,40 @@ TEST_CASE("Control audit: effect tf.ensemble", "[audit]") { runChecks(ensembleCh
 TEST_CASE("Control audit: effect tf.blur", "[audit]") { runChecks(blurChecks()); }
 TEST_CASE("Control audit: effect tf.strings", "[audit]") { runChecks(stringsChecks()); }
 TEST_CASE("Control audit: effect tf.medium", "[audit]") { runChecks(mediumFxChecks()); }
+TEST_CASE("Control audit: effect tf.filter", "[audit]") { runChecks(filterChecks()); }
+TEST_CASE("Control audit: effect tf.pitchShimmer", "[audit]") { runChecks(pitchShimmerChecks()); }
+TEST_CASE("Control audit: effect tf.phaser", "[audit]") { runChecks(phaserChecks()); }
+TEST_CASE("Control audit: effect tf.tremolo", "[audit]") { runChecks(tremoloChecks()); }
+TEST_CASE("Control audit: effect tf.saturator", "[audit]") { runChecks(saturatorChecks()); }
+TEST_CASE("Control audit: effect tf.grainDelay", "[audit]") { runChecks(grainDelayChecks()); }
+TEST_CASE("Control audit: effect tf.compressor", "[audit]") { runChecks(compressorChecks()); }
+TEST_CASE("Control audit: effect tf.lofi", "[audit]") { runChecks(lofiChecks()); }
+
+TEST_CASE("Control audit: every built-in effect type has its controls audited", "[audit]")
+{
+    std::set<std::string> audited;
+    for (const auto& [type, checks] : builtinEffectGroups())
+    {
+        std::set<std::string> names;
+        for (const auto& c : checks)
+            names.insert(c.name.substr(0, c.name.find(" (")));
+        const auto* info = tf::dsp::ProcessorFactory::instance().find(type);
+        REQUIRE(info != nullptr);
+        for (const auto& control : info->controls)
+            if (control.display.curve != tf::dsp::DisplayMap::Curve::Hidden)
+            {
+                INFO(type << " control " << control.name);
+                CHECK(names.count(type + " " + control.name) == 1);
+            }
+        CHECK(names.count(type + " Mix") == 1);
+        audited.insert(type);
+    }
+    for (const auto& e : tf::dsp::ProcessorFactory::instance().entries())
+    {
+        INFO("effect type without an audit group: " << e.info->typeId);
+        CHECK(audited.count(e.info->typeId) == 1);
+    }
+}
 
 TEMPLATE_TEST_CASE_SIG("Control audit: strip", "[audit]", ((int S), S), 0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10)
 {

@@ -269,5 +269,20 @@ void addFactoryPresets(io::PresetLibrary& library)
     add("loops", "Airports", loops(5, 1, 0.85f, 60, 1.5f, 0.6f));
     add("loops", "Sparse bells", loops(3, 0.5f, 0.6f, 72, 1.0f, 0.5f));
     add("loops", "Busy shore", loops(8, 2, 0.95f, 55, 2.5f, 0.7f));
+
+    auto effect = [](float p1, float p2, float p3, float p4, float p5, float p6, float mix) {
+        return V { { "p1", p1 }, { "p2", p2 }, { "p3", p3 }, { "p4", p4 }, { "p5", p5 }, { "p6", p6 }, { "mix", mix } };
+    };
+    add("fx:tf.filter", "Slow low sweep", effect(0.1f, 0.5f, 0.4f, 0.1f, 0.5f, 0.15f, 1.0f));
+    add("fx:tf.filter", "Breathing band", effect(0.35f, 0.55f, 0.6f, 0.0f, 0.35f, 0.3f, 1.0f));
+    add("fx:tf.pitchShimmer", "Octave halo", effect(4.5f / 7.0f, 0.6f, 0.55f, 0.6f, 0.3f, 0.45f, 0.4f));
+    add("fx:tf.pitchShimmer", "Fifth bloom", effect(3.5f / 7.0f, 0.7f, 0.5f, 0.7f, 0.4f, 0.4f, 0.35f));
+    add("fx:tf.phaser", "Slow swirl", effect(0.2f, 0.8f, 0.7f, 0.5f, 0.45f, 0.7f, 1.0f));
+    add("fx:tf.tremolo", "Gentle pulse", effect(0.45f, 0.4f, 0.1f, 0.0f, 0.5f, 0.2f, 1.0f));
+    add("fx:tf.tremolo", "Wide auto-pan", effect(0.35f, 0.8f, 0.1f, 1.0f, 0.4f, 0.3f, 1.0f));
+    add("fx:tf.saturator", "Tape warmth", effect(0.25f, 0.3f, 0.55f, 0.6f, 1.0f, 0.5f, 1.0f));
+    add("fx:tf.grainDelay", "Scattered grains", effect(0.55f, 0.6f, 0.55f, 0.25f, 0.5f, 0.7f, 0.5f));
+    add("fx:tf.compressor", "Bus glue", effect(0.62f, 0.375f, 0.65f, 0.5f, 0.1f, 0.35f, 1.0f));
+    add("fx:tf.lofi", "Dusty sampler", effect(0.45f, 0.45f, 0.25f, 0.3f, 0.6f, 0.25f, 1.0f));
 }
 }

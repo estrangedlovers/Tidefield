@@ -619,6 +619,18 @@ Delay's Tone and Age skipped the first echo; both delays clipped the right chann
 spread time above 2.2 s. Docs/help: drone Shape direction, cloud Envelope, resonator
 Gravity, Bloom Attack/Position, Flakes; strip Width is now on every strip.
 
+### Built-in effects expansion
+Eight new built-in effects, loadable in any of the 28 slots: Filter (`tf.filter`),
+Pitch Shimmer (`tf.pitchShimmer`), Phaser (`tf.phaser`), Tremolo (`tf.tremolo`),
+Saturator (`tf.saturator`), Grain Delay (`tf.grainDelay`), Glue Compressor
+(`tf.compressor`) and Lo-fi (`tf.lofi`). Each allocates in `prepare`, smooths its gains
+per sample, bounds its feedback and resets to a bit-identical state.
+`tests/dsp/BuiltinFxTests.cpp` checks them at 44.1/48/96 kHz at every extreme (finite,
+bounded, no allocation), that `reset` reproduces the same output, that tails fall
+silent, and one behaviour per effect. The control audit now has a group per effect type
+and fails if a registered type has no group or a control is not swept. Factory presets
+for the new types (`fx:<type>`), and `scores/fx_palette.json` (passes `--strict`).
+
 ## How to run
 ```
 cmake --preset headless && cmake --build --preset headless

@@ -1,9 +1,17 @@
 #include "ProcessorFactory.h"
 
 #include "chorus/Ensemble.h"
+#include "delay/GrainDelay.h"
 #include "delay/TapeDelay.h"
 #include "delay/WornEcho.h"
+#include "drive/LoFi.h"
+#include "drive/Saturator.h"
+#include "dynamics/GlueCompressor.h"
+#include "filter/MultimodeFilter.h"
 #include "medium/Medium.h"
+#include "modulation/Phaser.h"
+#include "modulation/Tremolo.h"
+#include "pitch/PitchShimmer.h"
 #include "reverb/FdnReverb.h"
 #include "spectral/SpectralBlur.h"
 #include "strings/SympatheticStrings.h"
@@ -24,6 +32,14 @@ ProcessorFactory::ProcessorFactory()
     add(Ensemble::kInfo, [] { return ProcessorPtr(new Ensemble()); });
     add(SpectralBlur::kInfo, [] { return ProcessorPtr(new SpectralBlur()); });
     add(SympatheticStrings::kInfo, [] { return ProcessorPtr(new SympatheticStrings()); });
+    add(MultimodeFilter::kInfo, [] { return ProcessorPtr(new MultimodeFilter()); });
+    add(PitchShimmer::kInfo, [] { return ProcessorPtr(new PitchShimmer()); });
+    add(Phaser::kInfo, [] { return ProcessorPtr(new Phaser()); });
+    add(Tremolo::kInfo, [] { return ProcessorPtr(new Tremolo()); });
+    add(Saturator::kInfo, [] { return ProcessorPtr(new Saturator()); });
+    add(GrainDelay::kInfo, [] { return ProcessorPtr(new GrainDelay()); });
+    add(GlueCompressor::kInfo, [] { return ProcessorPtr(new GlueCompressor()); });
+    add(LoFi::kInfo, [] { return ProcessorPtr(new LoFi()); });
 }
 
 void ProcessorFactory::add(const ProcessorInfo& info, CreateFn createFn)

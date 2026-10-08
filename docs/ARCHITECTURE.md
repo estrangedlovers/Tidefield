@@ -223,6 +223,17 @@ them can be added without changing the core.
 **Effects**
 - Medium (section 8), reverse shimmer and fuzz (your plugins), cloud reverb with
   infinite hold, tape delay with Medium in the feedback, spectral blur, ensemble chorus.
+- Utility and colour effects, all built in: a multimode filter with a slow sweep, pitch
+  shimmer (dual-tap delay-line shifter with a 150/190 ms echo in its feedback, so the
+  repeats climb in steps rather than smearing), phaser, tremolo/auto-pan, saturator
+  (the ADAA tanh with bias, a pre/post low shelf so Warmth drives the lows without
+  changing the balance, and level compensation computed from the curve's swing at
+  -12 dBFS), grain delay (a fixed 24-grain pool reading a 4 s line, normalised by the
+  live envelope sum so feedback stays below unity whether grains are correlated or
+  not), glue compressor (stereo-linked, high-passed sidechain, soft knee, log-domain
+  attack/release) and lo-fi (smoothed bit depth and hold rate so sweeps never zipper).
+  Choices that change the signal path (filter mode, phaser stages) crossfade their
+  outputs instead of switching.
 
 **Visuals (phase 6)**
 - A particle per grain, an orb per drone voice, waves for Tide, and Medium-specific

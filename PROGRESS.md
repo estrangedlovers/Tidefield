@@ -431,6 +431,33 @@ CI; every macOS CI run green on Apple Silicon.
 whether the auto master's target shape suits your material, how the new gestures
 feel, CPU on the M1 Pro under real load, and the app on your interface and controller.
 
+### Factory sounds expansion (after 1.2.0)
+
+- 41 new original sounds in `make_samples.py` (`expansion()`), 59 in all, in five
+  Browser groups: Tonal (vibraphone, glass harmonica, music box, celesta, harp, koto,
+  tongue drum, electric piano, bonang, temple bell, crystal bowl), Pad (warm analog,
+  string ensemble, airy voices, reed organ, glass pad, cello section, chamber choir,
+  warped tape), Drone (new: tanpura, cello drone, bowed metal, organ pedal, sub hum),
+  Texture (forest at dawn, stream, distant thunder, radio static, vinyl crackle, fire,
+  night insects, wind in wires, rain on a tin roof, underwater) and One-shot (new: wood
+  knock, bowl strike, piano harmonic, metal scrape, breath swell, vocal swell, felt
+  mallet).
+- Modal, additive (formants applied per harmonic), plucked-string and noise-shaping
+  synthesis; each sound has its own seed from its name, so adding one never changes
+  another, and the 18 older files still regenerate bit for bit.
+- Drones and the new textures are seamless loops: frequencies and modulation rates are
+  snapped to whole cycles of the loop, noise is shaped in the frequency domain over the
+  whole loop and events wrap around the end.
+- Five presets for the new material: clouds Endless drone and Field recording; Bloom
+  Struck halo, Rising voice and Scattered knocks (34 in all).
+- Adds 32.1 MB (30.6 MiB) of 16-bit 48 kHz WAV, mono except Forest at dawn, Stream
+  and Rain on a tin roof.
+- Verified: every single-voice pitched sound within 2 cents of its root (detuned
+  ensembles within 7), no clipping or DC, loop seams no larger than a normal sample
+  step;
+  self-test (59 sounds decode, 34 presets) and all 143 ctest tests pass on Linux.
+  Not yet heard on speakers.
+
 ### Themes (after 1.2.0)
 
 - Ten themes under Appearance: dark Slate, Night swim, Control room (after Logic Pro:

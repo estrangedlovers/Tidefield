@@ -16,17 +16,58 @@ const std::vector<FactorySound>& factorySounds()
         { "Marimba", "Tonal", "marimba_wav", 60 },
         { "Bell", "Tonal", "bell_wav", 69 },
         { "Pluck", "Tonal", "pluck_wav", 50 },
+        { "Vibraphone", "Tonal", "vibraphone_wav", 65 },
+        { "Glass harmonica", "Tonal", "glass_harmonica_wav", 72 },
+        { "Music box", "Tonal", "music_box_wav", 84 },
+        { "Celesta", "Tonal", "celesta_wav", 72 },
+        { "Harp", "Tonal", "harp_wav", 55 },
+        { "Koto", "Tonal", "koto_wav", 62 },
+        { "Tongue drum", "Tonal", "tongue_drum_wav", 62 },
+        { "Electric piano", "Tonal", "electric_piano_wav", 60 },
+        { "Bonang", "Tonal", "bonang_wav", 63 },
+        { "Temple bell", "Tonal", "temple_bell_wav", 43 },
+        { "Crystal bowl", "Tonal", "crystal_bowl_wav", 60 },
         { "Chord", "Pad", "chord_wav", 50 },
         { "Choir", "Pad", "choir_wav", 50 },
         { "Bowed strings", "Pad", "bowed_strings_wav", 38 },
         { "Harmonium", "Pad", "harmonium_wav", 60 },
         { "Sub organ", "Pad", "sub_organ_wav", 38 },
         { "Shimmer", "Pad", "shimmer_wav", 74 },
+        { "Warm analog", "Pad", "warm_analog_wav", 48 },
+        { "String ensemble", "Pad", "string_ensemble_wav", 43 },
+        { "Airy voices", "Pad", "airy_voices_wav", 57 },
+        { "Reed organ", "Pad", "reed_organ_wav", 53 },
+        { "Glass pad", "Pad", "glass_pad_wav", 64 },
+        { "Cello section", "Pad", "cello_section_wav", 36 },
+        { "Chamber choir", "Pad", "chamber_choir_wav", 40 },
+        { "Warped tape", "Pad", "warped_tape_wav", 50 },
+        { "Tanpura", "Drone", "tanpura_wav", 48 },
+        { "Cello drone", "Drone", "cello_drone_wav", 36 },
+        { "Bowed metal", "Drone", "bowed_metal_wav", 57 },
+        { "Organ pedal", "Drone", "organ_pedal_wav", 24 },
+        { "Sub hum", "Drone", "sub_hum_wav", 28 },
         { "Wind chimes", "Texture", "wind_chimes_wav", -1 },
         { "Breath", "Texture", "breath_wav", -1 },
         { "Ocean", "Texture", "ocean_wav", -1 },
         { "Rain on leaves", "Texture", "rain_leaves_wav", -1 },
         { "Tape dust", "Texture", "tape_dust_wav", -1 },
+        { "Forest at dawn", "Texture", "forest_dawn_wav", -1 },
+        { "Stream", "Texture", "stream_wav", -1 },
+        { "Distant thunder", "Texture", "distant_thunder_wav", -1 },
+        { "Radio static", "Texture", "radio_static_wav", -1 },
+        { "Vinyl crackle", "Texture", "vinyl_crackle_wav", -1 },
+        { "Fire", "Texture", "fire_crackle_wav", -1 },
+        { "Night insects", "Texture", "night_insects_wav", -1 },
+        { "Wind in wires", "Texture", "wind_wires_wav", -1 },
+        { "Rain on a tin roof", "Texture", "rain_tin_roof_wav", -1 },
+        { "Underwater", "Texture", "underwater_wav", -1 },
+        { "Wood knock", "One-shot", "wood_knock_wav", 74 },
+        { "Bowl strike", "One-shot", "bowl_strike_wav", 62 },
+        { "Piano harmonic", "One-shot", "piano_harmonic_wav", 60 },
+        { "Metal scrape", "One-shot", "metal_scrape_wav", -1 },
+        { "Breath swell", "One-shot", "breath_swell_wav", -1 },
+        { "Vocal swell", "One-shot", "vocal_swell_wav", 57 },
+        { "Felt mallet", "One-shot", "felt_mallet_wav", 48 },
     };
     return sounds;
 }
@@ -153,6 +194,8 @@ void addFactoryPresets(io::PresetLibrary& library)
     add("cloud", "Reverse swells", cloud(4, 1600, 0.4f, 0.3f, -0.1f, 0, 0.1f, 0, 1.0f, 0.9f, 0.7f, 0));
     add("cloud", "Octave choir", cloud(18, 350, 0.35f, 0.35f, 0.02f, 0, 0.15f, 1.0f, 0.2f, 0.55f, 0.9f, 1.0f));
     add("cloud", "Frozen point", cloud(30, 220, 0.5f, 0.02f, 0, 0, 0.03f, 0, 0.5f, 0.5f, 0.6f, 0));
+    add("cloud", "Endless drone", cloud(8, 1400, 0.5f, 0.9f, 0.02f, 0, 0.02f, 0, 0.3f, 0.85f, 0.7f, 0));
+    add("cloud", "Field recording", cloud(12, 600, 0.5f, 1.0f, 0.04f, 0, 0, 0, 0.5f, 0.8f, 1.0f, 0));
 
     auto res = [](float root, float modes, float structure, float decay, float brightness, float rain, float rainColour, float spread) {
         return V { { "root", root }, { "modes", modes }, { "structure", structure }, { "decay", decay }, { "brightness", brightness },
@@ -172,6 +215,9 @@ void addFactoryPresets(io::PresetLibrary& library)
     add("bloom", "Ghost notes", bloom(3, 0.6f, 8, 0.02f, 3, 0.6f, 0.6f, 0.5f, 0.3f));
     add("bloom", "Constellation", bloom(4, 0.7f, 14, 0.01f, 6, 0.85f, 1.0f, 0.6f, 0.25f));
     add("bloom", "Old tape", bloom(5, 0.6f, 9, 0.05f, 3, 0.4f, 0.5f, 0.3f, 0.3f));
+    add("bloom", "Struck halo", bloom(3, 0.8f, 16, 0.01f, 8, 0.7f, 0.8f, 0.3f, 0.05f));
+    add("bloom", "Rising voice", bloom(0, 0.8f, 10, 1.5f, 6, 0.55f, 0.7f, 0.2f, 0.6f));
+    add("bloom", "Scattered knocks", bloom(4, 0.9f, 12, 0.005f, 5, 0.75f, 1.0f, 0.7f, 0.0f));
 
     auto weather = [](float wind, float rain, float surf, float gust, float tone, float distance) {
         return V { { "wind", wind }, { "rain", rain }, { "surf", surf }, { "gust", gust }, { "tone", tone }, { "distance", distance } };

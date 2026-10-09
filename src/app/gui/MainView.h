@@ -12,6 +12,7 @@ class Browser;
 class MacroPanel;
 class PadRow;
 class StatusBar;
+class LessonPanel;
 
 class MainView final : public juce::Component,
                        public juce::DragAndDropContainer,
@@ -60,6 +61,18 @@ public:
     bool isProjectorOpen() const noexcept { return projector != nullptr; }
     static void switchTheme(AppCore& core, Theme t);
 
+    void openLessons();
+    void closeLessons();
+    bool areLessonsOpen() const noexcept { return lessons != nullptr; }
+    void showLesson(int lesson, int page);
+    juce::String missingLessonTarget() const;
+    void offerLessons();
+    void dismissLessonOffer();
+    bool isOfferingLessons() const noexcept { return lessonOffer; }
+    static void showLessonsFor(AppCore& core);
+    juce::Rectangle<int> locateLessonTarget(const juce::String& target, bool reveal);
+    void setLessonHighlight(juce::Rectangle<int> area);
+
 private:
     void buildInterface();
     void teardownInterface();
@@ -93,6 +106,7 @@ private:
     std::unique_ptr<PadRow> pads;
     std::unique_ptr<DeviceView> devices;
     std::unique_ptr<StatusBar> status;
+    std::unique_ptr<LessonPanel> lessons;
     std::unique_ptr<juce::VBlankAttachment> vblank;
     std::unique_ptr<juce::FileChooser> chooser;
     std::unique_ptr<juce::DocumentWindow> projector;
@@ -119,5 +133,10 @@ private:
     int dropSlot = -1;
     int dropCount = 0;
     juce::String dropLabel;
+    juce::Rectangle<int> lessonHighlight;
+    juce::Component::SafePointer<juce::Component> lessonTarget;
+    juce::String lessonTargetName;
+    int lessonRetry = 0;
+    bool lessonOffer = false;
 };
 }

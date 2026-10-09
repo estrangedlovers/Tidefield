@@ -35,6 +35,7 @@ public:
     }
 
     int preferredWidth(int height) const;
+    const juce::String& getTitle() const noexcept { return title; }
     void paint(juce::Graphics& g) override;
     void resized() override;
     void mouseDown(const juce::MouseEvent& e) override;

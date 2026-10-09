@@ -2,6 +2,7 @@
 #include "gui/Settings.h"
 #include "AudioHost.h"
 #include "FactoryContent.h"
+#include "gui/Lessons.h"
 #include "gui/MainView.h"
 
 #include <AudioProcessorEffect.h>
@@ -91,6 +92,16 @@ int runSelfTest()
         for (const auto& m : macros.getMacros())
             mapped += static_cast<int>(m.targets.size());
         check(warnings.empty() && mapped >= 12, "starter macros: " + juce::String(mapped) + " targets, all controls known");
+    }
+    {
+        const auto problems = gui::lessonProblems(engine.getRegistry());
+        int pages = 0;
+        for (const auto& lesson : gui::lessons())
+            pages += static_cast<int>(lesson.pages.size());
+        for (const auto& p : problems)
+            std::cout << "      " << p << std::endl;
+        check(gui::lessons().size() >= 6 && problems.isEmpty(),
+              "lessons: " + juce::String(static_cast<int>(gui::lessons().size())) + " lessons, " + juce::String(pages) + " pages, every page, tab and parameter known");
     }
     engine::FxManager fx(engine);
     fx.loadDefaultLayout();
@@ -189,7 +200,7 @@ public:
     {
         about = 1, settings, newSession, open, save, saveAs, savePerformance, renderPerformance, renderLoop, record, showRecordings, clearRecent,
         undo, redo, capture, release, projector, zoomIn, zoomOut, zoomReset, fullScreen, fade, panic, keys, take, catchNow, freeze, loop,
-        cycles, path, manual, shortcuts, recentBase = 1000, pageBase = 2000, themeBase = 3000, sceneBase = 4000
+        cycles, path, manual, shortcuts, lessons, recentBase = 1000, pageBase = 2000, themeBase = 3000, sceneBase = 4000
     };
 
     juce::StringArray getMenuBarNames() override { return { "File", "Edit", "View", "Play", "Help" }; }
@@ -288,6 +299,7 @@ public:
         }
         else if (index == 4)
         {
+            m.addItem(lessons, "Lessons", v != nullptr, v != nullptr && v->areLessonsOpen());
             m.addItem(manual, "Tidefield Manual");
             m.addItem(shortcuts, "Keyboard Shortcuts");
             m.addSeparator();
@@ -356,6 +368,7 @@ public:
             case loop: press('l'); break;
             case cycles: press('e'); break;
             case path: press('p'); break;
+            case lessons: if (v != nullptr) v->openLessons(); break;
             case manual: juce::URL("https://github.com/estrangedlovers/Tidefield/blob/main/docs/MANUAL.md").launchInDefaultBrowser(); break;
             case shortcuts: juce::URL("https://github.com/estrangedlovers/Tidefield/blob/main/docs/MANUAL.md#23-keyboard-reference").launchInDefaultBrowser(); break;
             default: break;
@@ -409,6 +422,8 @@ public:
         auto* view = new gui::MainView(*core);
         window = std::make_unique<MainWindow>(getApplicationName() + " - " + core->session.getName(), view);
         openProjectsIn(commandLine);
+        if (! commandLine.contains("--ui-test"))
+            view->offerLessons();
         if (core->recovery != nullptr && ! commandLine.contains("--ui-test"))
             juce::Timer::callAfterDelay(600, [this] {
                 if (core != nullptr && core->recovery != nullptr)
@@ -433,6 +448,11 @@ public:
             juce::Timer::callAfterDelay(400, [this, tab] {
                 if (auto* v = window != nullptr ? dynamic_cast<gui::MainView*>(window->getContentComponent()) : nullptr)
                     v->openSettings(static_cast<gui::SettingsTab>(juce::jlimit(0, static_cast<int>(gui::SettingsTab::Count) - 1, tab.getIntValue())));
+            });
+        if (const auto lesson = commandLine.fromFirstOccurrenceOf("--lesson=", false, false).upToFirstOccurrenceOf(" ", false, false); lesson.isNotEmpty())
+            juce::Timer::callAfterDelay(500, [this, lesson] {
+                if (auto* v = window != nullptr ? dynamic_cast<gui::MainView*>(window->getContentComponent()) : nullptr)
+                    v->showLesson(lesson.upToFirstOccurrenceOf(".", false, false).getIntValue() - 1, lesson.fromFirstOccurrenceOf(".", false, false).getIntValue() - 1);
             });
         if (commandLine.contains("--ui-test"))
         {
@@ -473,11 +493,37 @@ public:
                     if (auto* v = dynamic_cast<gui::MainView*>(window->getContentComponent()))
                         v->showPage(p % gui::DeviceView::NumPages);
                 });
-            juce::Timer::callAfterDelay(800 + (gui::DeviceView::NumPages + 2) * 250, [this] {
+            const int lessonsStart = 800 + (gui::DeviceView::NumPages + 2) * 250;
+            const auto savedLesson = gui::savedLessonPosition(host->getSettings());
+            int step = 1;
+            juce::Timer::callAfterDelay(lessonsStart, [this] {
                 if (auto* v = window != nullptr ? dynamic_cast<gui::MainView*>(window->getContentComponent()) : nullptr)
+                    v->showLesson(-1, 0);
+            });
+            for (int l = 0; l < static_cast<int>(gui::lessons().size()); ++l)
+                for (int p = 0; p < static_cast<int>(gui::lessons()[static_cast<std::size_t>(l)].pages.size()); ++p)
+                    juce::Timer::callAfterDelay(lessonsStart + 60 * step++, [this, l, p] {
+                        if (auto* v = window != nullptr ? dynamic_cast<gui::MainView*>(window->getContentComponent()) : nullptr)
+                        {
+                            v->showLesson(l, p);
+                            if (const auto missing = v->missingLessonTarget(); missing.isNotEmpty())
+                            {
+                                std::cout << "FAIL  lesson " << l + 1 << " page " << p + 1 << " highlights " << missing << ", which is not on screen" << std::endl;
+                                setApplicationReturnValue(1);
+                            }
+                        }
+                    });
+            juce::Timer::callAfterDelay(lessonsStart + 60 * step + 100, [this, savedLesson, step] {
+                if (auto* v = window != nullptr ? dynamic_cast<gui::MainView*>(window->getContentComponent()) : nullptr)
+                {
+                    v->closeLessons();
                     if (v->isProjectorOpen())
                         v->toggleProjector();
-                std::cout << "UI test passed: every page and settings tab shown, every theme, projector opened and closed" << std::endl;
+                }
+                gui::saveLessonPosition(host->getSettings(), savedLesson);
+                const bool ok = getApplicationReturnValue() == 0;
+                std::cout << (ok ? "UI test passed" : "UI test FAILED") << ": every page and settings tab shown, every theme, projector opened and closed, "
+                          << step - 1 << " lesson pages stepped through" << std::endl;
                 quit();
             });
         }

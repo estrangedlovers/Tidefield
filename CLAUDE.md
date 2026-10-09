@@ -104,6 +104,9 @@ resources/fonts/Quicksand-Medium.ttf`.
 - `Tidefield --null-audio` runs the engine without a sound device, so the interface
   animates under Xvfb (screenshots, CPU measurement). Build with
   `-DJUCE_ENABLE_REPAINT_DEBUGGING=1` to see what repaints.
+- Lessons live in `gui/Lessons.cpp`: each page is data (text, device page, highlight target,
+  what to wait for); the self-test checks every page, tab and parameter it names and
+  `--ui-test` steps through every page. Highlight targets are component IDs set in `MainView`.
 - Preferences live in `gui/Settings.cpp`: one tab per area, each a `FormPage` of labelled
   rows. The macOS menu bar is `AppMenu` in `Main.cpp`; its Play items call
   `MainView::performKey` so menu and keyboard share one path.

@@ -385,8 +385,16 @@ void Pad::paint(juce::Graphics& g)
         g.drawText(keyCap, cap, juce::Justification::centred, false);
     }
     g.setColour(colour::text());
-    g.setFont(font(13.0f, 600));
-    g.drawText(title, t.removeFromTop(t.getHeight() * 0.5f).withTrimmedRight(keyCap.isNotEmpty() ? 20.0f : 0.0f), juce::Justification::bottomLeft, true);
+    auto titleArea = t.removeFromTop(t.getHeight() * 0.5f);
+    float titleSize = 13.0f;
+    if (keyCap.isNotEmpty() && juce::GlyphArrangement::getStringWidth(font(titleSize, 600), title) > titleArea.getWidth() - 20.0f)
+        titleSize = 12.0f;
+    else if (keyCap.isNotEmpty())
+        titleArea.removeFromRight(20.0f);
+    while (titleSize > 10.5f && juce::GlyphArrangement::getStringWidth(font(titleSize, 600), title) > titleArea.getWidth())
+        titleSize -= 0.5f;
+    g.setFont(font(titleSize, 600));
+    g.drawText(title, titleArea, juce::Justification::bottomLeft, true);
     g.setColour(on ? colour::text() : colour::textDim());
     g.setFont(font(10.5f, 500));
     g.drawText(shownSub.isNotEmpty() ? shownSub : sub, t, juce::Justification::topLeft, true);

@@ -40,6 +40,7 @@ target_sources(tidefield_app_core INTERFACE
     ${CMAKE_CURRENT_SOURCE_DIR}/LinkSync.cpp
     ${CMAKE_CURRENT_SOURCE_DIR}/SessionController.cpp
     ${CMAKE_CURRENT_SOURCE_DIR}/gui/Controls.cpp
+    ${CMAKE_CURRENT_SOURCE_DIR}/gui/Lessons.cpp
     ${CMAKE_CURRENT_SOURCE_DIR}/gui/MainView.cpp
     ${CMAKE_CURRENT_SOURCE_DIR}/gui/Model.cpp
     ${CMAKE_CURRENT_SOURCE_DIR}/gui/Pages.cpp

@@ -1,5 +1,6 @@
 #include "MainView.h"
 
+#include "Lessons.h"
 #include "Places.h"
 
 #include "../FactoryContent.h"
@@ -25,6 +26,8 @@ constexpr int kStatusH = 24;
 constexpr int kBrowserW = 214;
 constexpr int kMacroW = 244;
 constexpr int kPadsH = 78;
+constexpr int kLessonsW = 280;
+constexpr const char* kLessonsOfferedKey = "lessonsOffered";
 std::vector<MainView*> openViews;
 constexpr const char* kThemeKey = "theme";
 constexpr int kThemeMenuBase = 100;
@@ -349,6 +352,7 @@ public:
             menu.addSeparator();
             menu.addItem(5, shortcut("Projector window (Cmd+P)"), true, view.isProjectorOpen());
             menu.addItem(6, shortcut("Settings...  (Cmd+,)"));
+            menu.addItem(7, "Lessons", true, view.areLessonsOpen());
             menu.addSeparator();
             menu.addItem(8, "Undo " + model.core.undo.getUndoDescription() + shortcut("  (Cmd+Z)"), model.core.undo.canUndo());
             menu.addItem(9, "Redo " + model.core.undo.getRedoDescription() + shortcut("  (Shift+Cmd+Z)"), model.core.undo.canRedo());
@@ -369,6 +373,7 @@ public:
                 else if (r == 4) s.saveAs();
                 else if (r == 5) view.toggleProjector();
                 else if (r == 6) view.openSettings();
+                else if (r == 7) view.areLessonsOpen() ? view.closeLessons() : view.openLessons();
                 else if (r == 8) model.core.undo.undo();
                 else if (r == 9) model.core.undo.redo();
                 else if (r >= kThemeMenuBase && r < kThemeMenuBase + static_cast<int>(kThemes.size()))
@@ -388,6 +393,10 @@ public:
         audio.onClick = [this] { view.openSettings(); };
         for (auto* c : std::initializer_list<juce::Component*> { &sessionButton, &fade, &panic, &keys, &audio, &meter, &rec, &autoMaster, &tempo })
             addAndMakeVisible(c);
+        sessionButton.setComponentID("button:session");
+        fade.setComponentID("button:fade");
+        rec.setComponentID("button:record");
+        audio.setComponentID("button:settings");
     }
     ~TopBar() override { model.remove(this); }
 
@@ -1233,6 +1242,7 @@ public:
     {
         auto hold = [this](const char* title, const char* key, const char* sub, juce::Colour c, const char* help, P p, std::function<float()> level) {
             auto pad = std::make_unique<Pad>(model, title, sub, c, help);
+            pad->setComponentID("pad:" + juce::String(title));
             pad->keyCap = key;
             pad->onPress = [this, p] { model.set(p, 1.0f); };
             pad->onRelease = [this, p] { model.set(p, 0.0f); };
@@ -1242,6 +1252,7 @@ public:
         };
         auto toggle = [this](const char* title, const char* key, const char* sub, juce::Colour c, const char* help, P p, std::function<float()> level) {
             auto pad = std::make_unique<Pad>(model, title, sub, c, help);
+            pad->setComponentID("pad:" + juce::String(title));
             pad->keyCap = key;
             pad->onPress = [this, p] { model.toggle(p); };
             pad->level = std::move(level);
@@ -1282,6 +1293,7 @@ public:
 
         auto gesture = std::make_unique<Pad>(model, "Take", "", colour::learn(),
                                              "record your moves (knobs, terrain, notes) and play them back, looped; right-click for more");
+        gesture->setComponentID("pad:Take");
         gesture->keyCap = "G";
         gesture->onPress = [this] { gestureToggle(model.core, juce::ModifierKeys::currentModifiers.isShiftDown()); };
         gesture->onMenu = [this] { showGestureMenu(model.core, this); };
@@ -1303,12 +1315,14 @@ public:
         pads.push_back(std::move(gesture));
 
         auto catchPad = std::make_unique<Pad>(model, "Catch", "last seconds", colour::live(), "grab what just happened into a cloud, where it keeps playing");
+        catchPad->setComponentID("pad:Catch");
         catchPad->keyCap = "K";
         catchPad->onPress = [this] { model.engine.command(engine::Command::Catch); };
         pads.push_back(std::move(catchPad));
 
         for (auto& p : pads)
             addAndMakeVisible(*p);
+        shape.setComponentID("pad:Shape");
         addAndMakeVisible(shape);
     }
 
@@ -1378,6 +1392,32 @@ public:
         g.setColour(colour::line());
         g.fillRect(getLocalBounds().removeFromTop(1));
         auto r = getLocalBounds().reduced(10, 0).toFloat();
+        offerArea = {};
+        dismissArea = {};
+        if (view.isOfferingLessons())
+        {
+            const auto plain = font(11.5f, 500), strong = font(11.5f, 600);
+            const juce::String ask = "New to Tidefield?", open = "Open the lessons", notNow = "Not now";
+            const float askW = static_cast<float>(juce::GlyphArrangement::getStringWidthInt(plain, ask));
+            const float openW = static_cast<float>(juce::GlyphArrangement::getStringWidthInt(strong, open)) + 20.0f;
+            const float notNowW = static_cast<float>(juce::GlyphArrangement::getStringWidthInt(plain, notNow)) + 16.0f;
+            const auto dismiss = r.removeFromRight(notNowW);
+            const auto pill = r.removeFromRight(openW).withSizeKeepingCentre(openW, 18.0f);
+            const auto question = r.removeFromRight(askW + 10.0f);
+            r.removeFromRight(16.0f);
+            g.setFont(plain);
+            g.setColour(hoverOffer == 2 ? colour::text() : colour::textFaint());
+            g.drawText(notNow, dismiss, juce::Justification::centredRight);
+            g.setColour(colour::text());
+            g.drawText(ask, question, juce::Justification::centredLeft);
+            g.setColour(hoverOffer == 1 ? colour::lift(colour::accent(), 0.1f) : colour::accent());
+            g.fillRoundedRectangle(pill, 9.0f);
+            g.setColour(colour::window());
+            g.setFont(strong);
+            g.drawText(open, pill, juce::Justification::centred);
+            offerArea = question.getUnion(pill).toNearestInt();
+            dismissArea = dismiss.toNearestInt();
+        }
         g.setFont(font(11.5f, 500));
         if (keysText.isNotEmpty())
         {
@@ -1396,9 +1436,39 @@ public:
                    r, juce::Justification::centredLeft, true);
     }
 
+    void mouseMove(const juce::MouseEvent& e) override
+    {
+        const int h = dismissArea.contains(e.getPosition()) ? 2 : offerArea.contains(e.getPosition()) ? 1 : 0;
+        setMouseCursor(h > 0 ? juce::MouseCursor::PointingHandCursor : juce::MouseCursor::NormalCursor);
+        if (h != hoverOffer)
+        {
+            hoverOffer = h;
+            repaint();
+        }
+    }
+    void mouseExit(const juce::MouseEvent&) override
+    {
+        if (hoverOffer != 0)
+        {
+            hoverOffer = 0;
+            repaint();
+        }
+    }
+    void mouseUp(const juce::MouseEvent& e) override
+    {
+        if (! view.isOfferingLessons())
+            return;
+        if (dismissArea.contains(e.getPosition()))
+            later(this, [this] { view.dismissLessonOffer(); });
+        else if (offerArea.contains(e.getPosition()))
+            later(this, [this] { view.openLessons(); });
+    }
+
 private:
     Model& model;
     MainView& view;
+    juce::Rectangle<int> offerArea, dismissArea;
+    int hoverOffer = 0;
     juce::String help, message, keysText;
     bool warn = false;
     double messageTime = 0.0;
@@ -1469,10 +1539,20 @@ void MainView::buildInterface()
     devices->onLoadSample = [this](int slot) { chooseSample(slot); };
     for (auto* comp : std::initializer_list<juce::Component*> { topBar.get(), browser.get(), terrain.get(), macros.get(), pads.get(), devices.get(), status.get() })
         addAndMakeVisible(comp);
+    topBar->setComponentID("topbar");
+    browser->setComponentID("browser");
+    terrain->setComponentID("terrain");
+    macros->setComponentID("performance");
+    pads->setComponentID("pads");
+    devices->setComponentID("devices");
+    status->setComponentID("status");
 }
 
 void MainView::teardownInterface()
 {
+    lessons.reset();
+    lessonTarget = nullptr;
+    lessonTargetName.clear();
     status.reset();
     devices.reset();
     pads.reset();
@@ -1487,9 +1567,15 @@ void MainView::rebuildInterface()
     const int page = devices->getPage();
     const int chain = devices->getEffectsChain();
     const bool projecting = projector != nullptr;
+    const bool lessonsOpen = lessons != nullptr;
     projector.reset();
     teardownInterface();
     buildInterface();
+    if (lessonsOpen)
+    {
+        lessons = std::make_unique<LessonPanel>(model, *this, false);
+        addAndMakeVisible(*lessons);
+    }
     if (page == DeviceView::Effects)
         devices->showEffectsFor(chain);
     else
@@ -1563,6 +1649,11 @@ void MainView::resized()
     topBar->setBounds(r.removeFromTop(kTopH));
     status->setBounds(r.removeFromBottom(kStatusH));
     r.reduce(metric::gap, metric::gap);
+    if (lessons != nullptr)
+    {
+        lessons->setBounds(r.removeFromRight(kLessonsW));
+        r.removeFromRight(metric::gap);
+    }
     const int deviceH = juce::jlimit(214, 300, getHeight() * 30 / 100);
     devices->setBounds(r.removeFromBottom(deviceH));
     r.removeFromBottom(metric::gap);
@@ -2002,6 +2093,14 @@ void MainView::showDropTarget(const DropTarget& target)
 
 void MainView::paintOverChildren(juce::Graphics& g)
 {
+    if (! lessonHighlight.isEmpty())
+    {
+        const auto r = lessonHighlight.toFloat().expanded(2.5f);
+        g.setColour(colour::accent().withAlpha(0.25f));
+        g.drawRoundedRectangle(r.expanded(1.5f), metric::radius + 1.5f, 3.0f);
+        g.setColour(colour::accent());
+        g.drawRoundedRectangle(r, metric::radius, 2.0f);
+    }
     if (dropHighlight.isEmpty())
         return;
     const auto r = dropHighlight.toFloat().reduced(1.5f);
@@ -2138,4 +2237,124 @@ bool MainView::performKey(const juce::KeyPress& key)
 void MainView::showAudioSettings() { openSettings(SettingsTab::Audio); }
 
 void MainView::openSettings(SettingsTab tab) { gui::openSettings(*this, model, tab); }
+
+void MainView::openLessons()
+{
+    dismissLessonOffer();
+    if (lessons != nullptr)
+        return;
+    lessons = std::make_unique<LessonPanel>(model, *this, true);
+    addAndMakeVisible(*lessons);
+    resized();
+}
+
+void MainView::closeLessons()
+{
+    lessons.reset();
+    lessonTarget = nullptr;
+    lessonTargetName.clear();
+    setLessonHighlight({});
+    resized();
+}
+
+void MainView::showLesson(int lesson, int page)
+{
+    openLessons();
+    lessons->show(lesson, page);
+}
+
+juce::String MainView::missingLessonTarget() const { return lessons != nullptr ? lessons->missingTarget() : juce::String(); }
+
+void MainView::offerLessons()
+{
+    auto& settings = core.host.getSettings();
+    if (settings.getBoolValue(kLessonsOfferedKey, false))
+        return;
+    settings.setValue(kLessonsOfferedKey, true);
+    settings.saveIfNeeded();
+    lessonOffer = true;
+    status->repaint();
+}
+
+void MainView::dismissLessonOffer()
+{
+    if (! lessonOffer)
+        return;
+    lessonOffer = false;
+    status->repaint();
+}
+
+void MainView::showLessonsFor(AppCore& core)
+{
+    for (auto* v : openViews)
+        if (&v->core == &core)
+            return v->openLessons();
+}
+
+juce::Rectangle<int> MainView::locateLessonTarget(const juce::String& target, bool reveal)
+{
+    if (target.startsWith("tab:"))
+    {
+        const int page = lessonPageIndex(target.substring(4));
+        return page >= 0 ? devices->tabBounds(page) + devices->getPosition() : juce::Rectangle<int>();
+    }
+    if (target != lessonTargetName || (lessonTarget == nullptr && ++lessonRetry % 15 == 0) || reveal)
+    {
+        lessonTargetName = target;
+        lessonTarget = nullptr;
+        std::optional<engine::ParamIndex> param;
+        if (target.startsWith("param:"))
+            param = core.engine.getRegistry().find(target.substring(6).toStdString());
+        const auto deviceTitle = target.startsWith("device:") ? target.substring(7) : juce::String();
+        std::function<juce::Component*(juce::Component&)> search = [&](juce::Component& c) -> juce::Component* {
+            for (auto* child : c.getChildren())
+            {
+                if (child == lessons.get() || ! child->isVisible())
+                    continue;
+                if (param.has_value())
+                {
+                    if (auto* control = dynamic_cast<ParamComponent*>(child); control != nullptr && engine::idx(control->getParam()) == *param)
+                        return child;
+                }
+                else if (deviceTitle.isNotEmpty())
+                {
+                    if (auto* device = dynamic_cast<Device*>(child); device != nullptr && device->getTitle() == deviceTitle)
+                        return child;
+                }
+                else if (child->getComponentID() == target)
+                    return child;
+                if (auto* found = search(*child))
+                    return found;
+            }
+            return nullptr;
+        };
+        if (! target.startsWith("param:") || param.has_value())
+            lessonTarget = search(*this);
+    }
+    auto* c = lessonTarget.getComponent();
+    if (c == nullptr || ! c->isShowing())
+        return {};
+    for (auto* p = c->getParentComponent(); reveal && p != nullptr && p != this; p = p->getParentComponent())
+        if (auto* vp = dynamic_cast<juce::Viewport*>(p); vp != nullptr && vp->getViewedComponent() != nullptr)
+        {
+            const auto inView = vp->getViewedComponent()->getLocalArea(c, c->getLocalBounds());
+            if (! vp->getViewArea().contains(inView))
+                vp->setViewPosition(std::max(0, inView.getX() - 12), std::max(0, inView.getY() - 12));
+            break;
+        }
+    auto area = getLocalArea(c, c->getLocalBounds());
+    for (auto* p = c->getParentComponent(); p != nullptr && p != this; p = p->getParentComponent())
+        if (dynamic_cast<juce::Viewport*>(p) != nullptr)
+            area = area.getIntersection(getLocalArea(p, p->getLocalBounds()));
+    return area;
+}
+
+void MainView::setLessonHighlight(juce::Rectangle<int> area)
+{
+    if (area == lessonHighlight)
+        return;
+    repaint(lessonHighlight.expanded(8));
+    lessonHighlight = area;
+    repaint(lessonHighlight.expanded(8));
+}
 }

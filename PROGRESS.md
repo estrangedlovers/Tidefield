@@ -472,8 +472,34 @@ Built so far, each with tests:
   window. Verified under Xvfb in dark and light themes; not yet tried with real
   Finder drags on macOS.
 
+**Built-in lessons**
+
+- Eight lessons (52 short pages) written from the manual, in `gui/Lessons.cpp` as data:
+  each page has a title, text, an optional device page to open, a highlight target
+  (`terrain`, `tab:Clouds`, `device:Motion`, `param:drone.cutoff`, `pad:Swell`,
+  `button:fade` and so on) and an optional wait (fade in, cursor moved, page shown,
+  parameter moved, scene captured, route or season added, take or timeline recording).
+  A page with a wait shows Your turn and moves on 1.4 s after it is done; Next and Back
+  always work. One page glides to a scene as a demo.
+- `LessonPanel` docks on the right of `MainView` (280 px, the rest of the layout
+  shrinks), with Back, Next, page x of y, page dots, All lessons and close. The
+  highlight is an accent outline drawn in `paintOverChildren`, tracked every display
+  frame and repainted only when its rectangle changes; targets are found by component
+  ID, `Device` title or `ParamComponent` parameter, cached, and scrolled into view in the
+  device row. The last lesson and page are kept in settings (`lesson`, `lessonPage`).
+- Opened from Help > Lessons, the session menu and Settings > About. The first launch
+  (settings flag `lessonsOffered`) shows "New to Tidefield? Open the lessons" in the
+  status bar, never a modal; not under `--ui-test` or `--self-test`. `--lesson=N.P`
+  opens a page (0 opens the list), for screenshots.
+- The self-test checks every page name, tab, parameter and target and that no page has
+  an em dash or runs long. `--ui-test` opens the list, steps through every page of every
+  lesson and fails if a highlight target is not on screen.
+- Pads shrink their title to fit when narrow (the panel made "Freeze all" and "Hold
+  input" truncate at 1440 px).
+- Verified under Xvfb in Slate, Midnight, Paper and Daylight. Not yet tried on macOS.
+
 Still to do for 1.4: controller templates and custom shortcuts, instrument plugins as
-sources and MIDI out from the Cycles, built-in lessons, signing and notarisation.
+sources and MIDI out from the Cycles, signing and notarisation.
 
 ### 1.3.0: a deeper instrument
 

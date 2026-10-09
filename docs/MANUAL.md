@@ -110,6 +110,28 @@ glass loaded into the sampler sources. Everything is silent until you fade in.
 
 Hover over anything and the status bar at the bottom says what it does.
 
+### Lessons
+
+Tidefield has eight short lessons built in, a few pages each:
+
+1. First sound: fading in, the terrain and scenes.
+2. The drone: waves, chords, the filter, movement and presets.
+3. Clouds and the Browser: loading sounds, Places and drag and drop.
+4. Performing: the gestures, Shape, Freeze, Cycles, Catch and takes.
+5. Effects and macros.
+6. Modulation and seasons.
+7. Recording, the timeline and rendering.
+8. Saving, autosave and installation mode.
+
+Open them from **Help > Lessons**, the session menu or **Settings > About**. They sit in
+a panel on the right of the window, so the terrain stays in view and you can play while
+you read. Each page opens the device tab it talks about and outlines the control in
+the theme's highlight colour. Pages marked **Your turn** move on by themselves once you
+have done what they ask (fading in, moving the cursor, turning a knob); **Next** and
+**Back** are always there, and **All lessons** lists every lesson. Tidefield remembers
+where you stopped. The first time Tidefield opens, the status bar offers the lessons;
+click **Not now** to put the offer away.
+
 ---
 
 ## 3. The window
@@ -149,7 +171,7 @@ controller in the direction of the arrow until it picks up.
 
 **The top bar.**
 
-- **Session name**: New, Open, Save, Save as, the projector window, Settings and Appearance.
+- **Session name**: New, Open, Save, Save as, the projector window, Settings, Lessons and Appearance.
 - **Fade in / Fade out**: the same as Space.
 - **Panic**: silence now. See [Safety](#safety).
 - **Rec**: record to disk. Right-click for stems and the recordings folder.
@@ -1015,7 +1037,7 @@ in the menu bar. The window has a tab for each area:
 | Plug-ins | which formats to use (VST3, Audio Units), whether to scan the standard folders, extra folders to scan, Rescan, Rescan everything, and plug-ins that crashed while being scanned, with Retry |
 | Files and Startup | the recordings folder, the presets folder, whether Tidefield opens the starter session or the last session, the recent list, autosave, and installation mode |
 | Record and Render | whether recordings include stems, and the sample rate for timeline renders and loops |
-| About | the version, the manual and the settings file |
+| About | the version, the lessons, the manual and the settings file |
 
 Settings are kept between launches.
 
@@ -1028,7 +1050,7 @@ On macOS the menu bar at the top of the screen works like any other app's:
 - **Edit**: undo and redo (naming what they will undo), capture a scene, release held controls.
 - **View**: jump to any device tab, pick a theme, zoom, the projector window and full screen.
 - **Play**: fade, panic, glide to any scene, the computer keyboard, take, Catch, Freeze all, the tape loop, Cycles and path drawing.
-- **Help**: the manual and the keyboard shortcuts.
+- **Help**: the lessons, the manual and the keyboard shortcuts.
 
 ### Themes
 

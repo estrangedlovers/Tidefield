@@ -112,7 +112,7 @@ Hover over anything and the status bar at the bottom says what it does.
 
 ### Lessons
 
-Tidefield has eight short lessons built in, a few pages each:
+Tidefield has ten short lessons built in, a few pages each:
 
 1. First sound: fading in, the terrain and scenes.
 2. The drone: waves, chords, the filter, movement and presets.
@@ -120,8 +120,12 @@ Tidefield has eight short lessons built in, a few pages each:
 4. Performing: the gestures, Shape, Freeze, Cycles, Catch and takes.
 5. Effects and macros.
 6. Modulation and seasons.
-7. Recording, the timeline and rendering.
-8. Saving, autosave and installation mode.
+7. The Guest and MIDI out: loading an instrument plugin, Play From, Transpose, Choose
+   controls, Note Length and sending the Cycles over MIDI. It reads the same whether or
+   not you have an instrument plugin installed.
+8. Recording, the timeline and rendering.
+9. Controllers and shortcuts: MIDI learn, controller templates and your own keys.
+10. Saving, autosave and installation mode.
 
 Open them from **Help > Lessons**, the session menu or **Settings > About**. They sit in
 a panel on the right of the window, so the terrain stays in view and you can play while
@@ -131,6 +135,18 @@ have done what they ask (fading in, moving the cursor, turning a knob); **Next**
 **Back** are always there, and **All lessons** lists every lesson. Tidefield remembers
 where you stopped. The first time Tidefield opens, the status bar offers the lessons;
 click **Not now** to put the offer away.
+
+The lessons always name the keys you have set in **Settings > Keys**. Change the fade key
+and the first lesson tells you to press the new one; clear a key and the lesson says it is
+unassigned.
+
+**What's new.** The first time a new version of Tidefield opens, the status bar says so
+and offers **See what's new** instead of the lessons offer (never both, and never a
+dialog). It opens a short tour of the 1.4 additions in the same panel, one page each:
+macros, the Guest, the Cycles' MIDI out, Places in the Browser, controller templates,
+your own keys, the lessons and autosave, each outlining where to find it. Open it again
+from **Help > What's New in Tidefield**, **Settings > About** or the bottom row of
+**All lessons**.
 
 ---
 
@@ -1118,7 +1134,7 @@ in the menu bar. The window has a tab for each area:
 | Plug-ins | which formats to use (VST3, Audio Units), whether to scan the standard folders, extra folders to scan, Rescan, Rescan everything, and plug-ins that crashed while being scanned, with Retry |
 | Files and Startup | the recordings folder, the presets folder, whether Tidefield opens the starter session or the last session, the recent list, autosave, and installation mode |
 | Record and Render | whether recordings include stems, and the sample rate for timeline renders and loops |
-| About | the version, the lessons, the manual and the settings file |
+| About | the version, the lessons, what's new, the manual and the settings file |
 
 Settings are kept between launches.
 
@@ -1131,7 +1147,7 @@ On macOS the menu bar at the top of the screen works like any other app's:
 - **Edit**: undo and redo (naming what they will undo), capture a scene, release held controls.
 - **View**: jump to any device tab, pick a theme, zoom, the projector window and full screen.
 - **Play**: fade, panic, glide to any scene, the computer keyboard, take, Catch, Freeze all, the tape loop, Cycles and path drawing.
-- **Help**: the lessons, the manual and the keyboard shortcuts (Settings > Keys).
+- **Help**: the lessons, What's New in Tidefield, the manual and the keyboard shortcuts (Settings > Keys).
 
 The menus always show the shortcuts you have set.
 

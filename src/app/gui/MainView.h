@@ -66,11 +66,14 @@ public:
     void closeLessons();
     bool areLessonsOpen() const noexcept { return lessons != nullptr; }
     void showLesson(int lesson, int page);
+    void showWhatsNew(int page = 0);
     juce::String missingLessonTarget() const;
-    void offerLessons();
+    enum class Offer { None, Lessons, WhatsNew };
+    void offerLessons(bool firstLaunch);
     void dismissLessonOffer();
-    bool isOfferingLessons() const noexcept { return lessonOffer; }
+    Offer getOffer() const noexcept { return lessonOffer; }
     static void showLessonsFor(AppCore& core);
+    static void showWhatsNewFor(AppCore& core);
     juce::Rectangle<int> locateLessonTarget(const juce::String& target, bool reveal);
     void setLessonHighlight(juce::Rectangle<int> area);
 
@@ -139,6 +142,6 @@ private:
     juce::Component::SafePointer<juce::Component> lessonTarget;
     juce::String lessonTargetName;
     int lessonRetry = 0;
-    bool lessonOffer = false;
+    Offer lessonOffer = Offer::None;
 };
 }

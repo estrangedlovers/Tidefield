@@ -55,8 +55,13 @@ struct Lesson
 };
 
 std::span<const Lesson> lessons();
+const Lesson& whatsNew();
+inline constexpr const char* kWhatsNewVersion = "1.4";
 int lessonPageIndex(const juce::String& name);
+juce::String lessonText(const char* text, const KeyBindings& keys);
 juce::StringArray lessonProblems(const engine::ParamRegistry& registry);
+bool isNewerVersion(const juce::String& version, const juce::String& than);
+bool shouldOfferWhatsNew(const juce::String& lastSeen, const juce::String& running);
 
 struct LessonPosition
 {
@@ -72,6 +77,9 @@ public:
     ~LessonPanel() override;
 
     void show(int lesson, int page);
+    void showWhatsNew(int page);
+    void restoreWhatsNew(int page);
+    bool isShowingWhatsNew() const noexcept { return news; }
     LessonPosition getPosition() const noexcept { return { lesson, page }; }
     juce::String missingTarget() const;
 
@@ -83,6 +91,7 @@ public:
     void mouseUp(const juce::MouseEvent& e) override;
 
 private:
+    const Lesson& currentLesson() const;
     const LessonPage& current() const;
     int pageCount() const;
     void enter();
@@ -95,7 +104,8 @@ private:
     Model& model;
     MainView& view;
     int lesson = 0, page = 0;
-    bool indexShown = false, done = false;
+    bool indexShown = false, done = false, news = false;
+    int shownKeys = -1;
     double doneAt = 0.0;
     float baseValue = 0.0f;
     float baseX = 0.0f, baseY = 0.0f;

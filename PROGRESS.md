@@ -474,7 +474,7 @@ Built so far, each with tests:
 
 **Built-in lessons**
 
-- Eight lessons (52 short pages) written from the manual, in `gui/Lessons.cpp` as data:
+- Eight lessons (52 short pages, now ten and 64) written from the manual, in `gui/Lessons.cpp` as data:
   each page has a title, text, an optional device page to open, a highlight target
   (`terrain`, `tab:Clouds`, `device:Motion`, `param:drone.cutoff`, `pad:Swell`,
   `button:fade` and so on) and an optional wait (fade in, cursor moved, page shown,
@@ -497,6 +497,30 @@ Built so far, each with tests:
 - Pads shrink their title to fit when narrow (the panel made "Freeze all" and "Hold
   input" truncate at 1440 px).
 - Verified under Xvfb in Slate, Midnight, Paper and Daylight. Not yet tried on macOS.
+- **Lessons follow the user's keys.** Lesson text names rebindable keys as placeholders
+  (`{key:fade}`, the `KeyActionInfo` id) resolved at display time through
+  `KeyBindings::text`, so a rebound key shows the new chord (Cmd or Ctrl by platform) and a
+  cleared one reads "the Fade in or out key (unassigned)". The panel re-lays out when
+  the bindings change. Tab, the arrows and 1 to 9 stay literal. The self-test fails a
+  placeholder that names no action and any page that writes a key out (a lone capital
+  letter, Esc, "press Space", Cmd+/Ctrl+/Shift+), and checks a rebound and a cleared key.
+- **Two more lessons** (ten, 64 pages): "The Guest and MIDI out" (loading an instrument,
+  Play From, Transpose, Choose controls, a missing instrument, Note Length, MIDI out;
+  written to read the same with no plugin installed; the Guest device has component ID
+  `guest` because its title becomes the plugin's name) and "Controllers and shortcuts"
+  (MIDI learn, templates, suggestions, Settings > Keys, keys following you). They sit
+  before Saving, which ends the course.
+- **What's new in 1.4**: a nine-page tour in the same panel (macros, the Guest, Cycles MIDI
+  out, Places, controller templates, keys, lessons, autosave), each page outlining its
+  tab or button. Settings key `lastSeenVersion`; on launch `MainView::offerLessons`
+  offers the lessons on a first-ever launch (no settings file yet) and otherwise "See
+  what's new" in the status bar when `shouldOfferWhatsNew(lastSeen, TIDEFIELD_VERSION)`
+  (no version seen yet, or one older than both the running version and 1.4). Never both,
+  never modal, not under `--ui-test` or `--self-test`. Also Help > What's New in
+  Tidefield, Settings > About and a row under All lessons. It does not move the saved
+  lesson position, survives a theme change, and `--lesson=new.P` opens a page.
+  `--ui-test` steps through it too (73 pages). The project version is still 1.3.0, so
+  this build offers it to anyone who has not run it yet.
 
 **Controller templates and custom shortcuts**
 

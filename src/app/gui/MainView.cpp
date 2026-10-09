@@ -28,6 +28,7 @@ constexpr int kMacroW = 244;
 constexpr int kPadsH = 78;
 constexpr int kLessonsW = 280;
 constexpr const char* kLessonsOfferedKey = "lessonsOffered";
+constexpr const char* kLastSeenVersionKey = "lastSeenVersion";
 std::vector<MainView*> openViews;
 constexpr const char* kThemeKey = "theme";
 constexpr int kThemeMenuBase = 100;
@@ -1429,10 +1430,12 @@ public:
         auto r = getLocalBounds().reduced(10, 0).toFloat();
         offerArea = {};
         dismissArea = {};
-        if (view.isOfferingLessons())
+        if (view.getOffer() != MainView::Offer::None)
         {
             const auto plain = font(11.5f, 500), strong = font(11.5f, 600);
-            const juce::String ask = "New to Tidefield?", open = "Open the lessons", notNow = "Not now";
+            const bool news = view.getOffer() == MainView::Offer::WhatsNew;
+            const juce::String ask = news ? "Tidefield " + juce::String(kWhatsNewVersion) + " is here." : juce::String("New to Tidefield?");
+            const juce::String open = news ? "See what's new" : "Open the lessons", notNow = "Not now";
             const float askW = static_cast<float>(juce::GlyphArrangement::getStringWidthInt(plain, ask));
             const float openW = static_cast<float>(juce::GlyphArrangement::getStringWidthInt(strong, open)) + 20.0f;
             const float notNowW = static_cast<float>(juce::GlyphArrangement::getStringWidthInt(plain, notNow)) + 16.0f;
@@ -1491,12 +1494,12 @@ public:
     }
     void mouseUp(const juce::MouseEvent& e) override
     {
-        if (! view.isOfferingLessons())
+        if (view.getOffer() == MainView::Offer::None)
             return;
         if (dismissArea.contains(e.getPosition()))
             later(this, [this] { view.dismissLessonOffer(); });
         else if (offerArea.contains(e.getPosition()))
-            later(this, [this] { view.openLessons(); });
+            later(this, [this] { view.getOffer() == MainView::Offer::WhatsNew ? view.showWhatsNew() : view.openLessons(); });
     }
 
 private:
@@ -1605,12 +1608,16 @@ void MainView::rebuildInterface()
     const int chain = devices->getEffectsChain();
     const bool projecting = projector != nullptr;
     const bool lessonsOpen = lessons != nullptr;
+    const bool newsOpen = lessonsOpen && lessons->isShowingWhatsNew();
+    const int newsPage = lessonsOpen ? lessons->getPosition().page : 0;
     projector.reset();
     teardownInterface();
     buildInterface();
     if (lessonsOpen)
     {
         lessons = std::make_unique<LessonPanel>(model, *this, false);
+        if (newsOpen)
+            lessons->restoreWhatsNew(newsPage);
         addAndMakeVisible(*lessons);
     }
     if (page == DeviceView::Effects)
@@ -2306,24 +2313,36 @@ void MainView::showLesson(int lesson, int page)
     lessons->show(lesson, page);
 }
 
+void MainView::showWhatsNew(int page)
+{
+    openLessons();
+    lessons->showWhatsNew(page);
+}
+
 juce::String MainView::missingLessonTarget() const { return lessons != nullptr ? lessons->missingTarget() : juce::String(); }
 
-void MainView::offerLessons()
+void MainView::offerLessons(bool firstLaunch)
 {
     auto& settings = core.host.getSettings();
-    if (settings.getBoolValue(kLessonsOfferedKey, false))
-        return;
+    const auto lastSeen = settings.getValue(kLastSeenVersionKey);
+    const bool lessonsOffered = settings.getBoolValue(kLessonsOfferedKey, false);
+    settings.setValue(kLastSeenVersionKey, TIDEFIELD_VERSION);
     settings.setValue(kLessonsOfferedKey, true);
     settings.saveIfNeeded();
-    lessonOffer = true;
+    if (firstLaunch)
+        lessonOffer = Offer::Lessons;
+    else if (shouldOfferWhatsNew(lastSeen, TIDEFIELD_VERSION))
+        lessonOffer = Offer::WhatsNew;
+    else if (! lessonsOffered)
+        lessonOffer = Offer::Lessons;
     status->repaint();
 }
 
 void MainView::dismissLessonOffer()
 {
-    if (! lessonOffer)
+    if (lessonOffer == Offer::None)
         return;
-    lessonOffer = false;
+    lessonOffer = Offer::None;
     status->repaint();
 }
 
@@ -2332,6 +2351,13 @@ void MainView::showLessonsFor(AppCore& core)
     for (auto* v : openViews)
         if (&v->core == &core)
             return v->openLessons();
+}
+
+void MainView::showWhatsNewFor(AppCore& core)
+{
+    for (auto* v : openViews)
+        if (&v->core == &core)
+            return v->showWhatsNew();
 }
 
 juce::Rectangle<int> MainView::locateLessonTarget(const juce::String& target, bool reveal)

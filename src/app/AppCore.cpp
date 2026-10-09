@@ -10,9 +10,9 @@
 
 namespace tf::app {
 AppCore::AppCore(Host& h)
-    : host(h), engine(h.getEngine()), scenes(h.getEngine()), fx(h.getEngine()), catcher(h.getEngine()), midi(h.getEngine()), seasons(h.getEngine()), paths(h.getEngine()), gestures(h.getEngine()), mod(h.getEngine()),
+    : host(h), engine(h.getEngine()), scenes(h.getEngine()), fx(h.getEngine()), guest(h.getEngine()), catcher(h.getEngine()), midi(h.getEngine()), seasons(h.getEngine()), paths(h.getEngine()), gestures(h.getEngine()), mod(h.getEngine()),
       controllers(h.getSettings().getFile().getSiblingFile("Controller templates"), h.getEngine().getRegistry()),
-      session(h.getEngine(), scenes, fx, &midi, &seasons, &paths, &gestures, &mod), recorder(h.getEngine().getRecordTap())
+      session(h.getEngine(), scenes, fx, &midi, &seasons, &paths, &gestures, &mod, &guest), recorder(h.getEngine().getRecordTap())
 {
     engine.setGuardrailsEnabled(true);
     session.setWorkers(&workers);
@@ -21,6 +21,8 @@ AppCore::AppCore(Host& h)
         lastFrame.paramTargets[i] = registry.spec(i).defaultValue;
     session.onApplied = [this](const io::SessionData& s) {
         seedTargets(s);
+        if (cycleOut != nullptr)
+            cycleOut->allNotesOff();
         if (auto p = io::performanceFromSession(s, engine.getRegistry()))
             performance.load(std::move(*p));
         else
@@ -78,7 +80,9 @@ AppCore::AppCore(Host& h)
         plugins = std::make_unique<PluginHost>(host.getSettings(), host.getSettings().getFile().getSiblingFile("PluginScanCrashes.txt"));
         plugins->onStatus = [this](const juce::String& m, bool warning) { status(m, warning); };
         fx.setExternal(plugins.get());
+        guest.setExternal(plugins.get());
         clockOut = std::make_unique<MidiClockOut>(host.getSettings());
+        cycleOut = std::make_unique<CycleMidiOut>(engine, host.getSettings(), host.getBlockClock());
         if (auto* link = host.getLink(); link != nullptr && LinkSync::isAvailable())
             link->setEnabled(host.getSettings().getBoolValue("link", false));
         osc = std::make_unique<OscRemote>(*this, host.getSettings());
@@ -107,7 +111,9 @@ AppCore::~AppCore()
     recovery.reset();
     osc.reset();
     clockOut.reset();
+    cycleOut.reset();
     fx.setExternal(nullptr);
+    guest.setExternal(nullptr);
     recorder.onFinished = nullptr;
     saveRigMidi();
 }
@@ -414,11 +420,27 @@ void AppCore::setEffect(int slot, const std::string& type)
     }));
 }
 
+void AppCore::setInstrument(const std::string& type)
+{
+    struct GuestState
+    {
+        std::string type, state, name;
+    };
+    GuestState before { guest.getType(), guest.getState(), guest.getName() };
+    guest.setType(type);
+    undo.beginNewTransaction("Instrument");
+    lastUndoParam = engine::kNumParams;
+    undo.perform(new SnapshotAction<GuestState>(std::move(before), GuestState { type, {}, {} }, [this](const GuestState& s) {
+        guest.setType(s.type, false, s.state, s.name);
+    }));
+}
+
 void AppCore::timerCallback()
 {
     session.tick();
     scenes.tick();
     fx.tick();
+    guest.tick();
     midi.tick();
     seasons.tick();
     paths.tick();

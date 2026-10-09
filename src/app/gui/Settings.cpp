@@ -888,6 +888,12 @@ std::unique_ptr<FormPage> midiPage(Model& model)
     page->row("Follow", std::make_unique<ChoiceRow>(juce::StringArray { "Internal tempo", "MIDI clock" },
                                                     juce::roundToInt(model.value(engine::P::SyncSource)),
                                                     [&model](int i) { model.set(engine::P::SyncSource, static_cast<float>(i)); }));
+    if (core.cycleOut != nullptr)
+    {
+        page->header("Cycles MIDI out");
+        page->row("Send to", createCyclesOutView(model), 50);
+        page->note("Turn on MIDI Out and choose the channel on the Cycles page. Held notes are released when the Cycles stop, on panic and when a session opens.", 20);
+    }
     page->header("Sync and remote control");
     page->full(createRemoteView(model), 230);
     if (! LinkSync::isAvailable())
@@ -957,13 +963,13 @@ std::unique_ptr<FormPage> pluginsPage(AppCore& core)
     if (host == nullptr)
     {
         page->header("Plug-ins");
-        page->note("Hosting other plug-ins is part of the standalone app. Inside a DAW, use the DAW's own effects.");
+        page->note("Hosting other plug-ins is part of the standalone app. Inside a DAW, use the DAW's own effects and instruments.");
         return page;
     }
     page->header("Formats");
     for (const auto& format : host->formatNames())
         page->row(format == "AudioUnit" ? juce::String("Audio Units") : format,
-                  toggle("Use " + (format == "AudioUnit" ? juce::String("Audio Units") : format) + " effects", host->isFormatEnabled(format),
+                  toggle("Use " + (format == "AudioUnit" ? juce::String("Audio Units") : format) + " effects and instruments", host->isFormatEnabled(format),
                          [host, format](bool on) { host->setFormatEnabled(format, on); }));
     page->header("Folders");
     page->row("Standard folders", toggle("Scan the system plug-in folders", host->usesSystemFolders(), [host](bool on) { host->setUseSystemFolders(on); }));
@@ -975,7 +981,7 @@ std::unique_ptr<FormPage> pluginsPage(AppCore& core)
                       return "Scanning... " + juce::String(juce::roundToInt(host->scanProgress() * 100.0f)) + "%";
                   if (! host->hasScanned())
                       return juce::String("Not scanned yet");
-                  return juce::String(host->numEffects()) + " effect plug-ins available";
+                  return juce::String(host->numEffects()) + " effects and " + juce::String(host->numInstruments()) + " instruments available";
               }));
     page->row("Rescan", button("Rescan for new plug-ins", [host] { host->startScan(); }));
     page->row("Rescan all", button("Forget the list and rescan everything", [host] { host->clearAndRescan(); }));

@@ -21,6 +21,7 @@ class GestureManager;
 class SceneManager;
 class SeasonManager;
 class ModRouteManager;
+class GuestManager;
 }
 
 namespace tf::io {
@@ -42,6 +43,11 @@ struct SessionData
     std::vector<std::string> pins;
     std::map<std::string, std::string> fx;
     std::map<std::string, std::string> fxState;
+    struct GuestData
+    {
+        std::string type, name, state;
+    };
+    GuestData guest;
     juce::var midi;
     juce::var seasons;
     juce::var modRoutes;
@@ -58,12 +64,14 @@ struct SessionData
 SessionData captureSession(const engine::Engine& engine, const engine::TelemetryFrame& latest, const engine::SceneManager& scenes,
                            const engine::FxManager& fx, const engine::MidiManager* midi = nullptr,
                            const engine::SeasonManager* seasons = nullptr, const engine::PathManager* path = nullptr,
-                           const engine::GestureManager* gestures = nullptr, const engine::ModRouteManager* mod = nullptr);
+                           const engine::GestureManager* gestures = nullptr, const engine::ModRouteManager* mod = nullptr,
+                           const engine::GuestManager* guest = nullptr);
 
 std::vector<std::string> applySession(const SessionData& session, engine::Engine& engine, engine::SceneManager& scenes,
                                       engine::FxManager& fx, bool snap, engine::MidiManager* midi = nullptr,
                                       engine::SeasonManager* seasons = nullptr, engine::PathManager* path = nullptr,
-                                      engine::GestureManager* gestures = nullptr, engine::ModRouteManager* mod = nullptr);
+                                      engine::GestureManager* gestures = nullptr, engine::ModRouteManager* mod = nullptr,
+                                      engine::GuestManager* guest = nullptr);
 
 juce::var midiToJson(const engine::MidiManager& midi, const engine::ParamRegistry& registry);
 std::vector<std::string> applyMidiJson(const juce::var& json, engine::MidiManager& midi, const engine::ParamRegistry& registry);

@@ -5,6 +5,7 @@
 namespace tf::app {
 namespace {
 constexpr const char* kClockKey = "clockOut";
+constexpr const char* kCycleOutKey = "cyclesMidiOut";
 constexpr const char* kOscInKey = "oscReceivePort";
 constexpr const char* kOscOutKey = "oscSendTarget";
 }
@@ -68,6 +69,122 @@ void MidiClockOut::hiResTimerCallback()
     {
         output->sendMessageNow(juce::MidiMessage::midiClock());
         nextTick += period;
+    }
+}
+
+CycleMidiOut::CycleMidiOut(engine::Engine& e, juce::PropertiesFile& s, const BlockClock* c) : engine(e), settings(s), clock(c)
+{
+    deviceId = settings.getValue(kCycleOutKey);
+    if (deviceId.isNotEmpty())
+        output = juce::MidiOutput::openDevice(deviceId);
+    startTimer(1);
+}
+
+CycleMidiOut::~CycleMidiOut()
+{
+    stopTimer();
+    sendAllOff();
+}
+
+void CycleMidiOut::setDevice(const juce::String& identifier)
+{
+    stopTimer();
+    sendAllOff();
+    output.reset();
+    deviceId = identifier;
+    settings.setValue(kCycleOutKey, deviceId);
+    if (deviceId.isNotEmpty())
+        output = juce::MidiOutput::openDevice(deviceId);
+    startTimer(1);
+}
+
+double CycleMidiOut::dueTime(const engine::MidiOutEvent& e, double now) const
+{
+    BlockClock::Reading r;
+    if (clock == nullptr || ! clock->read(r))
+        return now;
+    const double offset = (static_cast<double>(e.sampleTime) - static_cast<double>(r.sampleTime)) * 1000.0 / r.sampleRate;
+    const double due = r.ms + offset + r.blockMs;
+    return due < now || due > now + 250.0 ? now : due;
+}
+
+void CycleMidiOut::send(const Scheduled& s)
+{
+    const int type = s.status & 0xf0, ch = s.status & 0x0f;
+    auto& held = sounding[static_cast<std::size_t>(ch)][s.data1 & 127];
+    if (type == 0x90 && s.data2 > 0)
+    {
+        if (held > 0 && output != nullptr)
+            output->sendMessageNow(juce::MidiMessage::noteOff(ch + 1, s.data1 & 127));
+        if (held == 0)
+            soundingCount.fetch_add(1, std::memory_order_relaxed);
+        held = 1;
+    }
+    else if (type == 0x80 || type == 0x90)
+    {
+        if (held == 0)
+            return;
+        held = 0;
+        soundingCount.fetch_sub(1, std::memory_order_relaxed);
+    }
+    else if (type == 0xb0 && s.data1 == 123)
+    {
+        for (auto& n : sounding[static_cast<std::size_t>(ch)])
+            if (n != 0)
+            {
+                n = 0;
+                soundingCount.fetch_sub(1, std::memory_order_relaxed);
+            }
+    }
+    if (output != nullptr)
+        output->sendMessageNow(juce::MidiMessage(s.status, s.data1, s.data2));
+}
+
+void CycleMidiOut::sendAllOff()
+{
+    count = 0;
+    for (int ch = 0; ch < 16; ++ch)
+    {
+        bool any = false;
+        for (int n = 0; n < 128; ++n)
+            if (sounding[static_cast<std::size_t>(ch)][static_cast<std::size_t>(n)] != 0)
+            {
+                any = true;
+                if (output != nullptr)
+                    output->sendMessageNow(juce::MidiMessage::noteOff(ch + 1, n));
+            }
+        if (any && output != nullptr)
+            output->sendMessageNow(juce::MidiMessage::allNotesOff(ch + 1));
+        sounding[static_cast<std::size_t>(ch)].fill(0);
+    }
+    soundingCount.store(0, std::memory_order_relaxed);
+}
+
+void CycleMidiOut::hiResTimerCallback()
+{
+    const double now = juce::Time::getMillisecondCounterHiRes();
+    if (wantAllOff.exchange(false, std::memory_order_acq_rel))
+    {
+        engine::MidiOutEvent e;
+        while (engine.popMidiOut(e)) {}
+        sendAllOff();
+    }
+    engine::MidiOutEvent e;
+    while (count < kMaxScheduled && engine.popMidiOut(e))
+    {
+        if (output == nullptr)
+            continue;
+        scheduled[static_cast<std::size_t>((head + count) % kMaxScheduled)] = { dueTime(e, now), e.status, e.data1, e.data2 };
+        ++count;
+    }
+    while (count > 0)
+    {
+        const auto& next = scheduled[static_cast<std::size_t>(head)];
+        if (next.due > now)
+            break;
+        send(next);
+        head = (head + 1) % kMaxScheduled;
+        --count;
     }
 }
 

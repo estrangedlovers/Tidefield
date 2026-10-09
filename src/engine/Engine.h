@@ -5,6 +5,7 @@
 #include "control/SpscQueue.h"
 #include "control/Telemetry.h"
 #include "guard/DegradationPolicy.h"
+#include "guest/InstrumentSlot.h"
 #include "master/MasterChain.h"
 #include "mix/ChannelStrip.h"
 #include "mix/FxSlot.h"
@@ -52,6 +53,10 @@ public:
     static constexpr int kControlInterval = 32;
     static constexpr int kTerrainDecimation = 4;
     static constexpr float kCloudSwapSeconds = 0.03f;
+    static constexpr int kGuestBlock = 128;
+    static constexpr int kMaxGuestEvents = 256;
+    static constexpr int kMaxGuestPending = 512;
+    enum GuestFrom : int { kFromBloomNotes, kFromMidi, kFromCycles, kFromAll };
 
     struct Config
     {
@@ -123,6 +128,12 @@ public:
 
     bool sendProcessor(int slot, dsp::ProcessorPtr processor);
     int collectProcessors(int slot);
+
+    bool sendInstrument(InstrumentPtr instrument) { return guestSlot.send(std::move(instrument)); }
+    int collectInstruments() { return guestSlot.collect(); }
+    dsp::ProcessSpec getGuestSpec() const noexcept { return { sampleRate, kGuestBlock }; }
+    int getGuestLatencySamples() const noexcept { return kGuestBlock; }
+    bool popMidiOut(MidiOutEvent& out) noexcept { return midiOut.pop(out); }
 
     void collectGarbage();
 
@@ -273,6 +284,40 @@ private:
     dsp::Disintegrator looper;
     dsp::WeatherBed weather;
     dsp::SpectralFreeze inputFreeze;
+
+    struct PendingGuestEvent
+    {
+        std::uint64_t time = 0;
+        GuestEvent event;
+    };
+    struct CycleHold
+    {
+        int guestNote = -1;
+        int midiNote = -1;
+        int midiChannel = -1;
+        float remaining = 0.0f;
+    };
+    InstrumentSlot guestSlot;
+    std::array<PendingGuestEvent, kMaxGuestPending> guestPending {};
+    int guestPendingCount = 0;
+    std::array<GuestEvent, kMaxGuestEvents> guestEvents {};
+    std::array<float, kGuestBlock> guestOutL {}, guestOutR {}, guestAltL {}, guestAltR {};
+    std::array<std::array<std::uint8_t, 128>, 16> guestKeys {};
+    std::array<CycleHold, 8> cycleHolds {};
+    std::array<std::uint16_t, 16> midiOutHeld {};
+    int guestFrom = kFromBloomNotes;
+    int cycleMidiMode = -1;
+    bool cycleMidiOn = false;
+    SpscQueue<MidiOutEvent> midiOut { 1024 };
+    bool guestPlays(int from) const noexcept { return guestFrom == kFromAll || guestFrom == from || (from == kFromMidi && guestFrom == kFromBloomNotes); }
+    void pushGuest(std::uint8_t status, std::uint8_t data1, std::uint8_t data2) noexcept;
+    void guestKey(int channel, int note, float velocity) noexcept;
+    void guestKeyOff(int note) noexcept { guestKey(0, note, 0.0f); }
+    void releaseGuestKeys() noexcept;
+    void releaseCycleNotes(bool guest, bool midi) noexcept;
+    void pushMidiOut(std::uint8_t status, std::uint8_t data1, std::uint8_t data2) noexcept;
+    void renderGuest() noexcept;
+    void updateGuest() noexcept;
 
     static constexpr double kFreezeRingSeconds = 3.0;
     static constexpr double kFreezeSeconds = 2.0;

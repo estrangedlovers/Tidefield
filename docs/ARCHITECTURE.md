@@ -128,6 +128,7 @@ All voice/grain pools are allocated in `prepare()` with hard caps.
 | Resonator bank | 3 | modal resonators excited by noise, live input or other sources; tuned by harmony |
 | Live input | 3 | gain, gate, freeze-to-cloud, muted to master until armed |
 | **Bloom keyboard** (one-shot transformer) | 4 | see section 9 |
+| **Guest** (a hosted instrument plugin) | 1.4 | see section 16 |
 
 Slots never change the graph shape at runtime; the UI just sees slots become active.
 
@@ -298,7 +299,7 @@ colour per scene: top bar (session, fade, panic, record, auto master, keys, CPU,
 meter), browser (scenes with live weights, factory and disk sounds), the terrain,
 the performance panel (Tide, Wander, Gravity, Glide, key, scale, wander style,
 recording type), performance pads, a tabbed device panel (Drone, Clouds, Resonator,
-Bloom, Input, Looper, Weather, Gestures, Loops, Seasons, Mixer, Effects, Master,
+Bloom, Input, Looper, Weather, Guest, Gestures, Loops, Seasons, Mixer, Effects, Master,
 MIDI) and a status bar that explains whatever is under the mouse. `MainView` owns the
 keyboard: standalone, every key is consumed so macOS never beeps; holds (S, H, T)
 release on key-up, focus loss or the app going to the background; M turns the letter
@@ -389,7 +390,62 @@ outputs plays stereo.
 transitions, keep-awake, reopening a lost device every ten seconds, resuming ten
 seconds after a panic, and a plain-text log. None of it touches the audio thread.
 
-## 16. Extension points for later features
+## 16. Version 1.4 systems
+
+**Guest: a hosted instrument plugin.** The engine holds an `engine::Instrument`
+(`engine/guest/Instrument.h`): `prepare`, `reset`, `setControls` (six smoothed knob
+values) and `process(events, numEvents, left, right, numSamples)`, where each
+`GuestEvent` is a raw three-byte MIDI message with a sample offset. It knows nothing of
+JUCE; the app's `PluginHost` implements `ExternalInstruments` and wraps an
+`AudioPluginInstance` in a `HostedInstrument` (stereo or mono out, inputs disabled, MIDI
+built into a `MidiBuffer` reserved in `prepare`). `HostedInstrument` and
+`HostedPluginEffect` share `HostedPlugin`, so the knob remap (`Choose controls`), the
+editor window and the `map=a,b,c,d,e,f;<base64>` state work the same; the Guest uses host
+slot `PluginHost::kGuestSlot`, one past the effect slots.
+
+`GuestManager` (message thread) creates the instrument through the provider and hands it
+to the audio thread through `InstrumentSlot`, an `FxSlot`-style pair of SPSC queues:
+the new one fades in over 50 ms while the old one gets All Notes Off on every channel,
+fades out and goes back to the message thread to be deleted. A type the provider cannot
+create (not installed, not scanned, or the Tidefield plugin build, which has no
+provider) leaves the Guest silent but keeps the type, name and state, so saving keeps
+them. Sessions store them under `guest` (`type`, `name`, `state`); a session without the
+field has no Guest.
+
+Notes reach the Guest without allocation. Keyboard and gesture notes (`applyEvent`),
+MIDI notes, bends, pressure and unmapped controllers (`handleMidi`, channel kept) and the
+Cycles push into a fixed array of pending events stamped with the absolute sample time;
+`guest.playFrom` decides which sources pass. A table of sounding notes per channel maps
+each held key to the transposed note it started, so a note-off always finds its note
+when Transpose moves, and lets Play From changes, panics and instrument swaps release
+everything. The instrument renders in fixed 128-sample windows aligned to absolute
+sample time: when the engine reaches a window boundary it renders the window just
+finished with every event inside it at its exact offset, and plays that audio during the
+next window. The Guest is therefore 128 samples late (2.7 ms at 48 kHz, not reported as
+latency since nothing else waits for it), but its timing is exact and identical for any
+host block size, and the plugin always sees the same block size. Non-finite output from
+a plugin zeroes that window instead of tripping the master guard. The strip itself is an
+ordinary `StripId::Guest` with two inserts (`guest.fx1`, `guest.fx2`), so there are now
+30 effect slots.
+
+**Cycles note length and MIDI out.** The Cycles keep one hold per loop: the Guest note,
+the MIDI note and channel, and the time left (`loops.gate`, wall time, not Tide). A loop
+that fires while its note still sounds releases it first. `loops.midiOut` sends note-on
+and note-off as `MidiOutEvent { sampleTime, status, data1, data2 }` through an SPSC
+queue (audio thread to `CycleMidiOut`); turning MIDI out off, stopping the Cycles,
+changing `loops.midiChannel` (0 is a channel per cycle, otherwise one channel) and panic
+release every hold, and panic also silences the Cycles' MIDI and Guest notes until it is
+lifted. `CycleMidiOut` (app, `Remote.cpp`) is the queue's only consumer, on a 1 ms
+`HighResolutionTimer` like `MidiClockOut`. The audio callback stamps a `BlockClock`
+(a seqlock of block start sample, wall time, sample rate and block length) before
+`Engine::process`; each event is sent at that wall time plus its sample offset plus one
+block, so notes keep their spacing to within the timer's millisecond instead of
+bunching at block boundaries, and leave roughly when their audio does. The sender keeps
+its own table of sounding notes and releases them (note-offs and All Notes Off) when the
+device changes, a session is applied and the app quits; without a device it drains and
+drops the queue.
+
+## 17. Extension points for later features
 
 | Later feature | Where it plugs in |
 |---|---|
@@ -397,7 +453,7 @@ seconds after a panic, and a plain-text log. None of it touches the audio thread
 | Multichannel output | master bus channel count + a panner interface on strips |
 | OSC control | another `ControlEvent` producer with its own SPSC queue |
 
-## 17. Phase plan
+## 18. Phase plan
 
 1. Skeleton, device settings, safety chain, drone, render harness. **(done)**
 2. Scene system and terrain interpolation (placeholder UI). **(done)**

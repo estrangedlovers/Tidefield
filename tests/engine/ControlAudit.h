@@ -7,6 +7,8 @@
 #include <engine/mix/FxManager.h>
 #include <engine/scene/SceneManager.h>
 
+#include "support/FakeInstrument.h"
+
 #include <catch2/catch_test_macros.hpp>
 
 #include <algorithm>
@@ -302,6 +304,19 @@ struct Rig
         fx.setType(slot, type);
     }
 
+    tf::test::FakeInstrument* guest = nullptr;
+
+    void loadGuest()
+    {
+        auto fake = std::make_unique<tf::test::FakeInstrument>();
+        fake->prepare(engine.getGuestSpec());
+        guest = fake.get();
+        engine.sendInstrument(std::move(fake));
+    }
+
+    int midiOutEvents = 0;
+    std::set<int> midiOutChannels;
+
     SceneManager& sceneManager()
     {
         if (scenes == nullptr)
@@ -340,6 +355,12 @@ struct Rig
             if (scenes != nullptr)
                 scenes->tick();
             engine.collectGarbage();
+            MidiOutEvent m;
+            while (engine.popMidiOut(m))
+            {
+                ++midiOutEvents;
+                midiOutChannels.insert(m.status & 0x0f);
+            }
         }
     }
 

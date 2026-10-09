@@ -95,6 +95,17 @@ void Engine::prepare(double newSampleRate, int maxBlockSize)
     master.prepare(spec);
     for (auto& slot : fxSlots)
         slot.prepareAll(spec);
+    guestSlot.prepareAll(getGuestSpec());
+    guestPendingCount = 0;
+    guestOutL.fill(0.0f);
+    guestOutR.fill(0.0f);
+    for (auto& k : guestKeys)
+        k.fill(0);
+    cycleHolds.fill({});
+    midiOutHeld.fill(0);
+    guestFrom = std::clamp(toInt(params.current(P::GuestPlayFrom)), 0, 3);
+    cycleMidiOn = false;
+    cycleMidiMode = -1;
 
     const double terrainRate = sampleRate / (kControlInterval * kTerrainDecimation);
     cursorX.prepare(terrainRate, 1.0f, false);
@@ -435,6 +446,13 @@ void Engine::drainControl() noexcept
     }
     for (auto& slot : fxSlots)
         slot.acquire();
+    if (guestSlot.acquire())
+    {
+        for (auto& k : guestKeys)
+            k.fill(0);
+        for (auto& h : cycleHolds)
+            h.guestNote = -1;
+    }
     ControlEvent e;
     while (controlQueue.pop(e))
         applyEvent(e);
@@ -577,6 +595,7 @@ void Engine::handleMidi(const RawMidi& m) noexcept
     if (m.isCc() || m.isNoteOn() || m.isNoteOff())
     {
         const int src = m.isCc() ? 0 : 1;
+        bool mapped = false;
         if (map != nullptr)
         {
             const auto s = static_cast<std::size_t>(src), c = static_cast<std::size_t>(ch), n = static_cast<std::size_t>(m.data1 & 127);
@@ -589,11 +608,14 @@ void Engine::handleMidi(const RawMidi& m) noexcept
                 if (bi < kMaxMidiBindings)
                     applyMidiBinding(bi, map->bindings[bi], value);
             }
-            if (src == 1 && count > 0)
+            mapped = count > 0;
+            if (src == 1 && mapped)
                 return;
         }
         if (m.isCc())
         {
+            if (guestPlays(kFromMidi) && ! mapped)
+                pushGuest(m.status, m.data1, m.data2);
             if (m.data1 == 1)
                 modWheel = static_cast<float>(m.data2) / 127.0f;
             if (m.data1 == 74 && map != nullptr && map->mpe && ch != 0)
@@ -617,6 +639,8 @@ void Engine::handleMidi(const RawMidi& m) noexcept
     const bool channelOk = mpe || map == nullptr || map->noteChannel < 0 || map->noteChannel == ch;
     if (! channelOk)
         return;
+    if (guestPlays(kFromMidi) && (m.type() == 0xe0 || m.type() == 0xd0 || m.type() == 0xa0))
+        pushGuest(m.status, m.data1, m.data2);
     if (m.type() == 0xe0)
     {
         const float bend = static_cast<float>(((m.data1 & 0x7f) | ((m.data2 & 0x7f) << 7)) - 8192) / 8192.0f;
@@ -645,6 +669,8 @@ void Engine::handleMidi(const RawMidi& m) noexcept
         if (member)
             bloom.setChannelExpression(ch, mpeBend[uc], mpePressure[uc], mpeTimbre[uc]);
         bloom.noteOn(m.data1, static_cast<float>(m.data2) / 127.0f, member ? ch : -1);
+        if (guestPlays(kFromMidi))
+            guestKey(ch, m.data1, static_cast<float>(m.data2) / 127.0f);
         if (map != nullptr && map->notesToDrone)
         {
             int root = m.data1;
@@ -659,6 +685,8 @@ void Engine::handleMidi(const RawMidi& m) noexcept
     {
         recordPerformance(ControlEvent::note(m.data1, 0.0f, ControlSource::Midi));
         bloom.noteOff(m.data1);
+        if (guestPlays(kFromMidi))
+            guestKey(ch, m.data1, 0.0f);
     }
 }
 
@@ -679,7 +707,10 @@ void Engine::releasePlayedNotes() noexcept
 {
     for (int n = 0; n < 128; ++n)
         if (playHeld.test(static_cast<std::size_t>(n)))
+        {
             bloom.noteOff(n);
+            guestKeyOff(n);
+        }
     playHeld.reset();
 }
 
@@ -787,7 +818,10 @@ void Engine::updatePerformance() noexcept
         performanceVersion = take->version;
         for (int n = 0; n < 128; ++n)
             if (performanceHeld.test(static_cast<std::size_t>(n)))
+            {
                 bloom.noteOff(n);
+                guestKeyOff(n);
+            }
         performanceHeld.reset();
         performancePlaying = take->length > 0;
         performanceIndex = 0;
@@ -814,7 +848,10 @@ void Engine::updatePerformance() noexcept
     {
         for (int n = 0; n < 128; ++n)
             if (performanceHeld.test(static_cast<std::size_t>(n)))
+            {
                 bloom.noteOff(n);
+                guestKeyOff(n);
+            }
         performanceHeld.reset();
         performancePlaying = false;
     }
@@ -868,6 +905,8 @@ void Engine::applyEvent(const ControlEvent& e) noexcept
                 bloom.noteOn(static_cast<int>(e.param), e.value);
             else
                 bloom.noteOff(static_cast<int>(e.param));
+            if (guestPlays(kFromBloomNotes))
+                guestKey(0, static_cast<int>(e.param), e.value);
             break;
     }
 }
@@ -884,7 +923,13 @@ void Engine::applyCommand(Command c) noexcept
             master.setFadeSeconds(params.target(idx(P::MasterFadeSecs)));
             master.fadeOut();
             break;
-        case Command::Panic: master.panic(); break;
+        case Command::Panic:
+            master.panic();
+            releaseGuestKeys();
+            releaseCycleNotes(true, true);
+            for (int ch = 0; ch < 16; ++ch)
+                pushGuest(static_cast<std::uint8_t>(0xb0 | ch), 123, 0);
+            break;
         case Command::ResumeFromPanic:
             master.setFadeSeconds(params.target(idx(P::MasterFadeSecs)));
             master.resumeFromPanic();
@@ -918,6 +963,7 @@ void Engine::resetFeedback() noexcept
     freezeLoaded = false;
     for (auto& slot : fxSlots)
         slot.reset();
+    guestSlot.reset();
     medium.reset();
     autoMaster.reset();
     master.reset();
@@ -1121,6 +1167,7 @@ void Engine::controlTick() noexcept
     updateGesture();
     updatePerformance();
     updateTempo(tickSeconds);
+    updateGuest();
     updateLoops(tickSeconds);
 
     for (int s = 0; s < kNumStrips; ++s)
@@ -1362,6 +1409,7 @@ void Engine::updateTempo(float dt) noexcept
 
 void Engine::updateLoops(float dt) noexcept
 {
+    static_assert(std::tuple_size_v<decltype(cycleHolds)> == kMaxLoops);
     static constexpr std::array<float, kMaxLoops> kPeriods { 17.0f, 19.7f, 23.3f, 26.3f, 29.9f, 31.7f, 37.1f, 41.3f };
 
     const int pattern = toInt(params.current(P::LoopsPattern));
@@ -1383,8 +1431,35 @@ void Engine::updateLoops(float dt) noexcept
     const float reg = params.current(P::LoopsRegister);
     const float spread = params.current(P::LoopsSpread) * 12.0f;
     const float velocity = params.current(P::LoopsVelocity);
-    const int target = std::clamp(toInt(params.current(P::LoopsTarget)), 0, 2);
+    const int target = std::clamp(toInt(params.current(P::LoopsTarget)), 0, 3);
     const float flashDecay = std::exp(-dt / 0.4f);
+    const float gate = params.current(P::LoopsGate);
+    const bool quiet = master.isPanicActive();
+    const bool midiOn = on && ! quiet && params.current(P::LoopsMidiOut) > 0.5f;
+    const int midiMode = std::clamp(toInt(params.current(P::LoopsMidiChannel)), 0, 16);
+    const bool toGuest = on && ! quiet && guestPlays(kFromCycles);
+    if (! midiOn || midiMode != cycleMidiMode)
+        releaseCycleNotes(false, true);
+    if (! toGuest)
+        releaseCycleNotes(true, false);
+    cycleMidiOn = midiOn;
+    cycleMidiMode = midiMode;
+    for (auto& h : cycleHolds)
+    {
+        if (h.guestNote < 0 && h.midiNote < 0)
+            continue;
+        h.remaining -= dt;
+        if (h.remaining > 0.0f)
+            continue;
+        if (h.guestNote >= 0)
+            pushGuest(0x80, static_cast<std::uint8_t>(h.guestNote), 0);
+        if (h.midiNote >= 0)
+        {
+            pushMidiOut(static_cast<std::uint8_t>(0x80 | h.midiChannel), static_cast<std::uint8_t>(h.midiNote), 0);
+            midiOutHeld[static_cast<std::size_t>(h.midiChannel)] = static_cast<std::uint16_t>(std::max(0, midiOutHeld[static_cast<std::size_t>(h.midiChannel)] - 1));
+        }
+        h = {};
+    }
 
     static constexpr std::array<int, 40> kPrimes { 2,  3,  5,  7,  11, 13, 17, 19, 23, 29, 31, 37, 41, 43, 47, 53, 59, 61, 67, 71,
                                                    73, 79, 83, 89, 97, 101, 103, 107, 109, 113, 127, 131, 137, 139, 149, 151, 157, 163, 167, 173 };
@@ -1427,14 +1502,153 @@ void Engine::updateLoops(float dt) noexcept
             continue;
         const float vel = velocity * (0.75f + 0.25f * loopRng.nextFloat());
         const int note = std::clamp(toInt(loopNote[uk]), 0, 127);
-        if (target != 1)
+        if (target == 0 || target == 2)
         {
             bloom.noteOn(note, vel);
             bloom.noteOff(note);
         }
-        if (target != 0)
+        if (target == 1 || target == 2)
             resonator.strike(vel);
+        auto& hold = cycleHolds[uk];
+        if (hold.guestNote >= 0 || hold.midiNote >= 0)
+        {
+            hold.remaining = 0.0f;
+            if (hold.guestNote >= 0)
+                pushGuest(0x80, static_cast<std::uint8_t>(hold.guestNote), 0);
+            if (hold.midiNote >= 0)
+            {
+                pushMidiOut(static_cast<std::uint8_t>(0x80 | hold.midiChannel), static_cast<std::uint8_t>(hold.midiNote), 0);
+                midiOutHeld[static_cast<std::size_t>(hold.midiChannel)] = static_cast<std::uint16_t>(std::max(0, midiOutHeld[static_cast<std::size_t>(hold.midiChannel)] - 1));
+            }
+            hold = {};
+        }
+        const auto velocity7 = static_cast<std::uint8_t>(std::clamp(toInt(vel * 127.0f), 1, 127));
+        if (toGuest && guestSlot.hasInstrument())
+        {
+            hold.guestNote = std::clamp(note + toInt(params.current(P::GuestTranspose)), 0, 127);
+            pushGuest(0x90, static_cast<std::uint8_t>(hold.guestNote), velocity7);
+        }
+        if (midiOn)
+        {
+            hold.midiChannel = midiMode == 0 ? k : midiMode - 1;
+            hold.midiNote = note;
+            pushMidiOut(static_cast<std::uint8_t>(0x90 | hold.midiChannel), static_cast<std::uint8_t>(note), velocity7);
+            ++midiOutHeld[static_cast<std::size_t>(hold.midiChannel)];
+        }
+        hold.remaining = gate;
         loopFlash[uk] = 1.0f;
+    }
+}
+
+void Engine::pushGuest(std::uint8_t status, std::uint8_t data1, std::uint8_t data2) noexcept
+{
+    if (guestPendingCount >= kMaxGuestPending)
+        return;
+    guestPending[static_cast<std::size_t>(guestPendingCount++)] = { sampleTime, GuestEvent { 0, status, data1, data2 } };
+}
+
+void Engine::guestKey(int channel, int note, float velocity) noexcept
+{
+    const auto c = static_cast<std::size_t>(channel & 15);
+    const auto n = static_cast<std::size_t>(note & 127);
+    auto& sounding = guestKeys[c][n];
+    if (sounding != 0)
+    {
+        pushGuest(static_cast<std::uint8_t>(0x80 | c), static_cast<std::uint8_t>(sounding - 1), 0);
+        sounding = 0;
+    }
+    if (velocity <= 0.0f || ! guestSlot.hasInstrument())
+        return;
+    const int out = std::clamp(note + toInt(params.current(P::GuestTranspose)), 0, 127);
+    pushGuest(static_cast<std::uint8_t>(0x90 | c), static_cast<std::uint8_t>(out), static_cast<std::uint8_t>(std::clamp(toInt(velocity * 127.0f), 1, 127)));
+    sounding = static_cast<std::uint8_t>(out + 1);
+}
+
+void Engine::releaseGuestKeys() noexcept
+{
+    for (std::size_t c = 0; c < guestKeys.size(); ++c)
+        for (std::size_t n = 0; n < 128; ++n)
+            if (guestKeys[c][n] != 0)
+            {
+                pushGuest(static_cast<std::uint8_t>(0x80 | c), static_cast<std::uint8_t>(guestKeys[c][n] - 1), 0);
+                guestKeys[c][n] = 0;
+            }
+}
+
+void Engine::releaseCycleNotes(bool guest, bool midi) noexcept
+{
+    for (auto& h : cycleHolds)
+    {
+        if (guest && h.guestNote >= 0)
+        {
+            pushGuest(0x80, static_cast<std::uint8_t>(h.guestNote), 0);
+            h.guestNote = -1;
+        }
+        if (midi && h.midiNote >= 0)
+        {
+            pushMidiOut(static_cast<std::uint8_t>(0x80 | h.midiChannel), static_cast<std::uint8_t>(h.midiNote), 0);
+            h.midiNote = -1;
+        }
+    }
+    if (midi)
+        for (std::size_t c = 0; c < midiOutHeld.size(); ++c)
+            if (midiOutHeld[c] != 0)
+            {
+                pushMidiOut(static_cast<std::uint8_t>(0xb0 | c), 123, 0);
+                midiOutHeld[c] = 0;
+            }
+}
+
+void Engine::pushMidiOut(std::uint8_t status, std::uint8_t data1, std::uint8_t data2) noexcept
+{
+    midiOut.push({ sampleTime, status, data1, data2 });
+}
+
+void Engine::updateGuest() noexcept
+{
+    const int from = std::clamp(toInt(params.current(P::GuestPlayFrom)), 0, 3);
+    if (from != guestFrom)
+    {
+        releaseGuestKeys();
+        guestFrom = from;
+    }
+    if (guestSlot.hasInstrument())
+        guestSlot.setControls({ params.current(P::GuestP1), params.current(P::GuestP2), params.current(P::GuestP3), params.current(P::GuestP4),
+                                params.current(P::GuestP5), params.current(P::GuestP6) });
+}
+
+void Engine::renderGuest() noexcept
+{
+    const auto windowStart = sampleTime >= static_cast<std::uint64_t>(kGuestBlock) ? sampleTime - static_cast<std::uint64_t>(kGuestBlock) : 0;
+    int count = 0, used = 0;
+    while (used < guestPendingCount && guestPending[static_cast<std::size_t>(used)].time < sampleTime && count < kMaxGuestEvents)
+    {
+        const auto& p = guestPending[static_cast<std::size_t>(used++)];
+        auto e = p.event;
+        e.offset = p.time > windowStart ? static_cast<std::uint32_t>(p.time - windowStart) : 0u;
+        guestEvents[static_cast<std::size_t>(count++)] = e;
+    }
+    if (used > 0)
+    {
+        std::copy(guestPending.begin() + used, guestPending.begin() + guestPendingCount, guestPending.begin());
+        guestPendingCount -= used;
+    }
+    if (! guestSlot.isActive())
+    {
+        guestOutL.fill(0.0f);
+        guestOutR.fill(0.0f);
+        return;
+    }
+    guestSlot.process(guestEvents.data(), count, guestOutL.data(), guestOutR.data(), kGuestBlock, guestAltL.data(), guestAltR.data());
+    for (int i = 0; i < kGuestBlock; ++i)
+    {
+        const auto ui = static_cast<std::size_t>(i);
+        if (! std::isfinite(guestOutL[ui]) || ! std::isfinite(guestOutR[ui]))
+        {
+            guestOutL.fill(0.0f);
+            guestOutR.fill(0.0f);
+            break;
+        }
     }
 }
 
@@ -1621,6 +1835,14 @@ void Engine::processChunk(const float* const* inputs, int numInputs, int inputOf
     }
 
     processFreeze(offset, n);
+
+    if (sampleTime % static_cast<std::uint64_t>(kGuestBlock) == 0)
+        renderGuest();
+    {
+        const auto at = static_cast<std::size_t>(sampleTime % static_cast<std::uint64_t>(kGuestBlock));
+        std::copy_n(guestOutL.data() + at, n, L(StripId::Guest));
+        std::copy_n(guestOutR.data() + at, n, R(StripId::Guest));
+    }
 
     for (int s = 0; s < kNumStrips; ++s)
     {
@@ -2124,6 +2346,17 @@ void Engine::accumulateTelemetry(const float* l, const float* r, int n) noexcept
     f.inputLevel = liveInput.getLevel();
     f.inputGateOpen = liveInput.isGateOpen();
     f.inputFreeze = inputFreeze.getGain();
+    f.guestLoaded = guestSlot.hasInstrument();
+    f.guestNotes = 0;
+    for (const auto& channel : guestKeys)
+        for (auto k : channel)
+            f.guestNotes += k != 0 ? 1 : 0;
+    f.cycleMidiNotes = 0;
+    for (const auto& h : cycleHolds)
+    {
+        f.guestNotes += h.guestNote >= 0 ? 1 : 0;
+        f.cycleMidiNotes += h.midiNote >= 0 ? 1 : 0;
+    }
     f.loopState = static_cast<int>(looper.getState());
     f.loopPosition = looper.getPosition();
     f.loopSeconds = looper.getLengthSeconds();

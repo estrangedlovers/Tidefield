@@ -134,7 +134,15 @@ juce::StringArray Model::choices(P p) const
     else if (id == "loop.source")
         c = { "Live input", "The mix" };
     else if (id == "loops.target")
-        c = { "Bloom", "Resonator", "Both" };
+        c = { "Bloom", "Resonator", "Both", "Neither" };
+    else if (id == "guest.playFrom")
+        c = { "Bloom's notes", "MIDI input", "Cycles", "All" };
+    else if (id == "loops.midiChannel")
+    {
+        c.add("Per cycle");
+        for (int ch = 1; ch <= 16; ++ch)
+            c.add("Channel " + juce::String(ch));
+    }
     else if (id.starts_with("mod.lfo") && id.ends_with(".shape"))
         for (const auto* n : engine::kLfoShapeNames)
             c.add(n);
@@ -157,7 +165,7 @@ juce::String Model::format(P p, float v) const
     if (id.endsWith(".root") || id == "loops.register")
         return noteName(v);
     if (s.flags & engine::ParamFlag::kDiscrete)
-        return juce::String(juce::roundToInt(v));
+        return juce::String(s.unit) == "st" ? (v > 0.5f ? "+" : "") + juce::String(juce::roundToInt(v)) + " st" : juce::String(juce::roundToInt(v));
 
     const juce::String unit(s.unit);
     auto fixed = [](float x, int d) { return juce::String(x, d); };
@@ -225,7 +233,7 @@ juce::String Model::groupName(engine::ParamIndex i) const
         { "weather", "Weather" }, { "freeze", "Freeze all" }, { "master", "Master" }, { "terrain", "Terrain" }, { "tide", "Tide" },
         { "harmony", "Harmony" }, { "medium", "Medium" }, { "catch", "Catch" }, { "swell", "Swell" }, { "hush", "Hush" },
         { "slow", "Slow" }, { "perform", "Shape" }, { "seasons", "Seasons" }, { "sync", "Tempo" }, { "busA", "Reverb return" },
-        { "busB", "Delay return" },
+        { "busB", "Delay return" }, { "guest", "Guest" },
     };
     for (const auto& [key, name] : names)
         if (head == key)
@@ -244,6 +252,10 @@ juce::String Model::longName(engine::ParamIndex i) const
             if (const auto* info = core.fx.getInfo(s); info != nullptr && info->controls[static_cast<std::size_t>(i - first)].name[0] != 0)
                 control = info->controls[static_cast<std::size_t>(i - first)].name;
     }
+    const auto guestFirst = engine::idx(engine::P::GuestP1);
+    if (i >= guestFirst && i < guestFirst + 6)
+        if (const auto* info = core.guest.getInfo(); info != nullptr && ! info->controls[static_cast<std::size_t>(i - guestFirst)].empty())
+            control = info->controls[static_cast<std::size_t>(i - guestFirst)];
     const auto group = groupName(i);
     return control.startsWithIgnoreCase(group) ? control : group + " " + control;
 }

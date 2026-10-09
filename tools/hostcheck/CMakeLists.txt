@@ -12,9 +12,9 @@ target_link_libraries(tidefield_hostcheck PRIVATE
     juce::juce_audio_processors
     juce::juce_gui_basics
     juce::juce_recommended_config_flags)
-add_dependencies(tidefield_hostcheck TidefieldTestGain_VST3)
+add_dependencies(tidefield_hostcheck TidefieldTestGain_VST3 TidefieldTestSine_VST3)
 if(TIDEFIELD_BUILD_TESTS)
-    add_test(NAME hosting COMMAND tidefield_hostcheck $<TARGET_FILE_DIR:TidefieldTestGain>/VST3)
+    add_test(NAME hosting COMMAND tidefield_hostcheck $<TARGET_FILE_DIR:TidefieldTestGain>/VST3 $<TARGET_FILE_DIR:TidefieldTestSine>/VST3)
 endif()
 if(APPLE)
     target_link_libraries(tidefield_hostcheck PRIVATE "-framework CoreAudioKit")

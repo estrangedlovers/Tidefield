@@ -1,6 +1,7 @@
 #pragma once
 
 #include <engine/Engine.h>
+#include <engine/guest/GuestManager.h>
 #include <engine/midi/MidiManager.h>
 #include <engine/mod/ModRouteManager.h>
 #include <engine/mod/SeasonManager.h>
@@ -21,7 +22,7 @@ class SessionController
 public:
     SessionController(engine::Engine& engine, engine::SceneManager& scenes, engine::FxManager& fx, engine::MidiManager* midi,
                       engine::SeasonManager* seasons = nullptr, engine::PathManager* path = nullptr,
-                      engine::GestureManager* gestures = nullptr, engine::ModRouteManager* mod = nullptr);
+                      engine::GestureManager* gestures = nullptr, engine::ModRouteManager* mod = nullptr, engine::GuestManager* guest = nullptr);
     ~SessionController();
 
     void newSession();
@@ -67,6 +68,7 @@ private:
     engine::PathManager* path;
     engine::GestureManager* gestures;
     engine::ModRouteManager* mod;
+    engine::GuestManager* guest;
     engine::TelemetryFrame latest;
     juce::File current;
     std::unique_ptr<juce::FileChooser> chooser;

@@ -61,6 +61,7 @@ add_library(tidefield_engine STATIC
     src/engine/master/MasterChain.cpp
     src/engine/scene/SceneManager.cpp
     src/engine/mix/FxManager.cpp
+    src/engine/guest/GuestManager.cpp
     src/engine/capture/CatchManager.cpp
     src/engine/midi/MidiManager.cpp
     src/engine/mod/SeasonManager.cpp

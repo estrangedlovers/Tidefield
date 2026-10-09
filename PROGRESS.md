@@ -535,8 +535,52 @@ Built so far, each with tests:
   both tabs checked under Xvfb in Slate and Paper. The controller layouts come from
   the makers' documented defaults and were not tried with the hardware.
 
-Still to do for 1.4: instrument plugins as sources and MIDI out from the Cycles,
-signing and notarisation.
+**Guest instrument and Cycles MIDI out**
+
+- **Guest** (`engine/guest`, a twelfth strip with inserts `guest.fx1`/`guest.fx2`, so 30
+  effect slots): one AU/VST3 instrument plugin as a source, app only. The engine holds a
+  JUCE-free `engine::Instrument`; `PluginHost` (now also `ExternalInstruments`) wraps the
+  plugin in `HostedInstrument`, sharing `HostedPlugin` with effects for Choose controls,
+  the plugin window and the `map=...;<base64>` state. `GuestManager` hands it over through
+  `InstrumentSlot` (50 ms crossfade, All Notes Off to the outgoing one). Notes, bends,
+  pressure and unmapped controllers are stamped with the sample time into a preallocated
+  array and rendered in fixed 128-sample windows (2.7 ms at 48 kHz), exact to the sample
+  and independent of the host block size. **Play From**: Bloom's notes, MIDI input (with
+  its channels, for MPE), Cycles or All; **Transpose**; six knobs. Sessions store
+  `guest` (`type`, `name`, `state`); a missing plugin warns, stays silent and keeps its
+  settings. Undo covers loading an instrument.
+- **Cycles**: **Note Length** (`loops.gate`) for the Guest and MIDI out; **Play Into**
+  gains **Neither**. **MIDI out** (`loops.midiOut`, `loops.midiChannel`: a channel per
+  cycle or one for all): notes leave the audio thread through an SPSC queue to
+  `CycleMidiOut` (1 ms high-resolution timer, like the clock out), timed against a
+  `BlockClock` the audio callback stamps, so their spacing is kept. Note-offs on stop,
+  MIDI out off, channel change, panic (which also mutes new Cycles notes until lifted),
+  session change, device change and quit. Device choice on the Cycles tab and in
+  Settings > MIDI, Sync and Remote.
+- UI: a **Guest** tab (instrument menu grouped by maker, six knobs, Plugin window, Choose
+  controls, Play From, Transpose, keyboard, strip), the Guest column in the Mixer, a
+  **MIDI out** device on the Cycles tab.
+- `tools/testfx` builds **Tidefield Test Sine** (VST3 instrument, a sine per note);
+  `tidefield_hostcheck` now scans both test plugins and loads the synth into the Guest,
+  plays it from the keyboard and the Cycles, checks note-offs, remaps a knob, reopens it
+  from saved state and checks a missing instrument. CI passes both folders.
+- Tests: `tests/engine/GuestTests.cpp` (a fake instrument: delivery and sample timing,
+  transpose with note-offs, every Play From, Note Length, panic and swaps, zero
+  allocations in `Engine::process` with the Guest, Cycles and MIDI out running, identical
+  output and MIDI across block sizes, MIDI out channels and clean note-offs,
+  `GuestManager` missing/restore), the control audit covers every new control and the
+  new strip and slots, a session round trip in `tests/io/SessionTests.cpp`, and
+  `--self-test` plays an instrument through the Guest strip and checks MIDI out.
+- No score: the Guest needs a plugin, and the render harness hosts none; MIDI out makes
+  no sound. Existing scores render bit-identically (the Guest strip is silent and the
+  Cycles' random draws are unchanged).
+- Not verified: real third-party instruments (AU or VST3) on macOS or Windows,
+  instruments with unusual bus layouts or that need a playhead, MIDI out to real
+  hardware or another app (no MIDI devices in the container), and the timing of MIDI out
+  against audio on a real interface.
+
+Still to do for 1.4: signing, notarisation and auto-update (needs the Apple Developer
+account).
 
 ### 1.3.0: a deeper instrument
 

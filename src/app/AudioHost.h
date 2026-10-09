@@ -28,6 +28,7 @@ public:
     void saveDeviceState();
     LinkSync* getLink() noexcept override { return &link; }
     juce::PropertiesFile& getSettings() noexcept override { return settings; }
+    const BlockClock* getBlockClock() const noexcept override { return &clock; }
 
 private:
     void audioDeviceIOCallbackWithContext(const float* const* inputs, int numInputs, float* const* outputs, int numOutputs,
@@ -41,6 +42,8 @@ private:
     engine::Engine engine;
     LinkSync link;
     double outputLatencySeconds = 0.0;
+    double deviceRate = 0.0;
+    BlockClock clock;
     std::unique_ptr<juce::Thread> nullThread;
 };
 }

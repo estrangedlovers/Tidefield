@@ -73,6 +73,12 @@ juce::String helpFor(P p)
         { P::MasterFadeSecs, "length of the Space-bar fade" },
         { P::LoopsRate, "pace of every cycle; they never line up" },
         { P::LoopsPattern, "which set of cycle lengths and notes" },
+        { P::LoopsTarget, "what the Cycles play inside Tidefield; the Guest instrument and MIDI out follow their own switches" },
+        { P::LoopsGate, "how long each Cycles note holds in the Guest instrument and on MIDI out (Bloom and the resonator ring on their own)" },
+        { P::LoopsMidiOut, "send the Cycles' notes to the MIDI output chosen here or in Settings > MIDI" },
+        { P::LoopsMidiChannel, "Per cycle: cycle 1 on channel 1, cycle 2 on channel 2 and so on; or one channel for every cycle" },
+        { P::GuestPlayFrom, "Bloom's notes: the keyboards, MIDI and replayed takes; MIDI input: only MIDI devices; Cycles: only the Cycles; All: everything" },
+        { P::GuestTranspose, "shifts every note the instrument plays, in semitones" },
         { P::SeasonsDepth, "scales every season at once" },
         { P::ModLfo1Rate, "how fast LFO 1 cycles; it follows Tide" },
         { P::ModLfo2Rate, "how fast LFO 2 cycles; it follows Tide" },
@@ -97,6 +103,65 @@ std::function<juce::String(float)> fxFormatter(const dsp::ProcessorControl& c)
         c.display.format(v, buf, static_cast<int>(sizeof(buf)));
         return juce::String(buf);
     };
+}
+
+void showPluginControlMenu(Model& model, juce::Component* owner, int hostSlot, P firstParam, std::function<void()> done)
+{
+    auto* plugins = model.core.plugins.get();
+    if (plugins == nullptr || ! plugins->hasInstance(hostSlot))
+        return;
+    const auto names = plugins->parameterNames(hostSlot);
+    if (names.isEmpty())
+        return model.core.status("This plugin has no parameters a knob can control.", true);
+    constexpr int kPerKnob = 10000, kPerPage = 40;
+    juce::PopupMenu m;
+    m.addSectionHeader("Which parameter should each knob control?");
+    for (int k = 0; k < 6; ++k)
+    {
+        juce::PopupMenu sub;
+        const int current = plugins->chosenParameter(hostSlot, k);
+        if (names.size() <= kPerPage)
+            for (int i = 0; i < names.size(); ++i)
+                sub.addItem((k + 1) * kPerKnob + i, names[i], true, i == current);
+        else
+            for (int from = 0; from < names.size(); from += kPerPage)
+            {
+                juce::PopupMenu page;
+                for (int i = from; i < std::min(names.size(), from + kPerPage); ++i)
+                    page.addItem((k + 1) * kPerKnob + i, names[i], true, i == current);
+                sub.addSubMenu(names[from] + " to " + names[std::min(names.size(), from + kPerPage) - 1], page);
+            }
+        const auto label = current >= 0 && current < names.size() ? names[current] : juce::String("nothing");
+        m.addSubMenu("Knob " + juce::String(k + 1) + ": " + label, sub);
+    }
+    showMenu(m, owner, [&model, hostSlot, firstParam, done = std::move(done)](int r) {
+        auto* host = model.core.plugins.get();
+        if (r < kPerKnob || host == nullptr)
+            return;
+        const int k = r / kPerKnob - 1, index = r % kPerKnob;
+        const auto p = static_cast<P>(engine::idx(firstParam) + static_cast<engine::ParamIndex>(k));
+        host->chooseParameter(hostSlot, k, index);
+        const float value = host->parameterValue(hostSlot, k);
+        if (value >= 0.0f)
+        {
+            model.engine.post(engine::ControlEvent::snapParam(engine::idx(p), value));
+            model.set(p, value, false);
+        }
+        if (done)
+            done();
+    });
+}
+
+void followPluginWindow(Model& model, int hostSlot, P firstParam, Knob* const* knobs)
+{
+    for (int k = 0; k < 6; ++k)
+    {
+        const float pluginValue = model.core.plugins->parameterValue(hostSlot, k);
+        const auto p = static_cast<P>(engine::idx(firstParam) + static_cast<engine::ParamIndex>(k));
+        if (pluginValue >= 0.0f && std::abs(pluginValue - model.value(p)) > 0.01f && std::abs(model.modulation(p)) < 1.0e-4f
+            && ! knobs[k]->isMouseButtonDown())
+            model.set(p, pluginValue, false);
+    }
 }
 
 class FxDevice final : public Device, public Animated
@@ -142,62 +207,10 @@ private:
 
     void showControlMenu()
     {
-        auto* plugins = model.core.plugins.get();
-        if (plugins == nullptr || ! plugins->hasInstance(slot))
-            return;
-        const auto names = plugins->parameterNames(slot);
-        if (names.isEmpty())
-            return model.core.status("This plugin has no parameters a knob can control.", true);
-        constexpr int kPerKnob = 10000, kPerPage = 40;
-        juce::PopupMenu m;
-        m.addSectionHeader("Which parameter should each knob control?");
-        for (int k = 0; k < 6; ++k)
-        {
-            juce::PopupMenu sub;
-            const int current = plugins->chosenParameter(slot, k);
-            if (names.size() <= kPerPage)
-                for (int i = 0; i < names.size(); ++i)
-                    sub.addItem((k + 1) * kPerKnob + i, names[i], true, i == current);
-            else
-                for (int from = 0; from < names.size(); from += kPerPage)
-                {
-                    juce::PopupMenu page;
-                    for (int i = from; i < std::min(names.size(), from + kPerPage); ++i)
-                        page.addItem((k + 1) * kPerKnob + i, names[i], true, i == current);
-                    sub.addSubMenu(names[from] + " to " + names[std::min(names.size(), from + kPerPage) - 1], page);
-                }
-            const auto label = current >= 0 && current < names.size() ? names[current] : juce::String("nothing");
-            m.addSubMenu("Knob " + juce::String(k + 1) + ": " + label, sub);
-        }
-        showMenu(m, this, [this](int r) {
-            auto* host = model.core.plugins.get();
-            if (r < kPerKnob || host == nullptr)
-                return;
-            const int k = r / kPerKnob - 1, index = r % kPerKnob;
-            const auto p = static_cast<P>(engine::idx(engine::kFxSlots[static_cast<std::size_t>(slot)].firstParam) + static_cast<engine::ParamIndex>(k));
-            host->chooseParameter(slot, k, index);
-            const float value = host->parameterValue(slot, k);
-            if (value >= 0.0f)
-            {
-                model.engine.post(engine::ControlEvent::snapParam(engine::idx(p), value));
-                model.set(p, value, false);
-            }
-            refresh();
-        });
+        showPluginControlMenu(model, this, slot, engine::kFxSlots[static_cast<std::size_t>(slot)].firstParam, [this] { refresh(); });
     }
 
-    void followPluginWindow()
-    {
-        const auto first = engine::idx(engine::kFxSlots[static_cast<std::size_t>(slot)].firstParam);
-        for (int k = 0; k < 6; ++k)
-        {
-            const float pluginValue = model.core.plugins->parameterValue(slot, k);
-            const auto p = static_cast<P>(first + static_cast<engine::ParamIndex>(k));
-            if (pluginValue >= 0.0f && std::abs(pluginValue - model.value(p)) > 0.01f && std::abs(model.modulation(p)) < 1.0e-4f
-                && ! knobs[static_cast<std::size_t>(k)]->isMouseButtonDown())
-                model.set(p, pluginValue, false);
-        }
-    }
+    void followPluginWindow() { tf::app::gui::followPluginWindow(model, slot, engine::kFxSlots[static_cast<std::size_t>(slot)].firstParam, knobs.data()); }
 
     void fillMenu()
     {
@@ -311,6 +324,268 @@ private:
     int shownListVersion = -1;
     int selectedId = 1;
     int syncFrames = 0;
+};
+
+class NoteText final : public juce::Component
+{
+public:
+    explicit NoteText(std::function<juce::String()> source) : text(std::move(source)) {}
+
+    void refresh()
+    {
+        if (const auto now = text(); now != shown)
+        {
+            shown = now;
+            repaint();
+        }
+    }
+
+    void paint(juce::Graphics& g) override
+    {
+        g.setFont(font(11.5f));
+        g.setColour(colour::textDim());
+        g.drawFittedText(shown, getLocalBounds(), juce::Justification::topLeft, 4);
+    }
+
+private:
+    std::function<juce::String()> text;
+    juce::String shown;
+};
+
+class GuestDevice final : public Device, public Animated
+{
+public:
+    explicit GuestDevice(Model& m) : Device(m, "Guest", colour::forScene(9))
+    {
+        model.add(this);
+        menu = setTop(std::make_unique<juce::ComboBox>(), 24, 4 * metric::knobW);
+        menu->setTextWhenNothingSelected("Choose an instrument plugin...");
+        menu->onChange = [this] { chosen(menu->getSelectedId()); };
+        for (int k = 0; k < 6; ++k)
+            knobs[static_cast<std::size_t>(k)] = static_cast<Knob*>(addKnob(static_cast<P>(engine::idx(P::GuestP1) + static_cast<engine::ParamIndex>(k))));
+        auto open = std::make_unique<FlatButton>("Plugin window");
+        open->setHelp(&model, "open the instrument's own controls");
+        open->onClick = [this] {
+            if (model.core.plugins != nullptr)
+                model.core.plugins->openEditor(PluginHost::kGuestSlot);
+        };
+        openButton = add(std::move(open), 2 * metric::knobW, 24);
+        auto pick = std::make_unique<FlatButton>("Choose controls");
+        pick->setHelp(&model, "choose which of the instrument's parameters each of the six knobs controls");
+        pick->onClick = [this] { showPluginControlMenu(model, this, PluginHost::kGuestSlot, P::GuestP1, [this] { refresh(); }); };
+        pickButton = add(std::move(pick), 2 * metric::knobW, 24);
+        note = add(std::make_unique<NoteText>([this] { return describe(); }), 2 * metric::knobW + 40, 58);
+        fillMenu();
+        refresh();
+    }
+    ~GuestDevice() override { model.remove(this); }
+
+    void tick() override
+    {
+        auto* plugins = model.core.plugins.get();
+        const int version = plugins != nullptr ? plugins->getListVersion() : 0;
+        if (version != shownListVersion)
+            fillMenu();
+        const bool loaded = plugins != nullptr && plugins->hasInstance(PluginHost::kGuestSlot);
+        if (model.core.guest.getType() != shownType || loaded != shownLoaded || model.core.guest.isMissing() != shownMissing)
+            refresh();
+        if (loaded && ++syncFrames % 6 == 0)
+            followPluginWindow(model, PluginHost::kGuestSlot, P::GuestP1, knobs.data());
+        if (++noteFrames % 15 == 0)
+            note->refresh();
+    }
+
+private:
+    static constexpr int kEmptyId = 1, kScanId = 900, kPluginBase = 1000;
+
+    juce::String describe() const
+    {
+        auto* plugins = model.core.plugins.get();
+        const auto& guest = model.core.guest;
+        if (plugins == nullptr)
+            return guest.isEmpty() ? "Instrument plugins play in the Tidefield app." : "Instrument plugins play in the Tidefield app; this one is kept with the session.";
+        if (guest.isMissing())
+            return "Not found: " + juce::String(guest.getName().empty() ? guest.getType() : guest.getName())
+                   + ". Install or rescan it, then choose it again; its settings are kept with the session.";
+        if (guest.isEmpty())
+            return plugins->hasScanned() ? (pluginList.empty() ? "No instrument plugins were found. Scan again after installing one." : "Choose an instrument above. It plays from the keyboard, MIDI or the Cycles (Play From).")
+                                         : "Choose Find my plugins in the menu above to look for instruments.";
+        const auto& f = model.frame();
+        return f.guestNotes > 0 ? juce::String(f.guestNotes) + (f.guestNotes == 1 ? " note sounding" : " notes sounding") : juce::String("Ready to play");
+    }
+
+    void fillMenu()
+    {
+        auto* plugins = model.core.plugins.get();
+        shownListVersion = plugins != nullptr ? plugins->getListVersion() : 0;
+        pluginList = plugins != nullptr ? plugins->instruments() : std::vector<juce::PluginDescription> {};
+        menu->clear(juce::dontSendNotification);
+        auto* root = menu->getRootMenu();
+        root->addItem(kEmptyId, "Empty");
+        if (plugins != nullptr)
+        {
+            std::map<juce::String, juce::PopupMenu> byMaker;
+            for (std::size_t k = 0; k < pluginList.size(); ++k)
+            {
+                const auto& d = pluginList[k];
+                const auto maker = d.manufacturerName.isNotEmpty() ? d.manufacturerName : juce::String("Other");
+                byMaker[maker].addItem(kPluginBase + static_cast<int>(k), d.name + "  (" + d.pluginFormatName + ")");
+            }
+            if (! byMaker.empty())
+                root->addSectionHeader("Instruments");
+            for (auto& [maker, sub] : byMaker)
+                root->addSubMenu(maker, sub);
+            root->addItem(kScanId, plugins->hasScanned() ? "Scan for new plugins" : "Find my plugins...");
+        }
+        refresh();
+    }
+
+    void chosen(int id)
+    {
+        if (id == kScanId)
+        {
+            menu->setSelectedId(selectedId, juce::dontSendNotification);
+            if (model.core.plugins != nullptr)
+                model.core.plugins->startScan();
+            return;
+        }
+        std::string type;
+        if (id >= kPluginBase && id - kPluginBase < static_cast<int>(pluginList.size()))
+            type = PluginHost::typeIdFor(pluginList[static_cast<std::size_t>(id - kPluginBase)]);
+        if (type == model.core.guest.getType() && ! model.core.guest.isMissing())
+            return;
+        model.core.setInstrument(type);
+        refresh();
+    }
+
+    void refresh()
+    {
+        auto* plugins = model.core.plugins.get();
+        const auto& guest = model.core.guest;
+        shownType = guest.getType();
+        shownMissing = guest.isMissing();
+        shownLoaded = plugins != nullptr && plugins->hasInstance(PluginHost::kGuestSlot);
+        selectedId = kEmptyId;
+        for (std::size_t k = 0; k < pluginList.size(); ++k)
+            if (shownType == PluginHost::typeIdFor(pluginList[k]))
+                selectedId = kPluginBase + static_cast<int>(k);
+        if (selectedId == kEmptyId && ! shownType.empty())
+            menu->setSelectedId(0, juce::dontSendNotification);
+        else
+            menu->setSelectedId(selectedId, juce::dontSendNotification);
+        if (selectedId == kEmptyId && ! shownType.empty())
+            menu->setText(juce::String(guest.getName()) + " (missing)", juce::dontSendNotification);
+        menu->setEnabled(plugins != nullptr);
+        for (int k = 0; k < 6; ++k)
+        {
+            auto* kn = knobs[static_cast<std::size_t>(k)];
+            const auto name = shownLoaded ? plugins->parameterName(PluginHost::kGuestSlot, k) : juce::String();
+            kn->setVisible(name.isNotEmpty());
+            if (name.isEmpty())
+                continue;
+            kn->setLabel(name);
+            kn->formatter = [this, k](float v) {
+                const auto text = model.core.plugins != nullptr ? model.core.plugins->parameterText(PluginHost::kGuestSlot, k, v) : juce::String();
+                return text.isNotEmpty() ? text : juce::String(juce::roundToInt(v * 100.0f)) + "%";
+            };
+        }
+        openButton->setVisible(shownLoaded);
+        pickButton->setVisible(shownLoaded);
+        title = shownType.empty() ? juce::String("Guest") : juce::String(guest.getName());
+        note->refresh();
+        resized();
+        repaint();
+        if (auto* view = findParentComponentOfClass<DeviceView>())
+            view->resized();
+    }
+
+    juce::ComboBox* menu = nullptr;
+    NoteText* note = nullptr;
+    FlatButton* openButton = nullptr;
+    FlatButton* pickButton = nullptr;
+    std::array<Knob*, 6> knobs {};
+    std::vector<juce::PluginDescription> pluginList;
+    std::string shownType = "\x01";
+    bool shownLoaded = false, shownMissing = false;
+    int shownListVersion = -1;
+    int selectedId = kEmptyId;
+    int syncFrames = 0, noteFrames = 0;
+};
+
+class CyclesOutView final : public juce::Component, public Animated
+{
+public:
+    explicit CyclesOutView(Model& m) : model(m)
+    {
+        model.add(this);
+        devices.setTextWhenNothingSelected("Send the Cycles to...");
+        devices.onChange = [this] {
+            const int id = devices.getSelectedId();
+            if (model.core.cycleOut != nullptr)
+                model.core.cycleOut->setDevice(id > 1 && id - 2 < outputs.size() ? outputs[id - 2].identifier : juce::String());
+        };
+        addAndMakeVisible(devices);
+        fill();
+    }
+    ~CyclesOutView() override { model.remove(this); }
+
+    void tick() override
+    {
+        if (++frames % 120 == 0 && juce::MidiOutput::getAvailableDevices() != outputs)
+            fill();
+        const auto text = status();
+        if (text != shown)
+        {
+            shown = text;
+            repaint();
+        }
+    }
+
+    void resized() override { devices.setBounds(getLocalBounds().removeFromTop(24)); }
+
+    void paint(juce::Graphics& g) override
+    {
+        g.setFont(font(11.5f));
+        g.setColour(colour::textDim());
+        g.drawFittedText(shown, getLocalBounds().withTrimmedTop(28), juce::Justification::topLeft, 2);
+    }
+
+private:
+    juce::String status() const
+    {
+        auto* out = model.core.cycleOut.get();
+        if (out == nullptr)
+            return "MIDI out is part of the Tidefield app.";
+        if (! out->isOpen())
+            return out->getDeviceId().isEmpty() ? "Choose a MIDI output for the Cycles' notes." : "That MIDI output is not connected.";
+        const bool on = model.value(P::LoopsMidiOut) > 0.5f && model.value(P::LoopsOn) > 0.5f;
+        if (! on)
+            return "Turn on MIDI Out and the Cycles to send notes.";
+        const int n = out->getSounding();
+        return n > 0 ? juce::String(n) + (n == 1 ? " note sounding" : " notes sounding") : juce::String("Sending");
+    }
+
+    void fill()
+    {
+        outputs = juce::MidiOutput::getAvailableDevices();
+        devices.clear(juce::dontSendNotification);
+        devices.addItem("No MIDI out", 1);
+        int selected = 1;
+        for (int k = 0; k < outputs.size(); ++k)
+        {
+            devices.addItem(outputs[k].name, k + 2);
+            if (model.core.cycleOut != nullptr && outputs[k].identifier == model.core.cycleOut->getDeviceId())
+                selected = k + 2;
+        }
+        devices.setSelectedId(selected, juce::dontSendNotification);
+        devices.setEnabled(model.core.cycleOut != nullptr);
+    }
+
+    Model& model;
+    juce::ComboBox devices;
+    juce::Array<juce::MidiDeviceInfo> outputs;
+    juce::String shown;
+    int frames = 0;
 };
 
 class FaderMeter final : public juce::Component
@@ -1929,7 +2204,7 @@ DeviceView::~DeviceView()
 
 juce::String DeviceView::pageName(int p)
 {
-    static const char* names[] = { "Drone", "Clouds", "Resonator", "Bloom", "Input", "Looper", "Weather", "Gestures", "Cycles", "Seasons", "Modulation", "Macros", "Timeline", "Mixer", "Effects", "Master", "MIDI" };
+    static const char* names[] = { "Drone", "Clouds", "Resonator", "Bloom", "Input", "Looper", "Weather", "Guest", "Gestures", "Cycles", "Seasons", "Modulation", "Macros", "Timeline", "Mixer", "Effects", "Master", "MIDI" };
     return names[juce::jlimit(0, NumPages - 1, p)];
 }
 
@@ -2187,11 +2462,26 @@ void DeviceView::build()
             strip(static_cast<int>(engine::StripId::Freeze), colour::tide());
             break;
         }
+        case Guest:
+        {
+            devices.push_back(std::make_unique<GuestDevice>(model));
+            auto& k = device("Play", sceneTint(9));
+            params(k, { P::GuestPlayFrom, P::GuestTranspose });
+            k.add(std::make_unique<KeyboardStrip>(model), 420, 120);
+            strip(static_cast<int>(engine::StripId::Guest), sceneTint(9));
+            break;
+        }
         case Loops:
         {
             auto& d = device("Cycles", sceneTint(7));
             params(d, { P::LoopsOn, P::LoopsTarget, P::LoopsCount, P::LoopsPattern, P::LoopsRate, P::LoopsDensity, P::LoopsRegister, P::LoopsSpread,
-                        P::LoopsVelocity });
+                        P::LoopsVelocity, P::LoopsGate });
+            if (! model.core.host.isPlugin())
+            {
+                auto& o = device("MIDI out", colour::learn());
+                params(o, { P::LoopsMidiOut, P::LoopsMidiChannel });
+                o.add(std::make_unique<CyclesOutView>(model), 3 * metric::knobW, 64);
+            }
             d.setPresets("loops", "loops.", { P::LoopsCount, P::LoopsRate, P::LoopsDensity, P::LoopsRegister, P::LoopsSpread, P::LoopsVelocity, P::LoopsPattern });
             auto& t = device("Tempo", colour::tide());
             params(t, { P::SyncOn, P::SyncBpm, P::SyncSource });
@@ -2315,6 +2605,8 @@ void DeviceView::build()
     viewport.setViewPosition(0, 0);
 }
 std::unique_ptr<juce::Component> createRemoteView(Model& model) { return std::make_unique<RemoteView>(model); }
+
+std::unique_ptr<juce::Component> createCyclesOutView(Model& model) { return std::make_unique<CyclesOutView>(model); }
 
 std::unique_ptr<juce::Component> createInstallationView(Model& model)
 {

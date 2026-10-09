@@ -1,4 +1,5 @@
 #include <engine/Engine.h>
+#include <engine/guest/GuestManager.h>
 #include <engine/midi/MidiManager.h>
 #include <engine/mix/FxManager.h>
 #include <engine/mod/ModRouteManager.h>
@@ -608,4 +609,53 @@ TEST_CASE("A session counts as changed only when its content changes")
     REQUIRE(mod.addMacroTarget(0, engine::idx(engine::P::DroneCutoff), 0.0f, 0.5f));
     const auto withMacro = io::captureSession(a.engine, a.last, a.scenes, a.fx, nullptr, nullptr, nullptr, nullptr, &mod);
     CHECK_FALSE(io::sameContent(saved, withMacro));
+}
+
+TEST_CASE("The Guest instrument's identity and state survive a session, and a missing one only warns", "[session][guest]")
+{
+    Rig a;
+    engine::GuestManager guestA(a.engine);
+    guestA.setType("plugin:VST3-Pad Synth-1-2", false, "map=0,1,2,3,4,5;c3RhdGU=", "Pad Synth");
+    a.engine.setParam(engine::P::GuestPlayFrom, 3.0f);
+    a.run(0.2);
+    auto session = io::captureSession(a.engine, a.last, a.scenes, a.fx, nullptr, nullptr, nullptr, nullptr, nullptr, &guestA);
+    REQUIRE(session.guest.type == "plugin:VST3-Pad Synth-1-2");
+    REQUIRE(session.guest.name == "Pad Synth");
+    REQUIRE(session.guest.state == "map=0,1,2,3,4,5;c3RhdGU=");
+
+    juce::MemoryOutputStream out;
+    juce::String error;
+    REQUIRE(io::writeSession(session, out, error));
+    auto loaded = io::readSession(out.getData(), out.getDataSize(), error);
+    REQUIRE(loaded.has_value());
+    REQUIRE(loaded->guest.type == session.guest.type);
+    REQUIRE(loaded->guest.state == session.guest.state);
+    REQUIRE(io::sameContent(session, *loaded));
+
+    Rig b;
+    engine::GuestManager guestB(b.engine);
+    const auto warnings = io::applySession(*loaded, b.engine, b.scenes, b.fx, true, nullptr, nullptr, nullptr, nullptr, nullptr, &guestB);
+    REQUIRE(guestB.isMissing());
+    REQUIRE(guestB.getState() == session.guest.state);
+    bool warned = false;
+    for (const auto& w : warnings)
+        warned = warned || juce::String(w).contains("Pad Synth");
+    REQUIRE(warned);
+    b.run(0.2);
+    REQUIRE(b.last.paramTargets[engine::idx(engine::P::GuestPlayFrom)] == 3.0f);
+    const auto again = io::captureSession(b.engine, b.last, b.scenes, b.fx, nullptr, nullptr, nullptr, nullptr, nullptr, &guestB);
+    REQUIRE(again.guest.type == session.guest.type);
+    REQUIRE(again.guest.state == session.guest.state);
+
+    auto changed = session;
+    changed.guest.state = "different";
+    REQUIRE_FALSE(io::sameContent(session, changed));
+
+    auto json = io::sessionToJson(session);
+    json.getDynamicObject()->removeProperty("guest");
+    auto old = io::sessionFromJson(json, error);
+    REQUIRE(old.has_value());
+    REQUIRE(old->guest.type.empty());
+    io::applySession(*old, b.engine, b.scenes, b.fx, true, nullptr, nullptr, nullptr, nullptr, nullptr, &guestB);
+    REQUIRE(guestB.isEmpty());
 }

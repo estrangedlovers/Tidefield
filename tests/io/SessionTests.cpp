@@ -611,6 +611,67 @@ TEST_CASE("A session counts as changed only when its content changes")
     CHECK_FALSE(io::sameContent(saved, withMacro));
 }
 
+TEST_CASE("Hosted plugin state counts as changed only when its edit revision moves", "[session][guest]")
+{
+    io::SessionData a;
+    a.params["drone.cutoff"] = 800.0f;
+    a.fx["drone.fx1"] = "plugin:VST3-Echo-1-2";
+    a.fx["drone.fx2"] = "tf.delay";
+    a.fxState["drone.fx1"] = "map=0,1,2,3,4,5;AAAA";
+    a.guest = { "plugin:VST3-Pad-3-4", "Pad", "map=0,1,2,3,4,5;BBBB" };
+
+    SECTION("without revisions the state blobs are compared")
+    {
+        auto b = a;
+        b.fxState["drone.fx1"] = "map=0,1,2,3,4,5;CCCC";
+        CHECK_FALSE(io::sameContent(a, b));
+        b = a;
+        b.guest.state = "map=0,1,2,3,4,5;DDDD";
+        CHECK_FALSE(io::sameContent(a, b));
+    }
+    SECTION("with revisions a blob that churns on its own is not a change")
+    {
+        a.pluginEdits = { { "drone.fx1", 7 }, { "guest", 3 } };
+        auto b = a;
+        b.fxState["drone.fx1"] = "map=0,1,2,3,4,5;CCCC";
+        b.guest.state = "map=0,1,2,3,4,5;DDDD";
+        CHECK(io::sameContent(a, b));
+        CHECK(io::sameContent(b, a));
+    }
+    SECTION("a moved revision is a change even when the blob is the same")
+    {
+        a.pluginEdits = { { "drone.fx1", 7 }, { "guest", 3 } };
+        auto b = a;
+        b.pluginEdits["drone.fx1"] = 8;
+        CHECK_FALSE(io::sameContent(a, b));
+        b = a;
+        b.pluginEdits["guest"] = 4;
+        CHECK_FALSE(io::sameContent(a, b));
+    }
+    SECTION("the plugin's identity and the knob values are still compared")
+    {
+        a.pluginEdits = { { "drone.fx1", 7 }, { "guest", 3 } };
+        auto b = a;
+        b.fx["drone.fx1"] = "plugin:VST3-Other-5-6";
+        CHECK_FALSE(io::sameContent(a, b));
+        b = a;
+        b.guest.type = "plugin:VST3-Other-5-6";
+        CHECK_FALSE(io::sameContent(a, b));
+        b = a;
+        b.params["drone.cutoff"] = 900.0f;
+        CHECK_FALSE(io::sameContent(a, b));
+    }
+    SECTION("a slot tracked on one side only falls back to its blob")
+    {
+        a.pluginEdits = { { "drone.fx1", 7 } };
+        auto b = a;
+        b.pluginEdits.clear();
+        CHECK(io::sameContent(a, b));
+        b.fxState["drone.fx1"] = "map=0,1,2,3,4,5;CCCC";
+        CHECK_FALSE(io::sameContent(a, b));
+    }
+}
+
 TEST_CASE("The Guest instrument's identity and state survive a session, and a missing one only warns", "[session][guest]")
 {
     Rig a;

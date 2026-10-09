@@ -374,7 +374,8 @@ while recording, timestamped from the start of the take. The app keeps the event
 an `io::Performance` with the session it started from. Playback applies that session,
 catches controls up to the chosen point and publishes a `GestureTake` with `startAt`
 through `performanceChannel`. `renderPerformance` replays the same events into a fresh
-engine offline, through `RecordTap`, for the master, stems or a crossfaded loop.
+engine offline, through `RecordTap`, for the master, stems or a crossfaded loop, with a
+fresh copy of the Guest instrument when the caller can make one (section 16).
 
 **Space.** After the strips, `spatialiseChunk` either renders each strip's left and
 right as two virtual sources through `BinauralSource` (interaural delay by Woodworth's
@@ -415,10 +416,17 @@ field has no Guest.
 Notes reach the Guest without allocation. Keyboard and gesture notes (`applyEvent`),
 MIDI notes, bends, pressure and unmapped controllers (`handleMidi`, channel kept) and the
 Cycles push into a fixed array of pending events stamped with the absolute sample time;
-`guest.playFrom` decides which sources pass. A table of sounding notes per channel maps
-each held key to the transposed note it started, so a note-off always finds its note
-when Transpose moves, and lets Play From changes, panics and instrument swaps release
-everything. The instrument renders in fixed 128-sample windows aligned to absolute
+`guest.playFrom` decides which sources pass. A table of sounding notes per origin (one
+for Bloom's notes, one per MIDI input channel) maps each held key to the transposed note
+it started, so a note-off always finds its note when Transpose moves, and lets Play From
+changes, panics and instrument swaps release everything. Below it, `guestNoteOn` and
+`guestNoteOff` count owners per output channel and note: a note-on for a note that
+already sounds sends a note-off and a new note-on (so it is heard again, and synths
+that would stack a second voice do not), and the note-off reaches the instrument only
+when the last owner lets go. Bloom's notes and the Cycles both play on channel 1 and
+MIDI input keeps its channels; the choice of ownership over a channel per origin is
+because most instruments are not multitimbral and ignore the channel, so separate
+channels would still collide inside the plugin. The instrument renders in fixed 128-sample windows aligned to absolute
 sample time: when the engine reaches a window boundary it renders the window just
 finished with every event inside it at its exact offset, and plays that audio during the
 next window. The Guest is therefore 128 samples late (2.7 ms at 48 kHz, not reported as
@@ -427,6 +435,32 @@ host block size, and the plugin always sees the same block size. Non-finite outp
 a plugin zeroes that window instead of tripping the master guard. The strip itself is an
 ordinary `StripId::Guest` with two inserts (`guest.fx1`, `guest.fx2`), so there are now
 30 effect slots.
+
+**The Guest in offline renders.** `io::renderPerformance` stays free of the plugin host:
+`RenderOptions::makeGuest` is a factory the caller supplies, given the session's
+`GuestData` and the render engine's Guest spec, returning a prepared `Instrument` that
+is sent through the render engine's `InstrumentSlot` before the pre-roll. Without a
+factory, or when it returns nothing, the render goes on with the strip silent and adds
+a warning. In the app, `PerformanceController::startRender` creates the instance on the
+message thread before queuing the worker (VST3 wants creation, state and
+`prepareToPlay` there, and AU creation may need it), with
+`PluginHost::createRenderInstrument`: a `HostedInstrument` outside the slot registry (so
+the live Guest, its editor and its saved state are untouched), restored from the
+performance's start state and prepared non-realtime. The worker only runs
+`processBlock`, through an `engine::SharedInstrument` that forwards to it; the last
+reference travels back to the message thread with the result, so the plugin is also
+destroyed there. A render is as repeatable as the plugin.
+
+**Hosted plugin state and unsaved changes.** Plugin state blobs are not reliable for
+change detection: some plugins rewrite them on their own. `HostedPlugin` listens to its
+instance: a gesture begin always counts as an edit, and parameter, program and
+non-parameter state changes count while its editor window is open.
+`PluginHost::editRevision(slot)` combines that with a per-slot count of loads and Choose
+controls changes. `SessionController::captureNow` records the revision of every hosted slot and
+of a loaded Guest in `SessionData::pluginEdits` (not saved), and `io::sameContent`
+compares revisions instead of blobs for every slot both sides track; untracked slots
+(a missing Guest, captures without a host) still compare their blobs. Knob values,
+including those mapped to plugin parameters, are parameters and compared as before.
 
 **Cycles note length and MIDI out.** The Cycles keep one hold per loop: the Guest note,
 the MIDI note and channel, and the time left (`loops.gate`, wall time, not Tide). A loop

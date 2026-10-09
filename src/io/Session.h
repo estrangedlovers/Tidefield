@@ -6,6 +6,7 @@
 
 #include <juce_core/juce_core.h>
 
+#include <cstdint>
 #include <map>
 #include <memory>
 #include <optional>
@@ -57,6 +58,7 @@ struct SessionData
     std::vector<engine::Point2> path;
     juce::var gesture;
     std::map<std::string, std::shared_ptr<const dsp::SampleBuffer>> samples;
+    std::map<std::string, std::uint64_t> pluginEdits;
 
     std::vector<std::string> warnings;
 };

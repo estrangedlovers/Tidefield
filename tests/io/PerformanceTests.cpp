@@ -1,3 +1,5 @@
+#include "support/FakeInstrument.h"
+
 #include <engine/Engine.h>
 #include <engine/mix/FxManager.h>
 #include <engine/scene/SceneManager.h>
@@ -7,6 +9,8 @@
 
 #include <catch2/catch_approx.hpp>
 #include <catch2/catch_test_macros.hpp>
+
+#include <algorithm>
 
 using namespace tf;
 using Catch::Approx;
@@ -197,5 +201,112 @@ TEST_CASE("A loop render folds its tail into its start so it repeats without a s
     for (int i = 1000; i < 2000; ++i)
         typicalStep = std::max(typicalStep, std::abs(audio.getSample(0, i) - audio.getSample(0, i - 1)));
     CHECK(std::abs(audio.getSample(0, 0) - audio.getSample(0, n - 1)) <= typicalStep * 2.0f + 1.0e-4f);
+    dir.deleteRecursively();
+}
+
+namespace {
+float peakOf(const juce::File& file)
+{
+    juce::AudioFormatManager formats;
+    formats.registerBasicFormats();
+    std::unique_ptr<juce::AudioFormatReader> reader(formats.createReaderFor(file));
+    if (reader == nullptr)
+        return -1.0f;
+    juce::AudioBuffer<float> audio(2, static_cast<int>(reader->lengthInSamples));
+    reader->read(&audio, 0, audio.getNumSamples(), 0, true, true);
+    return audio.getMagnitude(0, audio.getNumSamples());
+}
+
+io::Performance withGuest(const engine::Engine& e)
+{
+    auto p = sweep(e, 2.0);
+    p.start.guest = { "fake:sine", "Fake Sine", "stored-state" };
+    p.events.push_back({ static_cast<std::uint64_t>(0.3 * kRate), engine::ControlEvent::note(67, 0.9f), 0 });
+    p.events.push_back({ static_cast<std::uint64_t>(1.6 * kRate), engine::ControlEvent::note(67, 0.0f), 0 });
+    std::stable_sort(p.events.begin(), p.events.end(), [](const auto& a, const auto& b) { return a.time < b.time; });
+    return p;
+}
+}
+
+TEST_CASE("A performance render plays the session's Guest instrument, made fresh for the render", "[performance][render][guest]")
+{
+    engine::Engine e;
+    e.prepare(kRate, 256);
+    const auto p = withGuest(e);
+    const auto dir = juce::File::createTempFile("guestrender");
+    int made = 0;
+    std::string madeFrom;
+    tf::dsp::ProcessSpec madeWith;
+    io::RenderOptions o;
+    o.stems = true;
+    o.makeGuest = [&](const io::SessionData::GuestData& guest, const tf::dsp::ProcessSpec& spec, std::string&) -> engine::InstrumentPtr {
+        ++made;
+        madeFrom = guest.type + "|" + guest.state;
+        madeWith = spec;
+        auto fake = std::make_unique<tf::test::FakeInstrument>();
+        fake->prepare(spec);
+        return fake;
+    };
+    o.folder = dir.getChildFile("a");
+    const auto first = io::renderPerformance(p, o);
+    REQUIRE(first.ok);
+    CHECK(first.warnings.empty());
+    CHECK(made == 1);
+    CHECK(madeFrom == "fake:sine|stored-state");
+    CHECK(madeWith.sampleRate == kRate);
+    CHECK(madeWith.maxBlockSize == engine::Engine::kGuestBlock);
+    CHECK(peakOf(o.folder.getChildFile("stems").getChildFile("guest.wav")) > 0.01f);
+
+    o.folder = dir.getChildFile("b");
+    const auto second = io::renderPerformance(p, o);
+    REQUIRE(second.ok);
+    CHECK(fileBytes(first.master) == fileBytes(second.master));
+    CHECK(fileBytes(dir.getChildFile("a").getChildFile("stems").getChildFile("guest.wav"))
+          == fileBytes(dir.getChildFile("b").getChildFile("stems").getChildFile("guest.wav")));
+    dir.deleteRecursively();
+}
+
+TEST_CASE("A Guest instrument that cannot be made only warns, and the render goes on without it", "[performance][render][guest]")
+{
+    engine::Engine e;
+    e.prepare(kRate, 256);
+    const auto p = withGuest(e);
+    const auto dir = juce::File::createTempFile("guestfail");
+    io::RenderOptions o;
+    o.stems = true;
+    o.folder = dir.getChildFile("failing");
+    o.makeGuest = [](const io::SessionData::GuestData&, const tf::dsp::ProcessSpec&, std::string& error) -> engine::InstrumentPtr {
+        error = "it is not installed here";
+        return nullptr;
+    };
+    const auto failing = io::renderPerformance(p, o);
+    REQUIRE(failing.ok);
+    REQUIRE(failing.warnings.size() == 1);
+    CHECK(juce::String(failing.warnings.front()).contains("Fake Sine"));
+    CHECK(juce::String(failing.warnings.front()).contains("not installed"));
+    CHECK(peakOf(o.folder.getChildFile("stems").getChildFile("guest.wav")) < 1.0e-6f);
+    CHECK(peakOf(failing.master) > 0.01f);
+
+    o.folder = dir.getChildFile("none");
+    o.makeGuest = nullptr;
+    const auto none = io::renderPerformance(p, o);
+    REQUIRE(none.ok);
+    REQUIRE(none.warnings.size() == 1);
+    CHECK(juce::String(none.warnings.front()).contains("Guest"));
+    CHECK(fileBytes(failing.master) == fileBytes(none.master));
+
+    auto plain = p;
+    plain.start.guest = {};
+    o.folder = dir.getChildFile("plain");
+    int asked = 0;
+    o.makeGuest = [&](const io::SessionData::GuestData&, const tf::dsp::ProcessSpec&, std::string&) -> engine::InstrumentPtr {
+        ++asked;
+        return nullptr;
+    };
+    const auto withoutGuest = io::renderPerformance(plain, o);
+    REQUIRE(withoutGuest.ok);
+    CHECK(withoutGuest.warnings.empty());
+    CHECK(asked == 0);
+    CHECK(fileBytes(withoutGuest.master) == fileBytes(none.master));
     dir.deleteRecursively();
 }

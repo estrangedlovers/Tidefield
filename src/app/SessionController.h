@@ -13,6 +13,7 @@
 
 #include <juce_gui_basics/juce_gui_basics.h>
 
+#include <cstdint>
 #include <functional>
 #include <memory>
 
@@ -49,6 +50,7 @@ public:
     std::function<void()> onSessionChanged;
     std::function<io::SessionData()> makeNewSession;
     std::function<void(const io::SessionData&)> onApplied;
+    std::function<std::uint64_t(int hostSlot)> pluginEdits;
 
     void setWorkers(juce::ThreadPool* pool) { workers = pool; }
 

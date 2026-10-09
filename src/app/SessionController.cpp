@@ -193,7 +193,16 @@ void SessionController::autosaveTo(const juce::File& file, std::function<void(bo
 
 io::SessionData SessionController::captureNow() const
 {
-    return io::captureSession(engine, latest, scenes, fx, midi, seasons, path, gestures, mod, guest);
+    auto s = io::captureSession(engine, latest, scenes, fx, midi, seasons, path, gestures, mod, guest);
+    if (pluginEdits)
+    {
+        for (int slot = 0; slot < engine::kNumFxSlots; ++slot)
+            if (const std::string id = engine::kFxSlots[static_cast<std::size_t>(slot)].id; s.fxState.count(id) != 0)
+                s.pluginEdits[id] = pluginEdits(slot);
+        if (guest != nullptr && ! s.guest.type.empty() && ! guest->isMissing())
+            s.pluginEdits["guest"] = pluginEdits(engine::kNumFxSlots);
+    }
+    return s;
 }
 
 bool SessionController::hasUnsavedChanges() const

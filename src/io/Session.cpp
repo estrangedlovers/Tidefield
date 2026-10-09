@@ -568,6 +568,7 @@ std::vector<std::string> applySession(const SessionData& session, engine::Engine
 bool sameContent(const SessionData& a, const SessionData& b)
 {
     constexpr float kTolerance = 1.0e-5f;
+    constexpr const char* kGuestKey = "guest";
     if (a.params.size() != b.params.size())
         return false;
     for (const auto& [id, value] : a.params)
@@ -581,13 +582,22 @@ bool sameContent(const SessionData& a, const SessionData& b)
     for (const auto& [id, buffer] : a.samples)
         if (const auto it = b.samples.find(id); it == b.samples.end() || it->second != buffer)
             return false;
-    const auto structure = [](const SessionData& s) {
+    const auto tracked = [&](const std::string& key) { return a.pluginEdits.count(key) != 0 && b.pluginEdits.count(key) != 0; };
+    for (const auto& [key, revision] : a.pluginEdits)
+        if (tracked(key) && b.pluginEdits.at(key) != revision)
+            return false;
+    const auto structure = [&](const SessionData& s) {
         SessionData copy = s;
         copy.name.clear();
         copy.params.clear();
         copy.samples.clear();
         copy.performance = juce::var();
         copy.warnings.clear();
+        for (auto& [slot, state] : copy.fxState)
+            if (tracked(slot))
+                state.clear();
+        if (tracked(kGuestKey))
+            copy.guest.state.clear();
         return juce::JSON::toString(sessionToJson(copy), true);
     };
     return structure(a) == structure(b);

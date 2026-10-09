@@ -488,3 +488,108 @@ TEST_CASE("GuestManager loads, restores and keeps a missing instrument")
     REQUIRE(none.isMissing());
     REQUIRE(none.getState() == "kept");
 }
+
+namespace {
+int lastNoteState(const FakeInstrument& fake, int note)
+{
+    int sounding = 0;
+    for (int k = 0; k < fake.logged; ++k)
+    {
+        const auto& e = fake.log[static_cast<std::size_t>(k)].event;
+        if (e.data1 == note && (e.type() == 0x80 || e.type() == 0x90))
+            sounding = e.isNoteOn() ? 1 : 0;
+    }
+    return sounding;
+}
+
+int firstNoteOn(const FakeInstrument& fake, int from = 0)
+{
+    for (int k = from; k < fake.logged; ++k)
+        if (fake.log[static_cast<std::size_t>(k)].event.isNoteOn())
+            return fake.log[static_cast<std::size_t>(k)].event.data1;
+    return -1;
+}
+
+void oneCycle(GuestRig& rig, float gate)
+{
+    rig.engine.setParam(P::GuestPlayFrom, static_cast<float>(Engine::kFromAll));
+    rig.snap(P::LoopsCount, 1.0f);
+    rig.snap(P::LoopsSpread, 0.0f);
+    rig.snap(P::LoopsGate, gate);
+    cyclesFast(rig.engine);
+}
+}
+
+TEST_CASE("A note-off from one origin never ends a Guest note another origin still holds")
+{
+    SECTION("the keyboard and MIDI input on channel 1")
+    {
+        GuestRig rig;
+        auto* fake = rig.load();
+        rig.run(0.1);
+        rig.engine.noteOn(60, 0.8f);
+        rig.run(0.1);
+        rig.engine.postMidi(0, { 0x90, 60, 100, 0 });
+        rig.run(0.1);
+        REQUIRE(fake->noteOns() == 2);
+        REQUIRE(fake->held() == 1);
+        rig.engine.noteOff(60);
+        rig.run(0.1);
+        REQUIRE(fake->held() == 1);
+        REQUIRE(lastNoteState(*fake, 60) == 1);
+        rig.engine.postMidi(0, { 0x80, 60, 0, 0 });
+        rig.run(0.1);
+        REQUIRE(fake->held() == 0);
+    }
+    SECTION("a keyboard note outlives the Cycles playing and releasing the same note")
+    {
+        GuestRig rig;
+        auto* fake = rig.load();
+        oneCycle(rig, 0.1f);
+        rig.run(2.0);
+        const int cycleNote = firstNoteOn(*fake);
+        REQUIRE(cycleNote >= 0);
+        rig.engine.setParam(P::LoopsOn, 0.0f);
+        rig.run(0.5);
+        REQUIRE(fake->held() == 0);
+
+        const int before = fake->logged;
+        rig.engine.noteOn(cycleNote, 0.8f);
+        rig.run(0.1);
+        rig.engine.setParam(P::LoopsOn, 1.0f);
+        rig.run(3.0);
+        rig.engine.setParam(P::LoopsOn, 0.0f);
+        rig.run(0.5);
+        int repeats = 0;
+        for (int k = before; k < fake->logged; ++k)
+        {
+            const auto& e = fake->log[static_cast<std::size_t>(k)].event;
+            repeats += e.isNoteOn() && e.data1 == cycleNote ? 1 : 0;
+        }
+        REQUIRE(repeats >= 3);
+        REQUIRE(fake->held() == 1);
+        REQUIRE(lastNoteState(*fake, cycleNote) == 1);
+        rig.engine.noteOff(cycleNote);
+        rig.run(0.1);
+        REQUIRE(fake->held() == 0);
+    }
+    SECTION("a Cycles note outlives a keyboard release of the same note")
+    {
+        GuestRig rig;
+        auto* fake = rig.load();
+        oneCycle(rig, 8.0f);
+        rig.run(2.0);
+        const int cycleNote = firstNoteOn(*fake);
+        REQUIRE(cycleNote >= 0);
+        REQUIRE(fake->held() == 1);
+        rig.engine.noteOn(cycleNote, 0.8f);
+        rig.run(0.05);
+        rig.engine.noteOff(cycleNote);
+        rig.run(0.05);
+        REQUIRE(fake->held() == 1);
+        REQUIRE(lastNoteState(*fake, cycleNote) == 1);
+        rig.engine.setParam(P::LoopsOn, 0.0f);
+        rig.run(0.2);
+        REQUIRE(fake->held() == 0);
+    }
+}

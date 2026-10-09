@@ -101,6 +101,8 @@ void Engine::prepare(double newSampleRate, int maxBlockSize)
     guestOutR.fill(0.0f);
     for (auto& k : guestKeys)
         k.fill(0);
+    for (auto& o : guestOwners)
+        o.fill(0);
     cycleHolds.fill({});
     midiOutHeld.fill(0);
     guestFrom = std::clamp(toInt(params.current(P::GuestPlayFrom)), 0, 3);
@@ -450,6 +452,8 @@ void Engine::drainControl() noexcept
     {
         for (auto& k : guestKeys)
             k.fill(0);
+        for (auto& o : guestOwners)
+            o.fill(0);
         for (auto& h : cycleHolds)
             h.guestNote = -1;
     }
@@ -906,7 +910,7 @@ void Engine::applyEvent(const ControlEvent& e) noexcept
             else
                 bloom.noteOff(static_cast<int>(e.param));
             if (guestPlays(kFromBloomNotes))
-                guestKey(0, static_cast<int>(e.param), e.value);
+                guestKey(kGuestKeyboardKeys, static_cast<int>(e.param), e.value);
             break;
     }
 }
@@ -927,6 +931,8 @@ void Engine::applyCommand(Command c) noexcept
             master.panic();
             releaseGuestKeys();
             releaseCycleNotes(true, true);
+            for (auto& o : guestOwners)
+                o.fill(0);
             for (int ch = 0; ch < 16; ++ch)
                 pushGuest(static_cast<std::uint8_t>(0xb0 | ch), 123, 0);
             break;
@@ -1452,7 +1458,7 @@ void Engine::updateLoops(float dt) noexcept
         if (h.remaining > 0.0f)
             continue;
         if (h.guestNote >= 0)
-            pushGuest(0x80, static_cast<std::uint8_t>(h.guestNote), 0);
+            guestNoteOff(0, h.guestNote);
         if (h.midiNote >= 0)
         {
             pushMidiOut(static_cast<std::uint8_t>(0x80 | h.midiChannel), static_cast<std::uint8_t>(h.midiNote), 0);
@@ -1514,7 +1520,7 @@ void Engine::updateLoops(float dt) noexcept
         {
             hold.remaining = 0.0f;
             if (hold.guestNote >= 0)
-                pushGuest(0x80, static_cast<std::uint8_t>(hold.guestNote), 0);
+                guestNoteOff(0, hold.guestNote);
             if (hold.midiNote >= 0)
             {
                 pushMidiOut(static_cast<std::uint8_t>(0x80 | hold.midiChannel), static_cast<std::uint8_t>(hold.midiNote), 0);
@@ -1526,7 +1532,7 @@ void Engine::updateLoops(float dt) noexcept
         if (toGuest && guestSlot.hasInstrument())
         {
             hold.guestNote = std::clamp(note + toInt(params.current(P::GuestTranspose)), 0, 127);
-            pushGuest(0x90, static_cast<std::uint8_t>(hold.guestNote), velocity7);
+            guestNoteOn(0, hold.guestNote, velocity7);
         }
         if (midiOn)
         {
@@ -1547,31 +1553,51 @@ void Engine::pushGuest(std::uint8_t status, std::uint8_t data1, std::uint8_t dat
     guestPending[static_cast<std::size_t>(guestPendingCount++)] = { sampleTime, GuestEvent { 0, status, data1, data2 } };
 }
 
-void Engine::guestKey(int channel, int note, float velocity) noexcept
+void Engine::guestKey(int keys, int note, float velocity) noexcept
 {
-    const auto c = static_cast<std::size_t>(channel & 15);
-    const auto n = static_cast<std::size_t>(note & 127);
-    auto& sounding = guestKeys[c][n];
+    const auto k = static_cast<std::size_t>(std::clamp(keys, 0, kGuestKeyboardKeys));
+    const int channel = keys & 15;
+    auto& sounding = guestKeys[k][static_cast<std::size_t>(note & 127)];
     if (sounding != 0)
     {
-        pushGuest(static_cast<std::uint8_t>(0x80 | c), static_cast<std::uint8_t>(sounding - 1), 0);
+        guestNoteOff(channel, sounding - 1);
         sounding = 0;
     }
     if (velocity <= 0.0f || ! guestSlot.hasInstrument())
         return;
     const int out = std::clamp(note + toInt(params.current(P::GuestTranspose)), 0, 127);
-    pushGuest(static_cast<std::uint8_t>(0x90 | c), static_cast<std::uint8_t>(out), static_cast<std::uint8_t>(std::clamp(toInt(velocity * 127.0f), 1, 127)));
+    guestNoteOn(channel, out, static_cast<std::uint8_t>(std::clamp(toInt(velocity * 127.0f), 1, 127)));
     sounding = static_cast<std::uint8_t>(out + 1);
+}
+
+void Engine::guestNoteOn(int channel, int note, std::uint8_t velocity) noexcept
+{
+    const auto c = static_cast<std::size_t>(channel & 15);
+    auto& owners = guestOwners[c][static_cast<std::size_t>(note & 127)];
+    if (owners != 0)
+        pushGuest(static_cast<std::uint8_t>(0x80 | c), static_cast<std::uint8_t>(note & 127), 0);
+    pushGuest(static_cast<std::uint8_t>(0x90 | c), static_cast<std::uint8_t>(note & 127), velocity);
+    owners = static_cast<std::uint8_t>(std::min(255, owners + 1));
+}
+
+void Engine::guestNoteOff(int channel, int note) noexcept
+{
+    const auto c = static_cast<std::size_t>(channel & 15);
+    auto& owners = guestOwners[c][static_cast<std::size_t>(note & 127)];
+    if (owners == 0)
+        return;
+    if (--owners == 0)
+        pushGuest(static_cast<std::uint8_t>(0x80 | c), static_cast<std::uint8_t>(note & 127), 0);
 }
 
 void Engine::releaseGuestKeys() noexcept
 {
-    for (std::size_t c = 0; c < guestKeys.size(); ++c)
+    for (std::size_t k = 0; k < guestKeys.size(); ++k)
         for (std::size_t n = 0; n < 128; ++n)
-            if (guestKeys[c][n] != 0)
+            if (guestKeys[k][n] != 0)
             {
-                pushGuest(static_cast<std::uint8_t>(0x80 | c), static_cast<std::uint8_t>(guestKeys[c][n] - 1), 0);
-                guestKeys[c][n] = 0;
+                guestNoteOff(static_cast<int>(k & 15), guestKeys[k][n] - 1);
+                guestKeys[k][n] = 0;
             }
 }
 
@@ -1581,7 +1607,7 @@ void Engine::releaseCycleNotes(bool guest, bool midi) noexcept
     {
         if (guest && h.guestNote >= 0)
         {
-            pushGuest(0x80, static_cast<std::uint8_t>(h.guestNote), 0);
+            guestNoteOff(0, h.guestNote);
             h.guestNote = -1;
         }
         if (midi && h.midiNote >= 0)

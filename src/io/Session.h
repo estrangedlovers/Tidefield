@@ -45,6 +45,7 @@ struct SessionData
     juce::var midi;
     juce::var seasons;
     juce::var modRoutes;
+    juce::var macros;
     std::vector<float> bloomRoots;
     juce::var performance;
     std::vector<engine::Point2> path;
@@ -72,6 +73,9 @@ std::vector<std::string> applySeasonsJson(const juce::var& json, engine::SeasonM
 
 juce::var modRoutesToJson(const engine::ModRouteManager& mod, const engine::ParamRegistry& registry);
 std::vector<std::string> applyModRoutesJson(const juce::var& json, engine::ModRouteManager& mod, const engine::ParamRegistry& registry);
+
+juce::var macrosToJson(const engine::ModRouteManager& mod, const engine::ParamRegistry& registry);
+std::vector<std::string> applyMacrosJson(const juce::var& json, engine::ModRouteManager& mod, const engine::ParamRegistry& registry);
 
 juce::var gestureToJson(const engine::GestureTake& take, const engine::ParamRegistry& registry);
 std::vector<std::string> applyGestureJson(const juce::var& json, engine::GestureManager& gestures, const engine::ParamRegistry& registry);

@@ -561,3 +561,31 @@ TEST_CASE("Projects saved as .tidefield by 1.3 and earlier still open")
     REQUIRE(loaded->params.at("drone.cutoff") == Approx(1234.0f));
     REQUIRE(juce::String(io::kSessionExtension) == ".tide");
 }
+
+TEST_CASE("Macro names, targets and ranges survive a save and reload")
+{
+    Rig a;
+    engine::ModRouteManager mod(a.engine);
+    REQUIRE(mod.addMacroTarget(2, engine::idx(engine::P::DroneCutoff), 0.1f, -0.7f));
+    REQUIRE(mod.addMacroTarget(2, engine::idx(engine::P::BusALevel), 0.0f, 0.4f));
+    mod.setMacroName(2, "Darken");
+    auto session = io::captureSession(a.engine, a.last, a.scenes, a.fx, nullptr, nullptr, nullptr, nullptr, &mod);
+    const auto file = tempFile("macros.tide");
+    file.getParentDirectory().createDirectory();
+    juce::String error;
+    REQUIRE(io::saveSession(session, file, error));
+    const auto loaded = io::loadSession(file, error);
+    REQUIRE(loaded.has_value());
+
+    Rig b;
+    engine::ModRouteManager mod2(b.engine);
+    const auto warnings = io::applySession(*loaded, b.engine, b.scenes, b.fx, true, nullptr, nullptr, nullptr, nullptr, &mod2);
+    CHECK(warnings.empty());
+    const auto& m = mod2.getMacros()[2];
+    CHECK(m.name == "Darken");
+    REQUIRE(m.targets.size() == 2);
+    CHECK(m.targets[0].param == engine::idx(engine::P::DroneCutoff));
+    CHECK(m.targets[0].from == Approx(0.1f));
+    CHECK(m.targets[0].to == Approx(-0.7f));
+    CHECK(mod2.getMacros()[0].name == "Macro 1");
+}

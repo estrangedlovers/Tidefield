@@ -2,6 +2,8 @@
 
 #include "ModMatrix.h"
 
+#include <array>
+#include <string>
 #include <vector>
 
 namespace tf::engine {
@@ -29,8 +31,27 @@ public:
     bool canModulate(ParamIndex param) const;
     int freeSlot() const;
 
+    struct Macro
+    {
+        std::string name;
+        std::vector<MacroTarget> targets;
+    };
+    const std::array<Macro, kNumMacros>& getMacros() const noexcept { return macros; }
+    bool addMacroTarget(int macro, ParamIndex param, float from = 0.0f, float to = 0.5f);
+    void removeMacroTarget(int macro, int index);
+    void removeFromMacros(ParamIndex param);
+    void setMacroRange(int macro, int index, float from, float to);
+    void setMacroName(int macro, const std::string& name);
+    void replaceMacros(const std::array<Macro, kNumMacros>& all);
+    int macroFor(ParamIndex param) const;
+    static std::string defaultMacroName(int macro);
+
 private:
     void publish();
+    void publishMacros();
+    std::array<Macro, kNumMacros> macros;
+    std::uint64_t macroVersion = 0;
+    bool macrosDirty = false;
 
     Engine& engine;
     std::vector<Route> list;

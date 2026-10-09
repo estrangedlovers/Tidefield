@@ -235,7 +235,15 @@ inline constexpr unsigned kDiscrete = 1u << 4;
     X(SyncSource,       "sync.source",        "Follow",            0.0f,   1.0f,    0.0f, Linear,  Linear,         0.0f,  "",   kDiscrete) \
     X(SpaceMode,        "space.mode",         "Output",            0.0f,   4.0f,    0.0f, Linear,  Linear,         0.0f,  "",   kMidiLearnable | kDiscrete) \
     X(SpaceSpread,      "space.spread",       "Spread",            0.0f,   1.0f,    0.35f, Linear, Exponential,    0.3f,  "",   TF_TB_ML) \
-    X(SpaceRotate,      "space.rotate",       "Rotate",          -30.0f,  30.0f,    0.0f, Linear,  Exponential,    0.5f,  "deg/s", kMidiLearnable)
+    X(SpaceRotate,      "space.rotate",       "Rotate",          -30.0f,  30.0f,    0.0f, Linear,  Exponential,    0.5f,  "deg/s", kMidiLearnable) \
+    X(Macro1,          "macro.1",            "Macro 1",           0.0f,   1.0f,    0.0f, Linear,  Exponential,    0.05f, "",   TF_TB_ML | kPerformance) \
+    X(Macro2,          "macro.2",            "Macro 2",           0.0f,   1.0f,    0.0f, Linear,  Exponential,    0.05f, "",   TF_TB_ML | kPerformance) \
+    X(Macro3,          "macro.3",            "Macro 3",           0.0f,   1.0f,    0.0f, Linear,  Exponential,    0.05f, "",   TF_TB_ML | kPerformance) \
+    X(Macro4,          "macro.4",            "Macro 4",           0.0f,   1.0f,    0.0f, Linear,  Exponential,    0.05f, "",   TF_TB_ML | kPerformance) \
+    X(Macro5,          "macro.5",            "Macro 5",           0.0f,   1.0f,    0.0f, Linear,  Exponential,    0.05f, "",   TF_TB_ML | kPerformance) \
+    X(Macro6,          "macro.6",            "Macro 6",           0.0f,   1.0f,    0.0f, Linear,  Exponential,    0.05f, "",   TF_TB_ML | kPerformance) \
+    X(Macro7,          "macro.7",            "Macro 7",           0.0f,   1.0f,    0.0f, Linear,  Exponential,    0.05f, "",   TF_TB_ML | kPerformance) \
+    X(Macro8,          "macro.8",            "Macro 8",           0.0f,   1.0f,    0.0f, Linear,  Exponential,    0.05f, "",   TF_TB_ML | kPerformance)
 
 enum class P : ParamIndex
 {

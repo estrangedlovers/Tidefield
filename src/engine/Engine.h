@@ -78,6 +78,7 @@ public:
     bool publishSeasons(std::unique_ptr<SeasonSet> set) { return seasonChannel.publish(std::move(set)); }
     bool publishPath(std::unique_ptr<TerrainPath> path) { return pathChannel.publish(std::move(path)); }
     bool publishModRoutes(std::unique_ptr<ModRouteSet> routes) { return modChannel.publish(std::move(routes)); }
+    bool publishMacros(std::unique_ptr<MacroSet> set) { return macroChannel.publish(std::move(set)); }
 
     bool loadCloudSample(int cloud, std::shared_ptr<const dsp::SampleBuffer> buffer);
 
@@ -185,6 +186,7 @@ private:
     SnapshotChannel<SeasonSet> seasonChannel { 4 };
     SnapshotChannel<TerrainPath> pathChannel { 4 };
     SnapshotChannel<ModRouteSet> modChannel { 4 };
+    SnapshotChannel<MacroSet> macroChannel { 4 };
     std::array<float, kNumModSources> modValue {};
     std::array<float, kNumLfos> lfoPhase {}, lfoStep {};
     std::array<float, kNumRandoms> randomValue {}, randomTarget {}, randomClock {};

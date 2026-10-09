@@ -1944,6 +1944,8 @@ TEST_CASE("Control audit: every parameter is covered", "[audit]")
     for (P p : { P::MasterFadeSecs, P::HarmonyMorph, P::TerrainGlide, P::SwellAttack, P::SwellRelease, P::CatchSeconds, P::CatchSource, P::CatchTarget,
                  P::ModFollowAttack, P::ModFollowRelease, P::ModFollowGain, P::SyncSource, P::SpaceMode, P::SpaceSpread, P::SpaceRotate, P::DroneChord, P::DroneGlide, P::DroneRevoice })
         seen.insert(idx(p));
+    for (int m = 0; m < kNumMacros; ++m)
+        seen.insert(static_cast<ParamIndex>(idx(P::Macro1) + m));
     for (const auto& s : kStrips)
         seen.insert(idx(s.azimuth));
     for (ParamIndex i = idx(P::ModLfo1Rate); i < idx(P::ModFollowAttack); ++i)

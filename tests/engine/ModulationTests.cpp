@@ -132,3 +132,58 @@ TEST_CASE("Every modulation source runs on the audio thread without allocating",
     for (float x : rig.l)
         CHECK(std::isfinite(x));
 }
+
+TEST_CASE("A macro moves each of its targets across its own range", "[mod][macro]")
+{
+    Rig rig;
+    REQUIRE(rig.routes.addMacroTarget(0, engine::idx(engine::P::DroneCutoff), 0.0f, -0.6f));
+    REQUIRE(rig.routes.addMacroTarget(0, engine::idx(engine::P::ResDecay), 0.1f, 0.5f));
+    const auto modAt = [&rig](float amount) {
+        rig.engine.setParam(engine::P::Macro1, amount);
+        float cutoff = 0.0f, decay = 0.0f;
+        rig.run(0.6, 0.0f, [&](const engine::TelemetryFrame& f) {
+            cutoff = f.paramMod[engine::idx(engine::P::DroneCutoff)];
+            decay = f.paramMod[engine::idx(engine::P::ResDecay)];
+        });
+        return std::make_pair(cutoff, decay);
+    };
+    const auto low = modAt(0.0f);
+    const auto mid = modAt(0.5f);
+    const auto high = modAt(1.0f);
+    CHECK(std::abs(low.first) < 0.01f);
+    CHECK(std::abs(low.second - 0.1f) < 0.01f);
+    CHECK(std::abs(mid.first + 0.3f) < 0.02f);
+    CHECK(std::abs(high.first + 0.6f) < 0.02f);
+    CHECK(std::abs(high.second - 0.5f) < 0.02f);
+}
+
+TEST_CASE("Macros never target themselves or discrete controls and allow eight targets each", "[mod][macro]")
+{
+    Rig rig;
+    CHECK_FALSE(rig.routes.addMacroTarget(0, engine::idx(engine::P::Macro2)));
+    CHECK_FALSE(rig.routes.addMacroTarget(0, engine::idx(engine::P::DroneWave)));
+    CHECK_FALSE(rig.routes.addMacroTarget(8, engine::idx(engine::P::DroneCutoff)));
+    const engine::P targets[] = { engine::P::DroneCutoff, engine::P::DroneResonance, engine::P::DroneNoise, engine::P::DroneDetune,
+                                  engine::P::DroneSpread, engine::P::DroneTilt, engine::P::DroneSub, engine::P::DroneDrive, engine::P::DroneVibrato };
+    int added = 0;
+    for (auto p : targets)
+        added += rig.routes.addMacroTarget(3, engine::idx(p)) ? 1 : 0;
+    CHECK(added == engine::kMaxMacroTargets);
+    CHECK(rig.routes.macroFor(engine::idx(engine::P::DroneCutoff)) == 3);
+    rig.routes.removeFromMacros(engine::idx(engine::P::DroneCutoff));
+    CHECK(rig.routes.macroFor(engine::idx(engine::P::DroneCutoff)) == -1);
+}
+
+TEST_CASE("A macro at rest leaves the knob's own value untouched when its range starts at zero", "[mod][macro]")
+{
+    Rig rig;
+    rig.engine.setParam(engine::P::DroneCutoff, 2000.0f);
+    REQUIRE(rig.routes.addMacroTarget(1, engine::idx(engine::P::DroneCutoff), 0.0f, 0.8f));
+    float target = 0.0f, mod = 1.0f;
+    rig.run(0.6, 0.0f, [&](const engine::TelemetryFrame& f) {
+        target = f.paramTargets[engine::idx(engine::P::DroneCutoff)];
+        mod = f.paramMod[engine::idx(engine::P::DroneCutoff)];
+    });
+    CHECK(std::abs(target - 2000.0f) < 0.01f);
+    CHECK(std::abs(mod) < 1.0e-6f);
+}

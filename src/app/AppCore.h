@@ -69,6 +69,7 @@ public:
     void recordParamChange(engine::ParamIndex param, float from, float to, bool continuing);
     void editScenes(const juce::String& name, const std::function<void()>& change);
     void editRoutes(const juce::String& name, const std::function<void()>& change);
+    void editMacros(const juce::String& name, const std::function<void()>& change);
     void editSeasons(const juce::String& name, const std::function<void()>& change);
     void setEffect(int slot, const std::string& type);
     bool isUndoing() const noexcept { return undoing; }

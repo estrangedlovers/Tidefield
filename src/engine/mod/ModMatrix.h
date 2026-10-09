@@ -73,6 +73,23 @@ struct ModRoute
     ParamIndex param = 0;
 };
 
+inline constexpr int kNumMacros = 8;
+inline constexpr int kMaxMacroTargets = 8;
+
+struct MacroTarget
+{
+    ParamIndex param = 0;
+    float from = 0.0f;
+    float to = 0.5f;
+};
+
+struct MacroSet
+{
+    std::array<std::array<MacroTarget, kMaxMacroTargets>, kNumMacros> targets {};
+    std::array<int, kNumMacros> count {};
+    std::uint64_t version = 0;
+};
+
 struct ModRouteSet
 {
     int count = 0;

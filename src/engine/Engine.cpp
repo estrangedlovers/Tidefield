@@ -389,6 +389,7 @@ void Engine::collectGarbage()
     seasonChannel.collectGarbage();
     pathChannel.collectGarbage();
     modChannel.collectGarbage();
+    macroChannel.collectGarbage();
     gestureChannel.collectGarbage();
     performanceChannel.collectGarbage();
     midiMapChannel.collectGarbage();
@@ -424,6 +425,7 @@ void Engine::drainControl() noexcept
     seasonChannel.acquire();
     pathChannel.acquire();
     modChannel.acquire();
+    macroChannel.acquire();
     gestureChannel.acquire();
     performanceChannel.acquire();
     if (midiMapChannel.acquire())
@@ -1209,6 +1211,16 @@ void Engine::updateModulation(float dt) noexcept
             const float depth = params.current(static_cast<ParamIndex>(idx(P::ModRoute1Depth) + routes->slot[static_cast<std::size_t>(k)]));
             if (depth != 0.0f)
                 params.addModulation(r.param, depth * modValue[static_cast<std::size_t>(r.source)]);
+        }
+    if (const auto* macroSet = macroChannel.current())
+        for (int m = 0; m < kNumMacros; ++m)
+        {
+            const float amount = params.current(static_cast<ParamIndex>(idx(P::Macro1) + m));
+            for (int k = 0; k < macroSet->count[static_cast<std::size_t>(m)]; ++k)
+            {
+                const auto& t = macroSet->targets[static_cast<std::size_t>(m)][static_cast<std::size_t>(k)];
+                params.addModulation(t.param, t.from + (t.to - t.from) * amount);
+            }
         }
 
     const auto* set = seasonChannel.current();

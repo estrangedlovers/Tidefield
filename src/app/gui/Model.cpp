@@ -305,6 +305,18 @@ void Model::showParamMenu(P p, juce::Component* owner)
             sources.addItem(1000 + s, engine::kModSources[static_cast<std::size_t>(s)].name);
         m.addSeparator();
         m.addSubMenu("Modulate with", sources);
+        juce::PopupMenu macros;
+        const int mapped = core.mod.macroFor(i);
+        for (int k = 0; k < engine::kNumMacros; ++k)
+        {
+            const auto& macro = core.mod.getMacros()[static_cast<std::size_t>(k)];
+            macros.addItem(3000 + k, juce::String(macro.name) + "  (" + juce::String(static_cast<int>(macro.targets.size())) + " of "
+                                         + juce::String(engine::kMaxMacroTargets) + ")",
+                           static_cast<int>(macro.targets.size()) < engine::kMaxMacroTargets || k == mapped, k == mapped);
+        }
+        m.addSubMenu("Map to macro", macros);
+        if (mapped >= 0)
+            m.addItem(3100, "Remove from " + juce::String(core.mod.getMacros()[static_cast<std::size_t>(mapped)].name));
         const auto& routes = core.mod.getRoutes();
         for (std::size_t k = 0; k < routes.size(); ++k)
             if (routes[k].param == i)
@@ -316,6 +328,17 @@ void Model::showParamMenu(P p, juce::Component* owner)
             return modulate(static_cast<engine::ModSource>(r - 1000), i);
         if (r >= 2000 && r < 2000 + engine::kMaxModRoutes)
             return core.editRoutes("Modulation", [this, r] { core.mod.remove(r - 2000); });
+        if (r >= 3000 && r < 3000 + engine::kNumMacros)
+            return core.editMacros("Map to macro", [this, r, i] {
+                core.mod.removeFromMacros(i);
+                if (! core.mod.addMacroTarget(r - 3000, i, 0.0f, 0.5f))
+                    core.status("That macro already moves eight controls.", true);
+                else
+                    core.status(longName(i) + " follows " + juce::String(core.mod.getMacros()[static_cast<std::size_t>(r - 3000)].name)
+                                + ". Set its range on the Macros tab.");
+            });
+        if (r == 3100)
+            return core.editMacros("Remove from macro", [this, i] { core.mod.removeFromMacros(i); });
         if (r == 1)
             isLearning(p) ? core.midi.cancelLearn() : core.midi.learnParam(i);
         else if (r == 2)

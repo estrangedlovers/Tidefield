@@ -301,6 +301,17 @@ void AppCore::editRoutes(const juce::String& name, const std::function<void()>& 
                                                                                 [this](const auto& r) { mod.replaceAll(r); }));
 }
 
+void AppCore::editMacros(const juce::String& name, const std::function<void()>& change)
+{
+    auto before = mod.getMacros();
+    change();
+    auto after = mod.getMacros();
+    undo.beginNewTransaction(name);
+    lastUndoParam = engine::kNumParams;
+    undo.perform(new SnapshotAction<std::array<engine::ModRouteManager::Macro, engine::kNumMacros>>(
+        std::move(before), std::move(after), [this](const auto& m) { mod.replaceMacros(m); }));
+}
+
 void AppCore::editSeasons(const juce::String& name, const std::function<void()>& change)
 {
     auto before = seasons.getSeasons();

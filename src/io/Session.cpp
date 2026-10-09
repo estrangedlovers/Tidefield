@@ -288,6 +288,58 @@ juce::var modRoutesToJson(const engine::ModRouteManager& mod, const engine::Para
     return out;
 }
 
+juce::var macrosToJson(const engine::ModRouteManager& mod, const engine::ParamRegistry& reg)
+{
+    juce::Array<juce::var> out;
+    for (const auto& m : mod.getMacros())
+    {
+        auto* o = new juce::DynamicObject();
+        o->setProperty("name", juce::String(m.name));
+        juce::Array<juce::var> targets;
+        for (const auto& t : m.targets)
+        {
+            auto* to = new juce::DynamicObject();
+            to->setProperty("param", juce::String(reg.spec(t.param).id));
+            to->setProperty("from", t.from);
+            to->setProperty("to", t.to);
+            targets.add(juce::var(to));
+        }
+        o->setProperty("targets", targets);
+        out.add(juce::var(o));
+    }
+    return out;
+}
+
+std::vector<std::string> applyMacrosJson(const juce::var& json, engine::ModRouteManager& mod, const engine::ParamRegistry& reg)
+{
+    std::vector<std::string> warnings;
+    std::array<engine::ModRouteManager::Macro, engine::kNumMacros> all;
+    if (const auto* arr = json.getArray())
+        for (int m = 0; m < std::min(arr->size(), engine::kNumMacros); ++m)
+        {
+            const auto& v = (*arr)[m];
+            all[static_cast<std::size_t>(m)].name = v.getProperty("name", "").toString().substring(0, 40).toStdString();
+            if (const auto* targets = v.getProperty("targets", {}).getArray())
+                for (const auto& t : *targets)
+                {
+                    const auto id = t.getProperty("param", "").toString().toStdString();
+                    const auto param = reg.find(id);
+                    if (! param.has_value())
+                    {
+                        warnings.push_back("A macro target '" + id + "' was skipped: this version does not have it");
+                        continue;
+                    }
+                    auto number = [&t](const char* key, float fallback) {
+                        const double d = t.getProperty(key, fallback);
+                        return std::isfinite(d) ? static_cast<float>(d) : fallback;
+                    };
+                    all[static_cast<std::size_t>(m)].targets.push_back({ *param, number("from", 0.0f), number("to", 0.5f) });
+                }
+        }
+    mod.replaceMacros(all);
+    return warnings;
+}
+
 std::vector<std::string> applyModRoutesJson(const juce::var& json, engine::ModRouteManager& mod, const engine::ParamRegistry& reg)
 {
     std::vector<std::string> warnings;
@@ -361,7 +413,10 @@ SessionData captureSession(const engine::Engine& engine, const engine::Telemetry
     if (gestures != nullptr && gestures->hasTake())
         s.gesture = gestureToJson(gestures->getTake(), reg);
     if (mod != nullptr)
+    {
         s.modRoutes = modRoutesToJson(*mod, reg);
+        s.macros = macrosToJson(*mod, reg);
+    }
     return s;
 }
 
@@ -479,8 +534,12 @@ std::vector<std::string> applySession(const SessionData& session, engine::Engine
         for (auto& w : applyGestureJson(session.gesture, *gestures, reg))
             warnings.push_back(std::move(w));
     if (mod != nullptr)
+    {
         for (auto& w : applyModRoutesJson(session.modRoutes, *mod, reg))
             warnings.push_back(std::move(w));
+        for (auto& w : applyMacrosJson(session.macros, *mod, reg))
+            warnings.push_back(std::move(w));
+    }
     return warnings;
 }
 
@@ -526,6 +585,8 @@ juce::var sessionToJson(const SessionData& s)
         root->setProperty("seasons", s.seasons);
     if (s.modRoutes.isArray())
         root->setProperty("modRoutes", s.modRoutes);
+    if (s.macros.isArray())
+        root->setProperty("macros", s.macros);
     if (s.performance.isObject())
         root->setProperty("performance", s.performance);
     if (s.bloomRoots.size() > 1 || (s.bloomRoots.size() == 1 && s.bloomRoots[0] >= 0.0f))
@@ -606,6 +667,7 @@ std::optional<SessionData> sessionFromJson(const juce::var& json, juce::String& 
     s.midi = root->getProperty("midi");
     s.seasons = root->getProperty("seasons");
     s.modRoutes = root->getProperty("modRoutes");
+    s.macros = root->getProperty("macros");
     s.performance = root->getProperty("performance");
     if (const auto* roots = root->getProperty("bloomRoots").getArray())
         for (const auto& r : *roots)

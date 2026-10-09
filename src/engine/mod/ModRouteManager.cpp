@@ -5,7 +5,13 @@
 #include <algorithm>
 
 namespace tf::engine {
-ModRouteManager::ModRouteManager(Engine& e) : engine(e) {}
+ModRouteManager::ModRouteManager(Engine& e) : engine(e)
+{
+    for (int m = 0; m < kNumMacros; ++m)
+        macros[static_cast<std::size_t>(m)].name = defaultMacroName(m);
+}
+
+std::string ModRouteManager::defaultMacroName(int macro) { return "Macro " + std::to_string(macro + 1); }
 
 bool ModRouteManager::canModulate(ParamIndex param) const
 {
@@ -15,7 +21,9 @@ bool ModRouteManager::canModulate(ParamIndex param) const
     if ((spec.flags & ParamFlag::kDiscrete) != 0)
         return false;
     const auto first = idx(P::ModRoute1Depth);
-    return param < first || param >= static_cast<ParamIndex>(first + kMaxModRoutes);
+    const auto firstMacro = idx(P::Macro1);
+    return (param < first || param >= static_cast<ParamIndex>(first + kMaxModRoutes))
+           && (param < firstMacro || param >= static_cast<ParamIndex>(firstMacro + kNumMacros));
 }
 
 int ModRouteManager::freeSlot() const
@@ -66,12 +74,111 @@ void ModRouteManager::clear()
 {
     list.clear();
     publish();
+    std::array<Macro, kNumMacros> empty;
+    replaceMacros(empty);
 }
 
 void ModRouteManager::tick()
 {
     if (dirty)
         publish();
+    if (macrosDirty)
+        publishMacros();
+}
+
+bool ModRouteManager::addMacroTarget(int macro, ParamIndex param, float from, float to)
+{
+    if (macro < 0 || macro >= kNumMacros || ! canModulate(param))
+        return false;
+    auto& targets = macros[static_cast<std::size_t>(macro)].targets;
+    for (auto& t : targets)
+        if (t.param == param)
+        {
+            t.from = std::clamp(from, -1.0f, 1.0f);
+            t.to = std::clamp(to, -1.0f, 1.0f);
+            publishMacros();
+            return true;
+        }
+    if (static_cast<int>(targets.size()) >= kMaxMacroTargets)
+        return false;
+    targets.push_back({ param, std::clamp(from, -1.0f, 1.0f), std::clamp(to, -1.0f, 1.0f) });
+    publishMacros();
+    return true;
+}
+
+void ModRouteManager::removeMacroTarget(int macro, int index)
+{
+    if (macro < 0 || macro >= kNumMacros)
+        return;
+    auto& targets = macros[static_cast<std::size_t>(macro)].targets;
+    if (index < 0 || index >= static_cast<int>(targets.size()))
+        return;
+    targets.erase(targets.begin() + index);
+    publishMacros();
+}
+
+void ModRouteManager::removeFromMacros(ParamIndex param)
+{
+    for (auto& m : macros)
+        m.targets.erase(std::remove_if(m.targets.begin(), m.targets.end(), [param](const MacroTarget& t) { return t.param == param; }),
+                        m.targets.end());
+    publishMacros();
+}
+
+void ModRouteManager::setMacroRange(int macro, int index, float from, float to)
+{
+    if (macro < 0 || macro >= kNumMacros)
+        return;
+    auto& targets = macros[static_cast<std::size_t>(macro)].targets;
+    if (index < 0 || index >= static_cast<int>(targets.size()))
+        return;
+    targets[static_cast<std::size_t>(index)].from = std::clamp(from, -1.0f, 1.0f);
+    targets[static_cast<std::size_t>(index)].to = std::clamp(to, -1.0f, 1.0f);
+    publishMacros();
+}
+
+void ModRouteManager::setMacroName(int macro, const std::string& name)
+{
+    if (macro >= 0 && macro < kNumMacros)
+        macros[static_cast<std::size_t>(macro)].name = name.empty() ? defaultMacroName(macro) : name;
+}
+
+void ModRouteManager::replaceMacros(const std::array<Macro, kNumMacros>& all)
+{
+    for (int m = 0; m < kNumMacros; ++m)
+    {
+        auto& dst = macros[static_cast<std::size_t>(m)];
+        const auto& src = all[static_cast<std::size_t>(m)];
+        dst.name = src.name.empty() ? defaultMacroName(m) : src.name;
+        dst.targets.clear();
+        for (const auto& t : src.targets)
+            if (static_cast<int>(dst.targets.size()) < kMaxMacroTargets && canModulate(t.param))
+                dst.targets.push_back({ t.param, std::clamp(t.from, -1.0f, 1.0f), std::clamp(t.to, -1.0f, 1.0f) });
+    }
+    publishMacros();
+}
+
+int ModRouteManager::macroFor(ParamIndex param) const
+{
+    for (int m = 0; m < kNumMacros; ++m)
+        for (const auto& t : macros[static_cast<std::size_t>(m)].targets)
+            if (t.param == param)
+                return m;
+    return -1;
+}
+
+void ModRouteManager::publishMacros()
+{
+    auto set = std::make_unique<MacroSet>();
+    for (int m = 0; m < kNumMacros; ++m)
+    {
+        const auto& targets = macros[static_cast<std::size_t>(m)].targets;
+        set->count[static_cast<std::size_t>(m)] = static_cast<int>(targets.size());
+        for (std::size_t k = 0; k < targets.size(); ++k)
+            set->targets[static_cast<std::size_t>(m)][k] = targets[k];
+    }
+    set->version = ++macroVersion;
+    macrosDirty = ! engine.publishMacros(std::move(set));
 }
 
 void ModRouteManager::publish()

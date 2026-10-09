@@ -53,7 +53,8 @@ target_link_libraries(tidefield_app_core INTERFACE tidefield_fx_juce tidefield_e
 
 target_sources(Tidefield PRIVATE
     Main.cpp
-    AudioHost.cpp)
+    AudioHost.cpp
+    GuestSelfTest.cpp)
 if(TIDEFIELD_WITH_LINK)
     include(FetchContent)
     FetchContent_Declare(link GIT_REPOSITORY https://github.com/Ableton/link.git GIT_TAG Link-3.1.5 GIT_SHALLOW TRUE GIT_SUBMODULES modules/asio-standalone)

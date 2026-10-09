@@ -7,6 +7,7 @@
 
 #include <engine/Engine.h>
 #include <engine/midi/MidiManager.h>
+#include <engine/guest/GuestManager.h>
 #include <engine/mix/FxManager.h>
 #include <engine/mod/ModRouteManager.h>
 #include <engine/mod/SeasonManager.h>
@@ -371,7 +372,8 @@ std::vector<std::string> applyModRoutesJson(const juce::var& json, engine::ModRo
 
 SessionData captureSession(const engine::Engine& engine, const engine::TelemetryFrame& latest, const engine::SceneManager& scenes,
                            const engine::FxManager& fx, const engine::MidiManager* midi, const engine::SeasonManager* seasons,
-                           const engine::PathManager* path, const engine::GestureManager* gestures, const engine::ModRouteManager* mod)
+                           const engine::PathManager* path, const engine::GestureManager* gestures, const engine::ModRouteManager* mod,
+                           const engine::GuestManager* guest)
 {
     const auto& reg = engine.getRegistry();
     SessionData s;
@@ -397,6 +399,8 @@ SessionData captureSession(const engine::Engine& engine, const engine::Telemetry
         if (fx.isExternal(slot))
             s.fxState[engine::kFxSlots[static_cast<std::size_t>(slot)].id] = fx.getState(slot);
     }
+    if (guest != nullptr && ! guest->isEmpty())
+        s.guest = { guest->getType(), guest->getName(), guest->getState() };
 
     for (int k = 0; k < engine::kNumClouds; ++k)
         if (auto b = engine.getCloudSample(k))
@@ -440,10 +444,25 @@ SessionData defaultSession(const engine::Engine& engine)
 std::vector<std::string> applySession(const SessionData& session, engine::Engine& engine, engine::SceneManager& scenes,
                                       engine::FxManager& fx, bool snap, engine::MidiManager* midi,
                                       engine::SeasonManager* seasons, engine::PathManager* path,
-                                      engine::GestureManager* gestures, engine::ModRouteManager* mod)
+                                      engine::GestureManager* gestures, engine::ModRouteManager* mod, engine::GuestManager* guest)
 {
     const auto& reg = engine.getRegistry();
     std::vector<std::string> warnings = session.warnings;
+
+    if (guest != nullptr)
+    {
+        const auto& g = session.guest;
+        if (g.type.empty())
+        {
+            if (! guest->isEmpty())
+                guest->clear();
+        }
+        else if (g.type != guest->getType() || g.state != guest->getState())
+            guest->setType(g.type, false, g.state, g.name);
+        if (! g.type.empty() && guest->isMissing())
+            warnings.push_back("The instrument plugin " + (g.name.empty() ? std::string("in the Guest strip") : "'" + g.name + "'")
+                               + " is not available here; the Guest strip stays silent and keeps its settings for when it is");
+    }
 
     for (int slot = 0; slot < engine::kNumFxSlots; ++slot)
         if (session.fx.find(engine::kFxSlots[static_cast<std::size_t>(slot)].id) == session.fx.end())
@@ -611,6 +630,15 @@ juce::var sessionToJson(const SessionData& s)
         root->setProperty("fxState", juce::var(states));
     }
 
+    if (! s.guest.type.empty())
+    {
+        auto* g = new juce::DynamicObject();
+        g->setProperty("type", juce::String(s.guest.type));
+        g->setProperty("name", juce::String(s.guest.name));
+        g->setProperty("state", juce::String(s.guest.state));
+        root->setProperty("guest", juce::var(g));
+    }
+
     root->setProperty("midi", s.midi);
     if (s.seasons.isArray())
         root->setProperty("seasons", s.seasons);
@@ -695,6 +723,9 @@ std::optional<SessionData> sessionFromJson(const juce::var& json, juce::String& 
     if (const auto* states = root->getProperty("fxState").getDynamicObject())
         for (const auto& prop : states->getProperties())
             s.fxState[prop.name.toString().toStdString()] = prop.value.toString().toStdString();
+    if (const auto* g = root->getProperty("guest").getDynamicObject())
+        s.guest = { g->getProperty("type").toString().toStdString(), g->getProperty("name").toString().toStdString(),
+                    g->getProperty("state").toString().toStdString() };
     s.midi = root->getProperty("midi");
     s.seasons = root->getProperty("seasons");
     s.modRoutes = root->getProperty("modRoutes");

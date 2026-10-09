@@ -72,7 +72,7 @@ public:
     explicit DeviceView(Model& m);
     ~DeviceView() override;
 
-    enum Page { Drone, Clouds, Resonator, Bloom, Input, Looper, Weather, Gestures, Loops, Seasons, Modulation, Macros, Timeline, Mixer, Effects, Master, Midi, NumPages };
+    enum Page { Drone, Clouds, Resonator, Bloom, Input, Looper, Weather, Guest, Gestures, Loops, Seasons, Modulation, Macros, Timeline, Mixer, Effects, Master, Midi, NumPages };
     static juce::String pageName(int p);
 
     void show(int page);
@@ -102,6 +102,7 @@ private:
     std::vector<std::unique_ptr<Device>> devices;
 };
 std::unique_ptr<juce::Component> createRemoteView(Model& model);
+std::unique_ptr<juce::Component> createCyclesOutView(Model& model);
 std::unique_ptr<juce::Component> createInstallationView(Model& model);
 std::unique_ptr<juce::Component> createSpaceView(Model& model);
 }

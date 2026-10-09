@@ -22,6 +22,14 @@ struct RawMidi
     bool isNoteOff() const noexcept { return type() == 0x80 || (type() == 0x90 && data2 == 0); }
 };
 
+struct MidiOutEvent
+{
+    std::uint64_t sampleTime = 0;
+    std::uint8_t status = 0;
+    std::uint8_t data1 = 0;
+    std::uint8_t data2 = 0;
+};
+
 inline constexpr int kMaxMidiPorts = 4;
 inline constexpr int kMaxMidiBindings = 128;
 

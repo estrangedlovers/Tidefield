@@ -113,7 +113,7 @@ TEST_CASE("RecordTap moves through its states and keeps channels in step", "[rec
 TEST_CASE("RecordTap drops whole blocks when the writer falls behind", "[record]")
 {
     RecordTap tap;
-    tap.prepare(1000.0, 0.01);
+    tap.prepare(1000.0, 2.0 * 140.0 / (1000.0 * RecordTap::kMaxChannels));
     REQUIRE(tap.begin(false));
     std::vector<float> a(50, 1.0f);
     const float* ch[2] = { a.data(), a.data() };

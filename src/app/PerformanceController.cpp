@@ -42,7 +42,7 @@ void PerformanceController::record()
     if (state == State::Playing)
         stop();
     io::Performance fresh;
-    fresh.start = io::captureSession(core.engine, core.latest(), core.scenes, core.fx, &core.midi, &core.seasons, &core.paths, &core.gestures, &core.mod);
+    fresh.start = io::captureSession(core.engine, core.latest(), core.scenes, core.fx, &core.midi, &core.seasons, &core.paths, &core.gestures, &core.mod, &core.guest);
     fresh.sampleRate = core.engine.getSampleRate();
     fresh.startedOpen = core.latest().fadeState == engine::FadeState::Open || core.latest().fadeState == engine::FadeState::FadingIn;
     engine::GestureEvent stale;
@@ -246,7 +246,7 @@ void PerformanceController::renderSoundAsLoop(double seconds, double crossfadeSe
     if (rendering)
         return;
     auto still = std::make_shared<io::Performance>();
-    still->start = io::captureSession(core.engine, core.latest(), core.scenes, core.fx, &core.midi, &core.seasons, &core.paths, &core.gestures, &core.mod);
+    still->start = io::captureSession(core.engine, core.latest(), core.scenes, core.fx, &core.midi, &core.seasons, &core.paths, &core.gestures, &core.mod, &core.guest);
     still->sampleRate = 48000.0;
     still->length = static_cast<std::uint64_t>(std::max(1.0, seconds) * still->sampleRate);
     still->startedOpen = true;

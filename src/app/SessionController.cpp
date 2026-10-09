@@ -11,8 +11,8 @@ const char* const kWildcard = io::kSessionWildcard;
 
 SessionController::SessionController(engine::Engine& e, engine::SceneManager& s, engine::FxManager& f, engine::MidiManager* m,
                                      engine::SeasonManager* sm, engine::PathManager* pm,
-                                     engine::GestureManager* gm, engine::ModRouteManager* mm)
-    : engine(e), scenes(s), fx(f), midi(m), seasons(sm), path(pm), gestures(gm), mod(mm)
+                                     engine::GestureManager* gm, engine::ModRouteManager* mm, engine::GuestManager* gu)
+    : engine(e), scenes(s), fx(f), midi(m), seasons(sm), path(pm), gestures(gm), mod(mm), guest(gu)
 {
 }
 
@@ -102,7 +102,7 @@ void SessionController::applyNow()
         return;
     const bool resume = waitingForFadeOut;
     waitingForFadeOut = false;
-    auto warnings = io::applySession(*pending, engine, scenes, fx, true, midi, seasons, path, gestures, mod);
+    auto warnings = io::applySession(*pending, engine, scenes, fx, true, midi, seasons, path, gestures, mod, guest);
     if (onApplied)
         onApplied(*pending);
     const auto fadeIt = pending->params.find("master.fadeSeconds");
@@ -175,7 +175,7 @@ void SessionController::autosaveTo(const juce::File& file, std::function<void(bo
     if (busy || autosaving)
         return;
     autosaving = true;
-    auto data = std::make_shared<io::SessionData>(io::captureSession(engine, latest, scenes, fx, midi, seasons, path, gestures, mod));
+    auto data = std::make_shared<io::SessionData>(io::captureSession(engine, latest, scenes, fx, midi, seasons, path, gestures, mod, guest));
     data->name = getName().toStdString();
     runInBackground([this, file, data, done = std::move(done), token = alive] {
         juce::String error;
@@ -193,7 +193,7 @@ void SessionController::autosaveTo(const juce::File& file, std::function<void(bo
 
 io::SessionData SessionController::captureNow() const
 {
-    return io::captureSession(engine, latest, scenes, fx, midi, seasons, path, gestures, mod);
+    return io::captureSession(engine, latest, scenes, fx, midi, seasons, path, gestures, mod, guest);
 }
 
 bool SessionController::hasUnsavedChanges() const

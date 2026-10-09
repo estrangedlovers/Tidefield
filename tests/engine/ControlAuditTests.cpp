@@ -117,6 +117,23 @@ Setup bloomCtx()
     };
 }
 
+void playGuestNotes(Rig& r, double secs)
+{
+    r.run(0.02);
+    r.note(57, 0.9f);
+    r.note(64, 0.7f);
+    r.run(std::max(0.0, secs - 0.02));
+}
+
+Setup guestCtx()
+{
+    return [](Rig& r) {
+        r.solo({ StripId::Guest });
+        r.loadGuest();
+        r.snap(P::GuestP1, 1.0f);
+    };
+}
+
 Setup weatherCtx()
 {
     return [](Rig& r) {
@@ -285,9 +302,87 @@ std::vector<Check> stripGroup(StripId s)
                 r.snap(P::WeatherLevel, -60.0f);
                 r.run(secs - 1.2);
             }, 3.0, 1.8);
+        case StripId::Guest:
+            return stripChecks(s, "test instrument holding two notes", guestCtx(), playGuestNotes, 1.5, 0.4,
+                               then(guestCtx(), [](Rig& r) { r.snap(P::GuestP3, 1.0f); }), playGuestNotes);
         case StripId::Count: break;
     }
     return {};
+}
+
+std::vector<Check> guestChecks()
+{
+    std::vector<Check> v;
+    const auto cycles = [](Rig& r) {
+        r.snap(P::LoopsOn, 1.0f);
+        r.snap(P::LoopsRate, 4.0f);
+        r.snap(P::TideRate, 8.0f);
+        r.snap(P::LoopsDensity, 1.0f);
+        r.snap(P::LoopsTarget, 3.0f);
+    };
+    {
+        auto c = timed(sweep(P::GuestPlayFrom, "test instrument, two keys and the Cycles", then(guestCtx(), cycles)), 3.0, 0.3);
+        c.play = playGuestNotes;
+        c.measure = [](Rig& r, const Features&) { return static_cast<float>(r.guest->noteOns()); };
+        v.push_back(c);
+    }
+    {
+        auto c = timed(sweep(P::GuestTranspose, "test instrument holding two notes", guestCtx(), Metric::Centroid, 1), 1.0, 0.4);
+        c.play = playGuestNotes;
+        c.values = { -12.0f, 0.0f, 12.0f };
+        c.minDelta = 18.0f;
+        v.push_back(c);
+    }
+    {
+        auto c = timed(sweep(P::GuestP1, "test instrument: control 1 is its level", guestCtx(), Metric::Rms, 1), 1.0, 0.4);
+        c.apply = [](Rig& r, float value) { r.snap(P::GuestP1, value); };
+        c.values = { 0.1f, 0.5f, 1.0f };
+        c.play = playGuestNotes;
+        c.minDelta = 12.0f;
+        v.push_back(c);
+    }
+    for (int k = 1; k < 6; ++k)
+    {
+        const auto p = static_cast<P>(idx(P::GuestP1) + k);
+        auto c = timed(sweep(p, "test instrument: the control reaches the plugin", guestCtx(), Metric::Custom, 1), 0.5, 0.1);
+        c.play = playGuestNotes;
+        c.measure = [k](Rig& r, const Features&) { return 10.0f * r.guest->controls[static_cast<std::size_t>(k)]; };
+        c.minDelta = 5.0f;
+        v.push_back(c);
+    }
+    {
+        auto c = timed(sweep(P::LoopsGate, "the Cycles playing the test instrument", then(then(guestCtx(), cycles), [](Rig& r) {
+                                 r.snap(P::GuestPlayFrom, 2.0f);
+                             }), Metric::Custom, 1), 3.0, 0.3);
+        c.measure = [](Rig& r, const Features&) { return static_cast<float>(r.guest->heldSum / std::max(1, r.guest->blocks)); };
+        c.minDelta = 1.5f;
+        v.push_back(c);
+    }
+    {
+        auto c = timed(sweep(P::LoopsMidiOut, "the Cycles, everything muted", [cycles](Rig& r) {
+                           r.solo({});
+                           cycles(r);
+                       }, Metric::Custom, 1), 3.0, 0.3);
+        c.measure = [](Rig& r, const Features&) { return static_cast<float>(r.midiOutEvents); };
+        c.minDelta = 4.0f;
+        v.push_back(c);
+    }
+    {
+        auto c = timed(sweep(P::LoopsMidiChannel, "the Cycles sending MIDI, everything muted", [cycles](Rig& r) {
+                           r.solo({});
+                           cycles(r);
+                           r.snap(P::LoopsMidiOut, 1.0f);
+                       }), 3.0, 0.3);
+        c.values = { 0.0f, 1.0f, 16.0f };
+        c.measure = [](Rig& r, const Features&) {
+            float sum = 0.0f;
+            for (int ch : r.midiOutChannels)
+                sum += static_cast<float>(ch);
+            return 100.0f * static_cast<float>(r.midiOutChannels.size()) + sum;
+        };
+        v.push_back(c);
+    }
+    return v;
 }
 
 std::vector<Check> masterChecks()
@@ -1531,6 +1626,7 @@ Setup chainSource(int slot)
             };
         case StripId::Weather: return weatherCtx();
         case StripId::Freeze: return [](Rig& r) { r.solo({ StripId::Freeze, StripId::Drone }); r.snap(P::DroneLevel, -40.0f); };
+        case StripId::Guest: return guestCtx();
         case StripId::Count: break;
     }
     return {};
@@ -1545,6 +1641,7 @@ Play chainPlay(int slot)
         case StripId::Bloom: return playBloomNotes;
         case StripId::Loop: return playLoop;
         case StripId::Freeze: return playFreeze;
+        case StripId::Guest: return playGuestNotes;
         default: return {};
     }
 }
@@ -1583,7 +1680,7 @@ std::vector<std::vector<Check>> allGroups()
 {
     std::vector<std::vector<Check>> g { masterChecks(), droneChecks(), resonatorChecks(), inputChecks(), bloomChecks(), bloomRootChecks(), looperChecks(),
                                         weatherChecks(), freezeChecks(), gestureChecks(), harmonyChecks(), mediumChecks(), terrainChecks(), cycleChecks(),
-                                        patternChecks() };
+                                        patternChecks(), guestChecks() };
     for (auto& [type, checks] : builtinEffectGroups())
         g.push_back(std::move(checks));
     for (int k = 0; k < kNumClouds; ++k)
@@ -1620,6 +1717,7 @@ TEST_CASE("Control audit: medium", "[audit]") { runChecks(mediumChecks()); }
 TEST_CASE("Control audit: terrain and tide", "[audit]") { runChecks(terrainChecks()); }
 TEST_CASE("Control audit: cycles and tempo", "[audit]") { runChecks(cycleChecks()); }
 TEST_CASE("Control audit: cycle patterns", "[audit]") { runChecks(patternChecks()); }
+TEST_CASE("Control audit: guest instrument and Cycles MIDI out", "[audit]") { runChecks(guestChecks()); }
 TEST_CASE("Control audit: effect tf.reverb", "[audit]") { runChecks(reverbChecks()); }
 TEST_CASE("Control audit: effect tf.delay", "[audit]") { runChecks(delayChecks()); }
 TEST_CASE("Control audit: effect tf.wornEcho", "[audit]") { runChecks(wornEchoChecks()); }
@@ -1662,16 +1760,16 @@ TEST_CASE("Control audit: every built-in effect type has its controls audited", 
     }
 }
 
-TEMPLATE_TEST_CASE_SIG("Control audit: strip", "[audit]", ((int S), S), 0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10)
+TEMPLATE_TEST_CASE_SIG("Control audit: strip", "[audit]", ((int S), S), 0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11)
 {
-    STATIC_REQUIRE(kNumStrips == 11);
+    STATIC_REQUIRE(kNumStrips == 12);
     runChecks(stripGroup(static_cast<StripId>(S)));
 }
 
 TEMPLATE_TEST_CASE_SIG("Control audit: effect slot routing", "[audit]", ((int Slot), Slot), 0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17,
-                       18, 19, 20, 21, 22, 23, 24, 25, 26, 27)
+                       18, 19, 20, 21, 22, 23, 24, 25, 26, 27, 28, 29)
 {
-    STATIC_REQUIRE(kNumFxSlots == 28);
+    STATIC_REQUIRE(kNumFxSlots == 30);
     runChecks(routingChecks(Slot));
 }
 

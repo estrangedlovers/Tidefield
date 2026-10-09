@@ -583,6 +583,12 @@ std::unique_ptr<FormPage> midiPage(Model& model)
     page->row("Follow", std::make_unique<ChoiceRow>(juce::StringArray { "Internal tempo", "MIDI clock" },
                                                     juce::roundToInt(model.value(engine::P::SyncSource)),
                                                     [&model](int i) { model.set(engine::P::SyncSource, static_cast<float>(i)); }));
+    if (core.cycleOut != nullptr)
+    {
+        page->header("Cycles MIDI out");
+        page->row("Send to", createCyclesOutView(model), 50);
+        page->note("Turn on MIDI Out and choose the channel on the Cycles page. Held notes are released when the Cycles stop, on panic and when a session opens.", 20);
+    }
     page->header("Sync and remote control");
     page->full(createRemoteView(model), 230);
     if (! LinkSync::isAvailable())

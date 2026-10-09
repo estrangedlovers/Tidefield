@@ -9,7 +9,7 @@ namespace {
 class NullAudioThread final : public juce::Thread
 {
 public:
-    explicit NullAudioThread(engine::Engine& e) : juce::Thread("Tidefield null audio"), engine(e) {}
+    NullAudioThread(engine::Engine& e, BlockClock& c) : juce::Thread("Tidefield null audio"), engine(e), clock(c) {}
     ~NullAudioThread() override { stopThread(2000); }
 
     void run() override
@@ -22,6 +22,7 @@ public:
         auto due = juce::Time::getMillisecondCounterHiRes();
         while (! threadShouldExit())
         {
+            clock.mark(engine.getSampleTime(), juce::Time::getMillisecondCounterHiRes(), kRate, kBlock);
             engine.process(nullptr, 0, outs, 2, kBlock);
             due += kBlock / kRate * 1000.0;
             const auto ms = due - juce::Time::getMillisecondCounterHiRes();
@@ -32,6 +33,7 @@ public:
 
 private:
     engine::Engine& engine;
+    BlockClock& clock;
 };
 }
 
@@ -39,7 +41,7 @@ AudioHost::AudioHost(juce::PropertiesFile& s, bool nullAudio) : settings(s)
 {
     if (nullAudio)
     {
-        nullThread = std::make_unique<NullAudioThread>(engine);
+        nullThread = std::make_unique<NullAudioThread>(engine, clock);
         nullThread->startThread(juce::Thread::Priority::high);
         return;
     }
@@ -88,6 +90,7 @@ void AudioHost::audioDeviceAboutToStart(juce::AudioIODevice* device)
     outputLatencySeconds = static_cast<double>(device->getOutputLatencyInSamples() + blockSize) / sampleRate;
     link.prepare(sampleRate);
     engine.prepare(sampleRate, blockSize);
+    deviceRate = sampleRate;
 }
 
 void AudioHost::audioDeviceStopped()
@@ -100,6 +103,7 @@ void AudioHost::audioDeviceIOCallbackWithContext(const float* const* inputs, int
 {
     const juce::AudioProcessLoadMeasurer::ScopedTimer timer(loadMeasurer, numSamples);
     link.apply(engine, numSamples, outputLatencySeconds);
+    clock.mark(engine.getSampleTime(), juce::Time::getMillisecondCounterHiRes(), deviceRate, numSamples);
     engine.process(inputs, numInputs, outputs, numOutputs, numSamples);
 }
 }

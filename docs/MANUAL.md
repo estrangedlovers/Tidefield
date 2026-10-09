@@ -464,15 +464,50 @@ with **E** or the Cycles pad.
 
 | Control | What it does |
 |---|---|
-| Play Into | Bloom, the Resonator or both |
+| Play Into | Bloom, the Resonator, both, or neither (useful when only the Guest instrument or MIDI out should play them) |
 | Voices | how many loops, 1 to 8 |
 | Pattern | which set of cycle lengths and notes; try a few |
 | Pace | the speed of every loop together, 0.25x to 4x |
 | Density | how many of each loop's notes actually play |
 | Register, Spread | the centre note and how many octaves the notes cover |
 | Velocity | how hard the notes are played |
+| Note Length | how long each note holds in the Guest instrument and on MIDI out; Bloom and the Resonator ring on their own |
 
 The **Tempo** device on the same tab holds Tempo Sync and the tempo itself.
+
+**MIDI out.** The Cycles can play other instruments: a hardware synth, another app or a
+DAW. Choose the output under **MIDI out** on the Cycles tab (or in Settings > MIDI, Sync
+and Remote, under Cycles MIDI out), then turn on **MIDI Out**. **MIDI Channel** is
+either **Per cycle** (cycle 1 on channel 1, cycle 2 on channel 2 and so on, so each
+cycle can play its own sound) or one channel for every cycle. Each note lasts for the
+Note Length. Notes leave a little after they are made, in step with the audio, so the
+spacing between them stays exact. Every held note is released when the Cycles stop, when
+MIDI Out is turned off or its channel changes, on panic, when a session opens and when
+Tidefield quits. MIDI out is part of the app only.
+
+### Guest: an instrument plugin
+
+The **Guest** tab hosts one of your own instrument plugins (Audio Unit or VST3) as a
+source with its own strip, so it goes through the same inserts, reverb and delay sends,
+Direction, Medium and limiter as everything else. Choose it from the menu at the top of
+the Guest device; the first time, choose **Find my plugins...** (the same scan the
+effect slots use, see [Your own plugins](#your-own-plugins)).
+
+| Control | What it does |
+|---|---|
+| Six knobs | the instrument's first six automatable parameters; **Choose controls** points any knob at any parameter. They can be MIDI learned, modulated, mapped to macros and stored in scenes |
+| Plugin window | the instrument's own interface; changes there move the knobs |
+| Play From | **Bloom's notes**: the on-screen and computer keyboards, MIDI notes and replayed takes; **MIDI input**: only notes, bends and controllers from MIDI devices (on their own channels, so MPE instruments work); **Cycles**: only the Cycles; **All**: everything |
+| Transpose | shifts every note the instrument plays, up to two octaves either way |
+
+The instrument hears notes about 3 ms after they are played (it is given audio in steady
+blocks of 128 samples, which keeps its timing exact). Changing Play From, loading another
+instrument or pressing panic releases every note it holds. Its full state and your knob
+choices are saved with the session; a session that names an instrument this computer
+does not have opens with the Guest silent, says which plugin is missing, and keeps the
+settings so the session still has them when it is saved again. Instrument plugins play
+in the app only, not when Tidefield runs inside a DAW, and offline renders from the
+timeline leave the Guest out.
 
 ---
 
@@ -627,6 +662,7 @@ there move the knobs too. The plugin's full state is saved with the session. If 
 session names a plugin this Mac does not have, the slot opens empty and the status bar
 says which plugin was missing.
 
+The same scan finds instrument plugins for the [Guest](#guest-an-instrument-plugin) tab.
 Plugins are not available when Tidefield itself runs inside a DAW; use the DAW's
 effects there. Offline renders from the timeline cannot include plugins and say so.
 
@@ -916,7 +952,7 @@ tab.
   - Loop clear
   - Freeze all
   - Hold input
-- **Notes** play Bloom. Choose which channel to listen to. Turn on **Notes move the
+- **Notes** play Bloom, and the Guest instrument when its Play From allows. Choose which channel to listen to. Turn on **Notes move the
   drone** to have played notes set the drone's root as well.
 - **Default mapping** sets up a generic eight-knob controller on CC 21 to 28: terrain X
   and Y, Tide, Wander, Gravity, reverb return, Cloud 1 density and master level.
@@ -935,6 +971,7 @@ software.
   the clock arriving on any enabled MIDI input.
 - **MIDI clock out.** Choose an output under **MIDI clock out** to send Tidefield's
   tempo to drum machines, sequencers and delays.
+- **Cycles MIDI out.** Choose where the Cycles' notes go (see [Cycles](#cycles)).
 - **MPE keyboard.** Gives each note its own bend, pressure and brightness on Bloom.
 - **OSC.** Turn on **Receive on** to let phones, tablets, Max, TouchDesigner and other
   programs play Tidefield over the network on the port shown (9000 by default). Turn on
@@ -1137,7 +1174,7 @@ never breaks up. It steps back up by itself when there is headroom. To avoid it:
 than the mode needs, and the Space panel says so. In **Settings**, **Audio**, choose the
 interface and enable more output channels.
 
-**A plugin is missing from the effect menu.** Choose **Scan for new plugins** at the
+**A plugin is missing from the effect or Guest menu.** Choose **Scan for new plugins** at the
 bottom of the menu. A plugin that crashed while being examined is skipped; the list of
 skipped plugins is in `PluginScanCrashes.txt` beside Tidefield's settings.
 

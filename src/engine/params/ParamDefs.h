@@ -93,7 +93,10 @@ inline constexpr unsigned kDiscrete = 1u << 4;
     X(LoopsRegister,    "loops.register",     "Register",         36.0f,  84.0f,   60.0f, Linear,  Linear,         0.0f,  "st", TF_TB_ML) \
     X(LoopsSpread,      "loops.spread",       "Spread",            0.0f,   3.0f,    1.5f, Linear,  Linear,         0.0f,  "oct", TF_TB_ML) \
     X(LoopsVelocity,    "loops.velocity",     "Velocity",          0.0f,   1.0f,    0.6f, Linear,  Exponential,    0.2f,  "",   TF_TB_ML) \
-    X(LoopsTarget,      "loops.target",       "Play Into",         0.0f,   2.0f,    0.0f, Linear,  Linear,         0.0f,  "",   kMidiLearnable | kDiscrete) \
+    X(LoopsTarget,      "loops.target",       "Play Into",         0.0f,   3.0f,    0.0f, Linear,  Linear,         0.0f,  "",   kMidiLearnable | kDiscrete) \
+    X(LoopsGate,        "loops.gate",         "Note Length",       0.05f,  8.0f,    0.6f, Log,     LogExponential, 0.1f,  "s",  TF_TB_ML) \
+    X(LoopsMidiOut,     "loops.midiOut",      "MIDI Out",          0.0f,   1.0f,    0.0f, Linear,  Linear,         0.0f,  "",   kMidiLearnable | kDiscrete) \
+    X(LoopsMidiChannel, "loops.midiChannel",  "MIDI Channel",      0.0f,  16.0f,    0.0f, Linear,  Linear,         0.0f,  "",   kDiscrete) \
     X(SyncOn,           "sync.on",            "Tempo Sync",        0.0f,   1.0f,    0.0f, Linear,  Linear,         0.0f,  "",   kMidiLearnable | kDiscrete | kPerformance) \
     X(SyncBpm,          "sync.bpm",           "Tempo",            40.0f, 200.0f,   90.0f, Linear,  Linear,         0.0f,  "BPM", kMidiLearnable) \
     X(LoopsPattern,     "loops.pattern",      "Pattern",           0.0f,  99.0f,    0.0f, Linear,  Linear,         0.0f,  "",   TF_TB_ML | kDiscrete) \
@@ -187,6 +190,15 @@ inline constexpr unsigned kDiscrete = 1u << 4;
     X(FreezeDuck,       "freeze.duck",        "Duck the Mix",      0.0f,   1.0f,    0.6f, Linear,  Exponential,    0.1f,  "",   TF_TB_ML) \
     X(FreezeTexture,    "freeze.texture",     "Texture",           0.0f,   1.0f,    0.5f, Linear,  Exponential,    0.3f,  "",   TF_TB_ML) \
     TF_STRIP(X, Freeze,    "freeze",    0.0f, -10.0f, -60.0f, -30.0f) \
+    X(GuestPlayFrom,    "guest.playFrom",     "Play From",         0.0f,   3.0f,    0.0f, Linear,  Linear,         0.0f,  "",   kMidiLearnable | kDiscrete) \
+    X(GuestTranspose,   "guest.transpose",    "Transpose",       -24.0f,  24.0f,    0.0f, Linear,  Linear,         0.0f,  "st", TF_TB_ML | kDiscrete) \
+    X(GuestP1,          "guest.p1",           "Control 1",         0.0f,   1.0f,    0.5f, Linear,  Exponential,    0.08f, "",   TF_TB_ML) \
+    X(GuestP2,          "guest.p2",           "Control 2",         0.0f,   1.0f,    0.5f, Linear,  Exponential,    0.08f, "",   TF_TB_ML) \
+    X(GuestP3,          "guest.p3",           "Control 3",         0.0f,   1.0f,    0.5f, Linear,  Exponential,    0.08f, "",   TF_TB_ML) \
+    X(GuestP4,          "guest.p4",           "Control 4",         0.0f,   1.0f,    0.5f, Linear,  Exponential,    0.08f, "",   TF_TB_ML) \
+    X(GuestP5,          "guest.p5",           "Control 5",         0.0f,   1.0f,    0.5f, Linear,  Exponential,    0.08f, "",   TF_TB_ML) \
+    X(GuestP6,          "guest.p6",           "Control 6",         0.0f,   1.0f,    0.5f, Linear,  Exponential,    0.08f, "",   TF_TB_ML) \
+    TF_STRIP(X, Guest,     "guest",     0.0f, -10.0f, -24.0f, 90.0f) \
     TF_FX_SLOT(X, DroneFx1,  "drone.fx1")  TF_FX_SLOT(X, DroneFx2,  "drone.fx2")  \
     TF_FX_SLOT(X, Cloud1Fx1, "cloud1.fx1") TF_FX_SLOT(X, Cloud1Fx2, "cloud1.fx2") \
     TF_FX_SLOT(X, Cloud2Fx1, "cloud2.fx1") TF_FX_SLOT(X, Cloud2Fx2, "cloud2.fx2") \
@@ -198,6 +210,7 @@ inline constexpr unsigned kDiscrete = 1u << 4;
     TF_FX_SLOT(X, LoopFx1,   "loop.fx1")   TF_FX_SLOT(X, LoopFx2,   "loop.fx2")   \
     TF_FX_SLOT(X, WeatherFx1,"weather.fx1") TF_FX_SLOT(X, WeatherFx2,"weather.fx2") \
     TF_FX_SLOT(X, FreezeFx1, "freeze.fx1") TF_FX_SLOT(X, FreezeFx2, "freeze.fx2") \
+    TF_FX_SLOT(X, GuestFx1,  "guest.fx1")  TF_FX_SLOT(X, GuestFx2,  "guest.fx2")  \
     TF_FX_SLOT(X, BusAFx1,   "busA.fx1")   TF_FX_SLOT(X, BusAFx2,   "busA.fx2")   \
     TF_FX_SLOT(X, BusBFx1,   "busB.fx1")   TF_FX_SLOT(X, BusBFx2,   "busB.fx2")   \
     TF_FX_SLOT(X, MasterFx1, "master.fx1") TF_FX_SLOT(X, MasterFx2, "master.fx2") \

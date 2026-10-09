@@ -57,6 +57,10 @@ struct TelemetryFrame
     bool inputGateOpen = false;
     float inputFreeze = 0.0f;
 
+    bool guestLoaded = false;
+    int guestNotes = 0;
+    int cycleMidiNotes = 0;
+
     int loopState = 0;
     float loopPosition = 0.0f;
     float loopSeconds = 0.0f;

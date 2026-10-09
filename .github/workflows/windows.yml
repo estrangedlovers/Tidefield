@@ -77,7 +77,7 @@ jobs:
           "$CHECK" "$VST3"
           HOSTCHECK=$(find build/release -name tidefield_hostcheck.exe -type f | head -1)
           test -n "$HOSTCHECK"
-          "$HOSTCHECK" build/release/tools/testfx/TidefieldTestGain_artefacts/Release/VST3
+          "$HOSTCHECK" build/release/tools/testfx/TidefieldTestGain_artefacts/Release/VST3 build/release/tools/testfx/TidefieldTestSine_artefacts/Release/VST3
 
       - name: Package
         shell: pwsh

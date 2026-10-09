@@ -11,6 +11,7 @@
 #include "SessionController.h"
 
 #include <engine/capture/CatchManager.h>
+#include <engine/guest/GuestManager.h>
 #include <engine/midi/MidiManager.h>
 #include <engine/mix/FxManager.h>
 #include <engine/mod/ModRouteManager.h>
@@ -37,6 +38,7 @@ public:
     std::unique_ptr<PluginHost> plugins;
     engine::SceneManager scenes;
     engine::FxManager fx;
+    engine::GuestManager guest;
     engine::CatchManager catcher;
     engine::MidiManager midi;
     engine::SeasonManager seasons;
@@ -48,6 +50,7 @@ public:
     SessionController session;
     io::Recorder recorder;
     std::unique_ptr<MidiClockOut> clockOut;
+    std::unique_ptr<CycleMidiOut> cycleOut;
     std::unique_ptr<OscRemote> osc;
     PerformanceController performance { *this };
     std::unique_ptr<Installation> installation;
@@ -74,6 +77,7 @@ public:
     void editMacros(const juce::String& name, const std::function<void()>& change);
     void editSeasons(const juce::String& name, const std::function<void()>& change);
     void setEffect(int slot, const std::string& type);
+    void setInstrument(const std::string& type);
     bool isUndoing() const noexcept { return undoing; }
 
     void startRecording();

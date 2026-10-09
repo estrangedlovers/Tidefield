@@ -44,7 +44,7 @@ own JUCE modules, so JUCE module code is never linked twice.
 - New sound source: DSP class in `src/dsp/sources/<name>`, a strip in
   `engine/mix/Layout.h`, its parameters in `ParamDefs.h`, wiring in `Engine.cpp`.
 - New effect: implement `dsp::Processor` and register it in `ProcessorFactory`; it is
-  then loadable into any of the 28 FX slots with no engine changes. JUCE-based
+  then loadable into any of the 30 FX slots with no engine changes. JUCE-based
   effects (the imported shimmer and fuzz) live in a separate library and register
   themselves at startup.
 - Anything that allocates or touches files: message thread or worker, handed to the
@@ -55,6 +55,13 @@ own JUCE modules, so JUCE module code is never linked twice.
   too (the self-test checks every preset value names a parameter).
 - Your own JUCE effects (shimmer, fuzz): `src/fx_juce/UserEffects.cpp`, registered the
   same way as the existing ones; they become FX types like the built-in ones.
+- Hosted instrument plugins (the Guest strip): the engine sees only `engine::Instrument`
+  (`engine/guest`); the JUCE side is `HostedInstrument` in `app/PluginHost`, created by
+  `GuestManager` and handed over through `InstrumentSlot`. Notes for it go through
+  `Engine::pushGuest`/`guestKey` (preallocated, stamped with the sample time); nothing
+  calls the instrument directly.
+- Notes leaving Tidefield (Cycles MIDI out): `Engine::pushMidiOut` into the `midiOut`
+  SPSC queue; `CycleMidiOut` in `app/Remote` is its only consumer and sends them.
 - A performance gesture that moves many parameters at once: add offsets in
   `Engine::updateModulation` (never set targets for this).
 - A new expensive voice or grain pool: give it a limit setter and add a column to

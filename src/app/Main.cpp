@@ -2,6 +2,7 @@
 #include "gui/Settings.h"
 #include "AudioHost.h"
 #include "FactoryContent.h"
+#include "GuestSelfTest.h"
 #include "gui/MainView.h"
 
 #include <AudioProcessorEffect.h>
@@ -149,6 +150,8 @@ int runSelfTest()
     check(finite, "render is finite");
     check(peak <= dsp::dbToGain(-1.0f) + 1.0e-5f, "render stays under the -1 dBFS ceiling (peak " + juce::String(juce::Decibels::gainToDecibels(peak), 1) + " dB)");
     check(rmsDb > -50.0, "render is audible (" + juce::String(rmsDb, 1) + " dB RMS)");
+
+    checkGuestPath(check);
 
     std::cout << (failures == 0 ? "Self-test passed" : "Self-test FAILED") << std::endl;
     return failures == 0 ? 0 : 1;

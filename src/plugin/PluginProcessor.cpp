@@ -121,7 +121,7 @@ juce::AudioProcessorEditor* TidefieldProcessor::createEditor() { return new Edit
 std::shared_ptr<const io::SessionData> TidefieldProcessor::captureNow()
 {
     return std::make_shared<const io::SessionData>(
-        io::captureSession(engine, core->latest(), core->scenes, core->fx, &core->midi, &core->seasons, &core->paths, &core->gestures, &core->mod));
+        io::captureSession(engine, core->latest(), core->scenes, core->fx, &core->midi, &core->seasons, &core->paths, &core->gestures, &core->mod, &core->guest));
 }
 
 void TidefieldProcessor::timerCallback()
@@ -167,7 +167,7 @@ void TidefieldProcessor::setStateInformation(const void* data, int size)
     }
     restorePending = true;
     auto apply = [this, restored] {
-        io::applySession(*restored, engine, core->scenes, core->fx, true, &core->midi, &core->seasons, &core->paths, &core->gestures, &core->mod);
+        io::applySession(*restored, engine, core->scenes, core->fx, true, &core->midi, &core->seasons, &core->paths, &core->gestures, &core->mod, &core->guest);
         core->seedTargets(*restored);
         restorePending = false;
     };

@@ -32,6 +32,7 @@ public:
     void mouseEnter(const juce::MouseEvent& e) override;
 
     std::function<void(int slot)> onLoad;
+    int getSlot() const noexcept { return slot; }
 
 private:
     void rebuildPeaks();

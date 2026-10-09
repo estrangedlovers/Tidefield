@@ -431,6 +431,28 @@ CI; every macOS CI run green on Apple Silicon.
 whether the auto master's target shape suits your material, how the new gestures
 feel, CPU on the M1 Pro under real load, and the app on your interface and controller.
 
+### 1.4: Browser Places and drag and drop
+
+- **Places** in the Browser: user folders (settings key `browserPlaces`, open state in
+  `browserPlacesOpen`), added from the Browser, by dropping a folder, or in Settings >
+  Files and Startup (`PlaceList`). Each place scans on a worker thread with
+  `io::listAudioFiles` (recursive, hidden files skipped, natural sort, 500 listed, scan
+  stops at 20000 files or 200000 entries, cancellable) and lists files flat with their
+  relative paths. Search covers scanned places (200 results). File rows load, preview,
+  favourite (stored as full paths beside factory names), add to Bloom's keyboard and
+  reveal.
+- **Drag and drop** on `MainView` (`FileDragAndDropTarget`, `DragAndDropContainer`,
+  `DragAndDropTarget`): audio from Finder or a Browser row onto the terrain or Clouds
+  page asks for a target, onto a cloud device loads that cloud, onto Bloom loads Bloom
+  (several files spread across the keyboard). Project files open. The target is
+  outlined in `colour::accent` with a label (`paintOverChildren`).
+- `MainView::loadFiles` is the one path for user files (choosers, places, drops),
+  including pitch detection and adding to Bloom's keyboard.
+- Tests: `tests/io/AudioFolderTests.cpp` (recognition, recursion, sorting, cap,
+  cancel, search, places round trip). `--ui-test` also drives a file drag across the
+  window. Verified under Xvfb in dark and light themes; not yet tried with real
+  Finder drags on macOS.
+
 ### 1.3.0: a deeper instrument
 
 Built in this round, each with tests:

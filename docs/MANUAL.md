@@ -93,7 +93,7 @@ Hover over anything and the status bar at the bottom says what it does.
 | Area | What is there |
 |---|---|
 | Top bar | the session menu, Fade, Panic, Rec, Auto master, Keys, tempo, CPU load, output meter and Audio |
-| Browser (left) | scenes, Capture, the factory sounds and your own sounds |
+| Browser (left) | scenes, Capture, favourites, Places (your own sound folders) and the factory sounds |
 | Terrain (centre) | the map you play on |
 | Performance (right) | Tide, Wander, Gravity, Glide, key, scale, wander style and the Medium |
 | Pads (under the terrain) | the gestures, the Shape pad and the take recorder |
@@ -792,6 +792,30 @@ load a WAV, AIFF, FLAC, Ogg or MP3 file from disk the same way.
   limiter still apply.
 - **Favourites**: right-click a sound and choose **Add to favourites**. Favourites
   appear in their own group at the top and are kept between sessions.
+
+**Places** are your own sound folders, listed in the Browser like Ableton's. Click
+**+ Add folder...** (or drop a folder from Finder onto the window) and the folder
+appears under Places. Click it to open it: every WAV, AIFF, FLAC, Ogg and MP3 inside,
+subfolders included, is listed with its path. A folder is read in the background, so
+even a big library never stalls the interface; the first 500 files are listed and the
+count beside the folder shows how many there are. Files behave like factory sounds:
+click to load into a cloud or Bloom (Bloom detects the pitch and tunes itself), the
+triangle previews, and right-click offers favourites, **Add to Bloom's keyboard** and
+**Show in Finder**. Right-click a place to rescan it, show it or remove it. Search
+looks through your places as well. Places are kept between sessions and are also
+listed in **Settings > Files and Startup**, where you can add and remove them.
+
+**Drag and drop**: drag a sound file from Finder, or a row from the Browser, onto the
+window. The target lights up as you hover:
+
+- on the **terrain**, the **Clouds** tab or an empty part of the Clouds page, a menu
+  asks where it goes: Cloud 1 to 4, Bloom or Add to Bloom's keyboard;
+- on a **cloud's device**, it loads straight into that cloud;
+- on the **Bloom** tab or device, it loads into Bloom; drop several files there to
+  spread them across Bloom's keyboard;
+- a `.tide` (or older `.tidefield`) project file opens the project wherever you drop it.
+
+A place file dragged out of the Browser can also be dropped into another application.
 
 ### Presets
 

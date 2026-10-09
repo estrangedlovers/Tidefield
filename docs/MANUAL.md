@@ -42,7 +42,10 @@ VST3 plugin.
 
 ## 1. Installing
 
-You need a Mac with Apple Silicon and macOS 12 or later.
+Tidefield runs on a Mac with Apple Silicon and macOS 12 or later, or on a 64-bit PC
+with Windows 10 or 11 (see [On Windows](#on-windows) below).
+
+### On macOS
 
 **The app.** Download `Tidefield-macOS-arm64.zip` from the latest release, unzip it
 and drag `Tidefield.app` into Applications. The app is not notarised by Apple, so the
@@ -61,6 +64,27 @@ audio interface, sample rate and buffer size. A buffer of 256 samples is a good 
 Copy `Tidefield.component` to `~/Library/Audio/Plug-Ins/Components` and
 `Tidefield.vst3` to `~/Library/Audio/Plug-Ins/VST3`, then rescan plugins in your DAW.
 Tidefield appears as an instrument. See [Tidefield in a DAW](#22-tidefield-in-a-daw).
+
+### On Windows
+
+**The app.** Download `Tidefield-Windows-x64.zip` from the latest release and unzip it
+anywhere you like (your Documents folder, or `C:\Program Files` if you have
+administrator rights). Open the `Tidefield` folder and run `Tidefield.exe`. Nothing else
+needs installing. The app is not code-signed, so the first time Windows SmartScreen
+may show "Windows protected your PC": click **More info**, then **Run anyway**. If
+Windows marked the zip as downloaded from the internet and blocks the app, right-click
+the zip, choose Properties, tick **Unblock** and unzip it again.
+
+Click **Settings** in the top right (or press Ctrl+,), open **Audio** and choose your
+audio interface. Windows Audio (WASAPI) works with every device; start with a buffer of
+256 or 512 samples. Wherever this manual writes Cmd, use Ctrl on Windows (Ctrl+S saves,
+Ctrl+Z undoes); there is no menu bar, everything is in the window. To open a `.tide`
+project, use the session menu's Open, or drag the file onto `Tidefield.exe`.
+
+**The plugin.** `Tidefield-Plugins-Windows-x64.zip` holds a VST3 (Windows has no Audio
+Units). Copy the whole `Tidefield.vst3` folder to `C:\Program Files\Common Files\VST3`
+(Windows asks for administrator permission), then rescan plugins in your DAW.
+Tidefield appears as an instrument, as on macOS.
 
 ---
 

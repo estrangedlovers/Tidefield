@@ -26,6 +26,20 @@ Unit and a VST3 instrument. Copy `Tidefield.component` to
 `~/Library/Audio/Plug-Ins/VST3`, then rescan. Track MIDI plays Bloom and drives your
 mappings, and the whole piece (sounds included) is saved in the project.
 
+## Install (Windows 10/11, 64-bit)
+
+1. Download `Tidefield-Windows-x64.zip` from the same release (or from the newest
+   "Windows app" run under Actions) and unzip it anywhere, for example into
+   `C:\Program Files` or your Documents folder.
+2. Run `Tidefield.exe`. The app is not code-signed, so SmartScreen may say "Windows
+   protected your PC": choose **More info**, then **Run anyway**. It only asks once.
+3. Choose your audio interface in **Settings** (top right, or Ctrl+,), under Audio.
+   Windows Audio (WASAPI) works with any device; shortcuts written Cmd here are Ctrl
+   on Windows.
+
+**In a DAW**: `Tidefield-Plugins-Windows-x64.zip` holds the VST3 instrument. Copy the
+whole `Tidefield.vst3` folder to `C:\Program Files\Common Files\VST3`, then rescan.
+
 The full guide to every control is the [user manual](docs/MANUAL.md).
 
 ## First five minutes
@@ -124,6 +138,12 @@ cmake --preset release
 cmake --build --preset release
 ctest --test-dir build/release
 ```
+
+On Windows, configure from a "x64 Native Tools Command Prompt for VS 2022" (Visual
+Studio 2022 with the C++ workload; it brings CMake and Ninja) and add
+`-DTIDEFIELD_BUILD_APP=ON` to the first command; the app is
+`build\release\src\app\Tidefield_artefacts\Release\Tidefield.exe` and the plugin is in
+`build\release\src\app\TidefieldPlugin_artefacts\Release\VST3`.
 
 On macOS this builds `Tidefield.app` (in `build/release/src/app/Tidefield_artefacts/`)
 and the plugins (in `build/release/src/app/TidefieldPlugin_artefacts/`).

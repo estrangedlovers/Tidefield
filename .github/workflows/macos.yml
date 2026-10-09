@@ -118,6 +118,7 @@ jobs:
           target_commitish: ${{ github.sha }}
           name: Tidefield ${{ inputs.release_tag || github.ref_name }}
           make_latest: true
+          append_body: true
           files: |
             dist/Tidefield-macOS-arm64.zip
             dist/Tidefield-Plugins-macOS-arm64.zip

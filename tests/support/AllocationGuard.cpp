@@ -3,6 +3,10 @@
 #include <cstdlib>
 #include <new>
 
+#if defined(_MSC_VER)
+ #include <malloc.h>
+#endif
+
 namespace {
 thread_local bool tracking = false;
 thread_local std::size_t allocations = 0;
@@ -22,9 +26,22 @@ void* allocateAligned(std::size_t size, std::align_val_t alignment)
         ++allocations;
     const auto a = static_cast<std::size_t>(alignment);
     const auto rounded = ((size == 0 ? 1 : size) + a - 1) / a * a;
+#if defined(_MSC_VER)
+    if (void* p = _aligned_malloc(rounded, a))
+#else
     if (void* p = std::aligned_alloc(a, rounded))
+#endif
         return p;
     throw std::bad_alloc();
+}
+
+void releaseAligned(void* p) noexcept
+{
+#if defined(_MSC_VER)
+    _aligned_free(p);
+#else
+    std::free(p);
+#endif
 }
 }
 
@@ -36,10 +53,10 @@ void operator delete(void* p) noexcept { std::free(p); }
 void operator delete[](void* p) noexcept { std::free(p); }
 void operator delete(void* p, std::size_t) noexcept { std::free(p); }
 void operator delete[](void* p, std::size_t) noexcept { std::free(p); }
-void operator delete(void* p, std::align_val_t) noexcept { std::free(p); }
-void operator delete[](void* p, std::align_val_t) noexcept { std::free(p); }
-void operator delete(void* p, std::size_t, std::align_val_t) noexcept { std::free(p); }
-void operator delete[](void* p, std::size_t, std::align_val_t) noexcept { std::free(p); }
+void operator delete(void* p, std::align_val_t) noexcept { releaseAligned(p); }
+void operator delete[](void* p, std::align_val_t) noexcept { releaseAligned(p); }
+void operator delete(void* p, std::size_t, std::align_val_t) noexcept { releaseAligned(p); }
+void operator delete[](void* p, std::size_t, std::align_val_t) noexcept { releaseAligned(p); }
 
 namespace tf::test {
 ScopedAllocationCounter::ScopedAllocationCounter() noexcept

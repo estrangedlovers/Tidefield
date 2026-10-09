@@ -714,6 +714,26 @@ silent, and one behaviour per effect. The control audit now has a group per effe
 and fails if a registered type has no group or a control is not swept. Factory presets
 for the new types (`fx:<type>`), and `scores/fx_palette.json` (passes `--strict`).
 
+### Windows build (after 1.3.0)
+
+- `.github/workflows/windows.yml`: MSVC x64 on `windows-latest` with Ninja and the
+  `release` preset (app on), then ctest, the four `--strict` renders, `Tidefield.exe
+  --self-test` and `--ui-test --null-audio`, `tidefield_plugincheck` on the VST3 and
+  `tidefield_hostcheck` on the test plugin. Ships `Tidefield-Windows-x64.zip` (the app)
+  and `Tidefield-Plugins-Windows-x64.zip` (VST3 and a README) as artifacts and, on a
+  `v*` tag or a manual run with `release_tag`, attaches them to the same release as
+  macOS (both workflows append their notes, so the order they finish in does not matter).
+- Portability fixes: the MSVC runtime is linked statically (no VC++ redistributable
+  needed, and every target and dependency agrees), the allocation counter in the tests
+  uses `_aligned_malloc`/`_aligned_free` on MSVC (no `std::aligned_alloc` there), the
+  arm64 FPCR path in `Denormal.h` is only taken by GCC/Clang (it is inline assembly),
+  the hosting test points at the test plugin's `VST3` artefacts folder on every
+  platform, and shortcut hints read Ctrl instead of Cmd off macOS.
+- Verified only on Linux (GCC build, all tests, renders, app compile). Not yet built
+  with MSVC or run on Windows: the first CI run is the check. There is no file
+  association for `.tide` on Windows (no installer); projects open from the session
+  menu or by dropping them on `Tidefield.exe`. No ASIO (needs Steinberg's SDK).
+
 ## How to run
 ```
 cmake --preset headless && cmake --build --preset headless

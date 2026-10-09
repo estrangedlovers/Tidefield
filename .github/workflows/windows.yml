@@ -1,0 +1,121 @@
+name: Windows app
+
+on:
+  push:
+    branches: [main, "claude/**"]
+    tags: ["v*"]
+  pull_request:
+  workflow_dispatch:
+    inputs:
+      release_tag:
+        description: "Attach the Windows build to the release with this tag (e.g. v1.0.0); empty = build only"
+        required: false
+        default: ""
+
+permissions:
+  contents: write
+
+concurrency:
+  group: windows-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  build:
+    runs-on: windows-latest
+    timeout-minutes: 90
+    defaults:
+      run:
+        shell: bash
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: MSVC developer environment (x64)
+        uses: ilammy/msvc-dev-cmd@v1
+        with:
+          arch: x64
+
+      - name: Cache JUCE and Catch2
+        uses: actions/cache@v4
+        with:
+          path: build/_deps
+          key: deps-${{ runner.os }}-${{ hashFiles('cmake/Dependencies.cmake') }}
+
+      - name: Configure
+        shell: pwsh
+        run: cmake --preset release -DTIDEFIELD_BUILD_APP=ON -DCMAKE_C_COMPILER=cl -DCMAKE_CXX_COMPILER=cl
+
+      - name: Build
+        shell: pwsh
+        run: cmake --build --preset release --parallel
+
+      - name: Test
+        shell: pwsh
+        run: ctest --test-dir build/release --output-on-failure --parallel 4
+
+      - name: Strict renders
+        run: |
+          for s in drone_basic ecosystem bloom_catch safety_panic; do
+            ./build/release/tools/render/tidefield_render.exe "scores/$s.json" -o "out/$s.wav" --strict > /dev/null
+          done
+
+      - name: Self-test
+        run: |
+          APP=build/release/src/app/Tidefield_artefacts/Release/Tidefield.exe
+          test -f "$APP"
+          "$APP" --self-test
+
+      - name: Interface test
+        timeout-minutes: 5
+        run: ./build/release/src/app/Tidefield_artefacts/Release/Tidefield.exe --ui-test --null-audio
+
+      - name: Plugin (VST3) and hosting checks
+        run: |
+          VST3=build/release/src/app/TidefieldPlugin_artefacts/Release/VST3/Tidefield.vst3
+          test -f "$VST3/Contents/x86_64-win/Tidefield.vst3"
+          CHECK=$(find build/release -name tidefield_plugincheck.exe -type f | head -1)
+          test -n "$CHECK"
+          "$CHECK" "$VST3"
+          HOSTCHECK=$(find build/release -name tidefield_hostcheck.exe -type f | head -1)
+          test -n "$HOSTCHECK"
+          "$HOSTCHECK" build/release/tools/testfx/TidefieldTestGain_artefacts/Release/VST3
+
+      - name: Package
+        shell: pwsh
+        run: |
+          New-Item -ItemType Directory -Force dist/app/Tidefield, dist/plugins | Out-Null
+          Copy-Item build/release/src/app/Tidefield_artefacts/Release/Tidefield.exe dist/app/Tidefield/
+          Copy-Item -Recurse build/release/src/app/TidefieldPlugin_artefacts/Release/VST3/Tidefield.vst3 dist/plugins/
+          Copy-Item resources/plugins-README-Windows.txt dist/plugins/README.txt
+          Compress-Archive -Path dist/app/Tidefield -DestinationPath dist/Tidefield-Windows-x64.zip -Force
+          Compress-Archive -Path dist/plugins/* -DestinationPath dist/Tidefield-Plugins-Windows-x64.zip -Force
+          Get-ChildItem dist/*.zip | Format-Table Name, Length
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: Tidefield-Windows-x64
+          path: |
+            dist/Tidefield-Windows-x64.zip
+            dist/Tidefield-Plugins-Windows-x64.zip
+          retention-days: 30
+
+      - name: Attach to the release (version tag, or a manual run with release_tag)
+        if: startsWith(github.ref, 'refs/tags/v') || (github.event_name == 'workflow_dispatch' && inputs.release_tag != '')
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: ${{ inputs.release_tag || github.ref_name }}
+          target_commitish: ${{ github.sha }}
+          name: Tidefield ${{ inputs.release_tag || github.ref_name }}
+          make_latest: true
+          append_body: true
+          files: |
+            dist/Tidefield-Windows-x64.zip
+            dist/Tidefield-Plugins-Windows-x64.zip
+          generate_release_notes: true
+          body: |
+            Tidefield for Windows 10/11 (64-bit).
+
+            Unzip Tidefield-Windows-x64 anywhere and run Tidefield.exe. The app is not code-signed, so SmartScreen
+            may say "Windows protected your PC": choose More info, then Run anyway.
+
+            Plugin: unzip Tidefield-Plugins-Windows-x64 and copy the Tidefield.vst3 folder to
+            C:\Program Files\Common Files\VST3, then rescan in your DAW.

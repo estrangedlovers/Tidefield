@@ -108,6 +108,15 @@ inline void showMenu(juce::PopupMenu& menu, juce::Component* owner, std::functio
     });
 }
 
+inline juce::String shortcut(const juce::String& keys)
+{
+#if JUCE_MAC
+    return keys;
+#else
+    return keys.replace("Cmd", "Ctrl");
+#endif
+}
+
 inline void later(juce::Component* owner, std::function<void()> f)
 {
     juce::Component::SafePointer<juce::Component> safe(owner);

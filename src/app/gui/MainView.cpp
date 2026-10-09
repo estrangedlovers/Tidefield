@@ -333,7 +333,7 @@ public:
     TopBar(Model& m, MainView& v) : model(m), view(v), meter(m, -1, true), rec(m), autoMaster(m, P::MasterAuto, "Auto master", {}, colour::good()), tempo(m)
     {
         model.add(this);
-        sessionButton.setHelp(&model, "new, open, save (Cmd+N, Cmd+O, Cmd+S)");
+        sessionButton.setHelp(&model, shortcut("new, open, save (Cmd+N, Cmd+O, Cmd+S)"));
         sessionButton.onClick = [this] {
             juce::PopupMenu menu;
             menu.addItem(1, "New session");
@@ -342,11 +342,11 @@ public:
             menu.addItem(3, "Save");
             menu.addItem(4, "Save as...");
             menu.addSeparator();
-            menu.addItem(5, "Projector window (Cmd+P)", true, view.isProjectorOpen());
-            menu.addItem(6, "Settings...  (Cmd+,)");
+            menu.addItem(5, shortcut("Projector window (Cmd+P)"), true, view.isProjectorOpen());
+            menu.addItem(6, shortcut("Settings...  (Cmd+,)"));
             menu.addSeparator();
-            menu.addItem(8, "Undo " + model.core.undo.getUndoDescription() + "  (Cmd+Z)", model.core.undo.canUndo());
-            menu.addItem(9, "Redo " + model.core.undo.getRedoDescription() + "  (Shift+Cmd+Z)", model.core.undo.canRedo());
+            menu.addItem(8, "Undo " + model.core.undo.getUndoDescription() + shortcut("  (Cmd+Z)"), model.core.undo.canUndo());
+            menu.addItem(9, "Redo " + model.core.undo.getRedoDescription() + shortcut("  (Shift+Cmd+Z)"), model.core.undo.canRedo());
             juce::PopupMenu appearance;
             for (bool light : { false, true })
             {
@@ -379,7 +379,7 @@ public:
         panic.onClick = [this] { model.engine.command(model.frame().panicActive ? engine::Command::ResumeFromPanic : engine::Command::Panic); };
         keys.setHelp(&model, "play Bloom from the computer keyboard: A W S E D F T G Y H U J K, Z/X octave, C/V velocity (M)");
         keys.onClick = [this] { view.noteMode = ! view.noteMode; };
-        audio.setHelp(&model, "theme, zoom, audio device, MIDI and sync, plug-in folders, files, recording and rendering (Cmd+,)");
+        audio.setHelp(&model, shortcut("theme, zoom, audio device, MIDI and sync, plug-in folders, files, recording and rendering (Cmd+,)"));
         audio.onClick = [this] { view.openSettings(); };
         for (auto* c : std::initializer_list<juce::Component*> { &sessionButton, &fade, &panic, &keys, &audio, &meter, &rec, &autoMaster, &tempo })
             addAndMakeVisible(c);

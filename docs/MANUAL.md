@@ -516,6 +516,32 @@ removing a route returns the control exactly.
 
 ---
 
+### Macros
+
+A macro is one knob that moves several controls at once, each by its own amount: turn
+**Darken** and the drone, resonator, Bloom and weather all lose their brightness
+together.
+
+The **Macros** tab has eight. Each has an **Amount** knob, a name you can type over, and
+a list of up to eight controls it moves. To add one, right-click any knob and choose
+**Map to macro**. On the Macros tab, each control has a bar running from fully down
+(left) to fully up (right), with the middle meaning no change:
+
+- the hollow dot is where the control is pushed with the macro at 0;
+- the solid dot is where it is pushed with the macro at 100%.
+
+Drag either dot; it snaps to the middle near zero. Click the x to remove a control.
+Like modulation, a macro pushes a control away from where its knob is set rather than
+replacing it, so taking a control off a macro returns it exactly. Switches such as the
+drone's Wave and Chord cannot be on a macro.
+
+Macro knobs can be MIDI learned, modulated and stored in scenes, so travelling across
+the terrain can turn them too. The starter session comes with four: Darken, Wash,
+Thicken and Unsettle. Macros, their names and ranges are saved with the session, and
+changes to them can be undone.
+
+---
+
 ## 11. Mixer and effects
 
 ### Mixer

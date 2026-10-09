@@ -8,6 +8,7 @@
 #include <BinaryData.h>
 #include <engine/Engine.h>
 #include <engine/mix/FxManager.h>
+#include <engine/mod/ModRouteManager.h>
 #include <io/AudioFileIO.h>
 #include <io/Session.h>
 
@@ -83,6 +84,14 @@ int runSelfTest()
                   + " for effects, every value names a parameter and sits in its range");
     }
     check(starter.samples.count("cloud1") == 1 && starter.samples.count("bloom") == 1, "starter session loads its sounds");
+    {
+        engine::ModRouteManager macros(engine);
+        const auto warnings = io::applyMacrosJson(starter.macros, macros, engine.getRegistry());
+        int mapped = 0;
+        for (const auto& m : macros.getMacros())
+            mapped += static_cast<int>(m.targets.size());
+        check(warnings.empty() && mapped >= 12, "starter macros: " + juce::String(mapped) + " targets, all controls known");
+    }
     engine::FxManager fx(engine);
     fx.loadDefaultLayout();
 

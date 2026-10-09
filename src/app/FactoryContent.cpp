@@ -186,6 +186,29 @@ io::SessionData makeStarterSession(const engine::Engine& engine)
     };
     s.params["terrain.x"] = 0.5f;
     s.params["terrain.y"] = 0.62f;
+    auto macro = [](const char* name, std::initializer_list<std::tuple<const char*, float, float>> targets) {
+        auto* o = new juce::DynamicObject();
+        o->setProperty("name", juce::String(name));
+        juce::Array<juce::var> list;
+        for (const auto& [param, from, to] : targets)
+        {
+            auto* t = new juce::DynamicObject();
+            t->setProperty("param", juce::String(param));
+            t->setProperty("from", from);
+            t->setProperty("to", to);
+            list.add(juce::var(t));
+        }
+        o->setProperty("targets", list);
+        return juce::var(o);
+    };
+    juce::Array<juce::var> macros;
+    macros.add(macro("Darken", { { "drone.cutoff", 0.0f, -0.45f }, { "res.brightness", 0.0f, -0.4f }, { "bloom.tone", 0.0f, -0.4f }, { "weather.tone", 0.0f, -0.4f } }));
+    macros.add(macro("Wash", { { "drone.sendA", 0.0f, 0.35f }, { "cloud1.sendA", 0.0f, 0.3f }, { "bloom.sendA", 0.0f, 0.3f }, { "busA.level", 0.0f, 0.15f } }));
+    macros.add(macro("Thicken", { { "drone.density", 0.0f, 0.5f }, { "cloud1.density", 0.0f, 0.35f }, { "cloud2.density", 0.0f, 0.35f }, { "drone.detune", 0.0f, 0.3f } }));
+    macros.add(macro("Unsettle", { { "drone.driftDepth", 0.0f, 0.5f }, { "drone.vibrato", 0.0f, 0.3f }, { "cloud1.spray", 0.0f, 0.5f }, { "terrain.wander", 0.0f, 0.4f } }));
+    for (int k = 4; k < 8; ++k)
+        macros.add(macro(("Macro " + std::to_string(k + 1)).c_str(), {}));
+    s.macros = macros;
     return s;
 }
 

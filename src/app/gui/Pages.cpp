@@ -2,6 +2,7 @@
 #include "Timeline.h"
 
 #include "../LinkSync.h"
+#include "../Undo.h"
 #include "../Installation.h"
 #include "../PluginHost.h"
 
@@ -998,6 +999,178 @@ private:
     float shown = 0.0f;
 };
 
+class MacroPanel final : public juce::Component, public Animated
+{
+public:
+    MacroPanel(Model& m, int index) : model(m), macro(index), knob(m, static_cast<P>(engine::idx(P::Macro1) + index), "turn to move every control mapped to this macro")
+    {
+        model.add(this);
+        knob.setLabel("Amount");
+        addAndMakeVisible(knob);
+        name.setFont(font(12.5f, 600));
+        name.setText(current().name, false);
+        name.setInputRestrictions(32);
+        name.onReturnKey = [this] { commitName(); };
+        name.onFocusLost = [this] { commitName(); };
+        addAndMakeVisible(name);
+        shown = signature();
+    }
+    ~MacroPanel() override { model.remove(this); }
+
+    void tick() override
+    {
+        if (const auto sig = signature(); sig != shown)
+        {
+            shown = sig;
+            if (! name.hasKeyboardFocus(true))
+                name.setText(current().name, false);
+            repaint();
+        }
+    }
+
+    void resized() override
+    {
+        auto r = getLocalBounds();
+        auto top = r.removeFromTop(74);
+        knob.setBounds(top.removeFromLeft(metric::knobW).withHeight(metric::knobH));
+        top.removeFromLeft(8);
+        name.setBounds(top.removeFromTop(26).withTrimmedTop(4));
+    }
+
+    void paint(juce::Graphics& g) override
+    {
+        auto list = listArea();
+        drawWell(g, list.toFloat());
+        const auto& targets = current().targets;
+        if (targets.empty())
+        {
+            g.setFont(font(11.0f));
+            g.setColour(display::textFaint());
+            g.drawFittedText("Right-click any knob and choose Map to macro.", list.reduced(8), juce::Justification::centred, 3);
+            return;
+        }
+        for (std::size_t k = 0; k < targets.size(); ++k)
+        {
+            const auto row = rowBounds(static_cast<int>(k));
+            const auto& t = targets[k];
+            g.setFont(font(10.5f));
+            g.setColour(display::text());
+            g.drawText(model.longName(t.param), row.withWidth(row.getWidth() * 45 / 100), juce::Justification::centredLeft, true);
+            g.setColour(display::textFaint());
+            g.drawText("x", row.withTrimmedLeft(row.getWidth() - 14), juce::Justification::centred);
+            const auto bar = barBounds(static_cast<int>(k)).toFloat();
+            g.setColour(display::textFaint().withAlpha(0.3f));
+            g.fillRoundedRectangle(bar.withSizeKeepingCentre(bar.getWidth(), 4.0f), 2.0f);
+            g.setColour(display::textFaint().withAlpha(0.6f));
+            g.drawVerticalLine(juce::roundToInt(bar.getCentreX()), bar.getY() + 1.0f, bar.getBottom() - 1.0f);
+            const float xFrom = xOf(t.from, bar), xTo = xOf(t.to, bar);
+            g.setColour(display::tide().withAlpha(0.7f));
+            g.fillRect(juce::Rectangle<float>(std::min(xFrom, xTo), bar.getCentreY() - 2.0f, std::abs(xTo - xFrom), 4.0f));
+            g.setColour(display::textDim());
+            g.drawEllipse(juce::Rectangle<float>(9.0f, 9.0f).withCentre({ xFrom, bar.getCentreY() }), 1.5f);
+            g.setColour(display::tide());
+            g.fillEllipse(juce::Rectangle<float>(9.0f, 9.0f).withCentre({ xTo, bar.getCentreY() }));
+        }
+    }
+
+    void mouseDown(const juce::MouseEvent& e) override
+    {
+        dragRow = -1;
+        const auto& targets = current().targets;
+        for (int k = 0; k < static_cast<int>(targets.size()); ++k)
+        {
+            if (rowBounds(k).removeFromRight(14).contains(e.getPosition()))
+            {
+                later(this, [this, k] { model.core.editMacros("Remove macro target", [this, k] { model.core.mod.removeMacroTarget(macro, k); }); });
+                return;
+            }
+            const auto bar = barBounds(k).toFloat().expanded(0.0f, 4.0f);
+            if (bar.contains(e.position))
+            {
+                const auto& t = targets[static_cast<std::size_t>(k)];
+                dragRow = k;
+                dragFrom = std::abs(e.position.x - xOf(t.from, bar)) < std::abs(e.position.x - xOf(t.to, bar));
+                before = model.core.mod.getMacros();
+                mouseDrag(e);
+                return;
+            }
+        }
+    }
+
+    void mouseDrag(const juce::MouseEvent& e) override
+    {
+        const auto& targets = current().targets;
+        if (dragRow < 0 || dragRow >= static_cast<int>(targets.size()))
+            return;
+        const auto bar = barBounds(dragRow).toFloat();
+        float v = juce::jlimit(-1.0f, 1.0f, (e.position.x - bar.getCentreX()) / (bar.getWidth() * 0.5f));
+        if (std::abs(v) < 0.03f)
+            v = 0.0f;
+        const auto& t = targets[static_cast<std::size_t>(dragRow)];
+        model.core.mod.setMacroRange(macro, dragRow, dragFrom ? v : t.from, dragFrom ? t.to : v);
+        if (model.onHover)
+            model.onHover(model.longName(t.param) + ": from " + juce::String(juce::roundToInt(t.from * 100.0f)) + "% to "
+                          + juce::String(juce::roundToInt(t.to * 100.0f)) + "% of its range as " + juce::String(current().name) + " turns up");
+        repaint();
+    }
+
+    void mouseUp(const juce::MouseEvent&) override
+    {
+        if (dragRow < 0)
+            return;
+        dragRow = -1;
+        auto after = model.core.mod.getMacros();
+        model.core.undo.beginNewTransaction("Macro range");
+        model.core.undo.perform(new SnapshotAction<std::array<engine::ModRouteManager::Macro, engine::kNumMacros>>(
+            before, after, [this](const auto& all) { model.core.mod.replaceMacros(all); }));
+    }
+
+    void mouseMove(const juce::MouseEvent&) override
+    {
+        if (model.onHover)
+            model.onHover(juce::String(current().name)
+                          + ": drag the hollow dot for where a control sits with the macro down, the solid dot for where it goes with the macro up");
+    }
+
+private:
+    const engine::ModRouteManager::Macro& current() const { return model.core.mod.getMacros()[static_cast<std::size_t>(macro)]; }
+
+    juce::Rectangle<int> listArea() const { return getLocalBounds().withTrimmedTop(78); }
+    juce::Rectangle<int> rowBounds(int k) const { return listArea().reduced(8, 4).withHeight(18).translated(0, k * 19); }
+    juce::Rectangle<int> barBounds(int k) const
+    {
+        const auto row = rowBounds(k);
+        return row.withTrimmedLeft(row.getWidth() * 47 / 100).withTrimmedRight(20).withSizeKeepingCentre(row.getWidth() * 53 / 100 - 26, 12);
+    }
+    static float xOf(float v, juce::Rectangle<float> bar) { return bar.getCentreX() + v * bar.getWidth() * 0.5f; }
+
+    void commitName()
+    {
+        const auto text = name.getText().trim();
+        if (text.toStdString() == current().name)
+            return;
+        model.core.editMacros("Rename macro", [this, text] { model.core.mod.setMacroName(macro, text.toStdString()); });
+        name.setText(current().name, false);
+    }
+
+    juce::String signature() const
+    {
+        juce::String sig(current().name);
+        for (const auto& t : current().targets)
+            sig << ";" << static_cast<int>(t.param) << ":" << t.from << ":" << t.to;
+        return sig;
+    }
+
+    Model& model;
+    int macro;
+    Knob knob;
+    juce::TextEditor name;
+    juce::String shown;
+    int dragRow = -1;
+    bool dragFrom = false;
+    std::array<engine::ModRouteManager::Macro, engine::kNumMacros> before;
+};
+
 class RouteList final : public juce::Component, public Animated
 {
 public:
@@ -1747,7 +1920,7 @@ DeviceView::~DeviceView()
 
 juce::String DeviceView::pageName(int p)
 {
-    static const char* names[] = { "Drone", "Clouds", "Resonator", "Bloom", "Input", "Looper", "Weather", "Gestures", "Cycles", "Seasons", "Modulation", "Timeline", "Mixer", "Effects", "Master", "MIDI" };
+    static const char* names[] = { "Drone", "Clouds", "Resonator", "Bloom", "Input", "Looper", "Weather", "Gestures", "Cycles", "Seasons", "Modulation", "Macros", "Timeline", "Mixer", "Effects", "Master", "MIDI" };
     return names[juce::jlimit(0, NumPages - 1, p)];
 }
 
@@ -2049,6 +2222,13 @@ void DeviceView::build()
             params(f, { P::ModFollowAttack, P::ModFollowRelease, P::ModFollowGain });
             break;
         }
+        case Macros:
+            for (int k = 0; k < engine::kNumMacros; ++k)
+            {
+                auto& d = device("Macro " + juce::String(k + 1), colour::forScene(k));
+                d.add(std::make_unique<MacroPanel>(model, k), 260, 0);
+            }
+            break;
         case Timeline:
         {
             auto& d = device("Performance", colour::live());

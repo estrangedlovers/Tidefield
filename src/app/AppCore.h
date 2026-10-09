@@ -1,7 +1,9 @@
 #pragma once
 
+#include "ControllerTemplates.h"
 #include "Host.h"
 #include "Installation.h"
+#include "KeyBindings.h"
 #include "MidiInputs.h"
 #include "PerformanceController.h"
 #include "PluginHost.h"
@@ -44,6 +46,8 @@ public:
     engine::GestureManager gestures;
     engine::ModRouteManager mod;
     io::PresetLibrary presets;
+    ControllerTemplateLibrary controllers;
+    KeyBindings keys;
     std::unique_ptr<MidiInputs> midiInputs;
     SessionController session;
     io::Recorder recorder;
@@ -73,6 +77,11 @@ public:
     void editRoutes(const juce::String& name, const std::function<void()>& change);
     void editMacros(const juce::String& name, const std::function<void()>& change);
     void editSeasons(const juce::String& name, const std::function<void()>& change);
+    void editMidi(const juce::String& name, const std::function<void()>& change);
+    void applyControllerTemplate(const ControllerTemplate& t, bool replace);
+    void setKey(KeyAction action, const juce::KeyPress& key);
+    void resetKeys();
+    std::function<void()> onKeysChanged;
     void setEffect(int slot, const std::string& type);
     bool isUndoing() const noexcept { return undoing; }
 
@@ -97,6 +106,9 @@ private:
     void timerCallback() override;
     void loadRigMidi();
     void saveRigMidi();
+    void suggestControllerTemplates();
+
+    juce::StringArray connectedInputs;
 
     engine::TelemetryFrame lastFrame;
     double recordingRate = 0.0;

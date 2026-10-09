@@ -267,7 +267,9 @@ the audio thread (pickup with tolerance; "waiting to catch" goes out in telemetr
 Learn: the audio thread forwards the next CC as a notice; the message thread builds a
 new map. Notes go to pitched sources and Bloom. The default 8-knob layout is
 `resources/default_midi_map.json`: terrain X, terrain Y, Tide, wander, gravity
-amount, reverb send trim, cloud density, master level.
+amount, reverb send trim, cloud density, master level. Controller templates
+(`app/ControllerTemplates`) are named MIDI maps in the same JSON as sessions; applying
+one goes through `applyMidiJson` inside an undoable `AppCore::editMidi` snapshot.
 
 ## 13. CPU guardrails (phase 7, built)
 
@@ -300,7 +302,11 @@ Bloom, Input, Looper, Weather, Gestures, Loops, Seasons, Mixer, Effects, Master,
 MIDI) and a status bar that explains whatever is under the mouse. `MainView` owns the
 keyboard: standalone, every key is consumed so macOS never beeps; holds (S, H, T)
 release on key-up, focus loss or the app going to the background; M turns the letter
-rows into a Bloom keyboard. In a plugin, Space and unused keys go to the DAW.
+rows into a Bloom keyboard. In a plugin, Space and unused keys go to the DAW. Which
+key does what comes from `KeyBindings` (`app/KeyBindings`): a table of actions with
+default chords, user overrides stored in the settings file, matched exact first, then
+without Shift, then without Option/Ctrl, so the 1.3 keys behave as before. The menu bar
+and the keyboard both call `MainView::performAction`.
 
 The older web protocol (`src/io/UiProtocol`) remains for tools: `tidefield_render
 --dump-schema` writes the parameter schema for external controllers.

@@ -5,9 +5,10 @@
 namespace tf::app::gui {
 class MainView;
 
-enum class SettingsTab { Look, Audio, Midi, Plugins, Files, Record, About, Count };
+enum class SettingsTab { Look, Audio, Midi, Controllers, Keys, Plugins, Files, Record, About, Count };
 
 void openSettings(MainView& view, Model& model, SettingsTab tab = SettingsTab::Look);
+void openSettingsFrom(juce::Component& component, SettingsTab tab);
 void closeSettings();
 bool isSettingsOpen();
 

@@ -1,4 +1,5 @@
 #include "Pages.h"
+#include "Settings.h"
 #include "Timeline.h"
 
 #include "../LinkSync.h"
@@ -696,8 +697,8 @@ public:
     explicit LooperView(Model& m) : model(m), rec("Record"), clear("Clear")
     {
         model.add(this);
-        rec.setHelp(&model, "record, close the loop, overdub (L)");
-        clear.setHelp(&model, "fade the loop out and clear it (Shift+L)");
+        rec.setHelp(&model, "record, close the loop, overdub" + model.core.keys.hint(KeyAction::LoopRecord));
+        clear.setHelp(&model, "fade the loop out and clear it" + model.core.keys.hint(KeyAction::LoopClear));
         rec.onClick = [this] { model.engine.command(engine::Command::LoopRecord); };
         clear.onClick = [this] { model.engine.command(engine::Command::LoopClear); };
         addAndMakeVisible(rec);
@@ -1488,6 +1489,10 @@ public:
         defaults.onClick = [this] { model.core.midi.loadDefaultLayout(); };
         clearAll.onClick = [this] { model.core.midi.clearAll(); };
         defaults.setHelp(&model, "the built-in mapping for a generic 8-knob controller");
+        templates.setHelp(&model, "ready-made mappings for common controllers, and your own saved ones (Settings > Controllers)");
+        templates.onClick = [this] {
+            openSettingsFrom(*this, SettingsTab::Controllers);
+        };
         notesToDrone.setClickingTogglesState(true);
         notesToDrone.onClick = [this] { model.core.midi.setNotesToDrone(notesToDrone.getToggleState()); };
         notesToDrone.setHelp(&model, "on: played notes set the drone's root as well as playing Bloom");
@@ -1495,7 +1500,7 @@ public:
         for (int c = 1; c <= 16; ++c)
             channel.addItem("Notes: channel " + juce::String(c), c + 1);
         channel.onChange = [this] { model.core.midi.setNoteChannel(channel.getSelectedId() <= 1 ? -1 : channel.getSelectedId() - 2); };
-        for (auto* c : std::initializer_list<juce::Component*> { &defaults, &clearAll, &notesToDrone, &channel })
+        for (auto* c : std::initializer_list<juce::Component*> { &defaults, &templates, &clearAll, &notesToDrone, &channel })
             addAndMakeVisible(c);
     }
     ~MidiView() override { model.remove(this); }
@@ -1504,7 +1509,9 @@ public:
     {
         if (++frames % 10 != 0 || ! isShowing())
             return;
-        juce::String sig = juce::String(model.core.midi.getBindings().size()) + (model.core.midi.isLearning() ? "L" : "-");
+        juce::String sig = model.core.midi.isLearning() ? "L" : "-";
+        for (const auto& b : model.core.midi.getBindings())
+            sig << static_cast<int>(b.source) << b.channel << ':' << b.cc << ':' << static_cast<int>(b.param) << ':' << static_cast<int>(b.action) << ';';
         if (model.core.midiInputs != nullptr)
             for (const auto& d : model.core.midiInputs->getDevices())
                 sig << d.info.identifier << (d.enabled ? 1 : 0) << (d.open ? 1 : 0);
@@ -1529,9 +1536,11 @@ public:
         auto r = getLocalBounds();
         auto left = r.removeFromLeft(300);
         auto buttons = left.removeFromBottom(24);
-        defaults.setBounds(buttons.removeFromLeft(130));
+        defaults.setBounds(buttons.removeFromLeft(120));
         buttons.removeFromLeft(4);
-        clearAll.setBounds(buttons.removeFromLeft(90));
+        templates.setBounds(buttons.removeFromLeft(90));
+        buttons.removeFromLeft(4);
+        clearAll.setBounds(buttons.removeFromLeft(78));
         left.removeFromBottom(4);
         list.setBounds(left.withTrimmedTop(16));
         r.removeFromLeft(10);
@@ -1607,7 +1616,7 @@ private:
     juce::ListBox list;
     juce::StringArray texts;
     std::vector<std::unique_ptr<FlatButton>> learnButtons, deviceButtons;
-    FlatButton defaults { "Default mapping" }, clearAll { "Clear all" }, notesToDrone { "Notes move the drone", colour::good() };
+    FlatButton defaults { "Default mapping" }, templates { "Templates..." }, clearAll { "Clear all" }, notesToDrone { "Notes move the drone", colour::good() };
     juce::ComboBox channel;
     juce::String signature;
     int frames = 9;
@@ -2139,7 +2148,7 @@ void DeviceView::build()
             auto& c = device("Catch", sceneTint(4));
             params(c, { P::CatchSource, P::CatchTarget, P::CatchSeconds });
             auto catchButton = std::make_unique<FlatButton>("Catch now", colour::accent());
-            catchButton->setHelp(&model, "grab the last seconds into a cloud (K)");
+            catchButton->setHelp(&model, "grab the last seconds into a cloud" + model.core.keys.hint(KeyAction::Catch));
             catchButton->onClick = [this] { model.engine.command(engine::Command::Catch); };
             c.add(std::move(catchButton), 2 * metric::knobW, 26);
             strip(static_cast<int>(engine::StripId::Input), sceneTint(4));

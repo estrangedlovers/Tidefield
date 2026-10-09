@@ -11,6 +11,7 @@
 namespace tf::app {
 AppCore::AppCore(Host& h)
     : host(h), engine(h.getEngine()), scenes(h.getEngine()), fx(h.getEngine()), catcher(h.getEngine()), midi(h.getEngine()), seasons(h.getEngine()), paths(h.getEngine()), gestures(h.getEngine()), mod(h.getEngine()),
+      controllers(h.getSettings().getFile().getSiblingFile("Controller templates"), h.getEngine().getRegistry()),
       session(h.getEngine(), scenes, fx, &midi, &seasons, &paths, &gestures, &mod), recorder(h.getEngine().getRecordTap())
 {
     engine.setGuardrailsEnabled(true);
@@ -25,8 +26,16 @@ AppCore::AppCore(Host& h)
         else
             performance.load({});
     };
+    keys.load(h.getSettings());
     if (h.getDeviceManager() != nullptr)
+    {
         midiInputs = std::make_unique<MidiInputs>(engine, h.getSettings());
+        midiInputs->onDevicesChanged = [this] { suggestControllerTemplates(); };
+        juce::Timer::callAfterDelay(1500, [this, weak = std::weak_ptr<bool>(alive)] {
+            if (! weak.expired())
+                suggestControllerTemplates();
+        });
+    }
     fxjuce::registerUserEffects();
     fx.loadDefaultLayout();
     loadRigMidi();
@@ -323,6 +332,71 @@ void AppCore::editSeasons(const juce::String& name, const std::function<void()>&
     undo.beginNewTransaction(name);
     lastUndoParam = engine::kNumParams;
     undo.perform(new SnapshotAction<std::vector<engine::Season>>(std::move(before), std::move(after), [this](const auto& s) { seasons.replaceAll(s); }));
+}
+
+void AppCore::editMidi(const juce::String& name, const std::function<void()>& change)
+{
+    auto before = midi.getBindings();
+    change();
+    auto after = midi.getBindings();
+    undo.beginNewTransaction(name);
+    lastUndoParam = engine::kNumParams;
+    undo.perform(new SnapshotAction<std::vector<engine::MidiBinding>>(std::move(before), std::move(after), [this](const auto& b) {
+        midi.setBindings(b);
+        saveRigMidi();
+    }));
+    saveRigMidi();
+}
+
+void AppCore::applyControllerTemplate(const ControllerTemplate& t, bool replace)
+{
+    const auto& registry = engine.getRegistry();
+    std::vector<std::string> warnings;
+    editMidi("Controller template", [&] {
+        warnings = io::applyMidiJson(mergeMidiJson(io::midiToJson(midi, registry), t.midi, replace), midi, registry);
+    });
+    if (! warnings.empty())
+        return status("Applied " + t.name + ", skipping " + juce::String(static_cast<int>(warnings.size())) + " mappings to controls this version does not have", true);
+    const auto undoKey = keys.get(KeyAction::Undo);
+    status((replace ? "Your mappings are now " : "Added ") + t.name + (replace ? juce::String() : juce::String(" to your mappings")) + " ("
+           + juce::String(countBindings(t.midi)) + " controls)." + (undoKey.isValid() ? " Undo with " + KeyBindings::describe(undoKey, false) + "." : juce::String()));
+}
+
+void AppCore::suggestControllerTemplates()
+{
+    if (midiInputs == nullptr)
+        return;
+    juce::StringArray now;
+    for (const auto& d : midiInputs->getDevices())
+        if (d.enabled && d.open)
+            now.add(d.info.name);
+    for (const auto& name : now)
+    {
+        if (connectedInputs.contains(name))
+            continue;
+        if (const auto t = controllers.suggestFor(name); t && ! midiContains(io::midiToJson(midi, engine.getRegistry()), t->midi))
+        {
+            status(name + " is connected. Settings > Controllers has a template for it: " + t->name + ".");
+            break;
+        }
+    }
+    connectedInputs = now;
+}
+
+void AppCore::setKey(KeyAction action, const juce::KeyPress& key)
+{
+    keys.set(action, key);
+    keys.save(host.getSettings());
+    if (onKeysChanged)
+        onKeysChanged();
+}
+
+void AppCore::resetKeys()
+{
+    keys.resetAll();
+    keys.save(host.getSettings());
+    if (onKeysChanged)
+        onKeysChanged();
 }
 
 void AppCore::setEffect(int slot, const std::string& type)

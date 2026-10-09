@@ -434,8 +434,8 @@ feel, CPU on the M1 Pro under real load, and the app on your interface and contr
 ### 1.4 (in progress, not released)
 
 Built so far, each with tests:
-- **Settings window** with seven tabs (Look and Feel, Audio, MIDI and Sync, Plug-ins,
-  Files and Startup, Record and Render, About), a working macOS menu bar, and sixteen
+- **Settings window** with nine tabs (Look and Feel, Audio, MIDI and Sync, Controllers,
+  Keys, Plug-ins, Files and Startup, Record and Render, About), a working macOS menu bar, and sixteen
   themes.
 - **`.tide` project files**, registered with Finder; `.tidefield` still opens.
 - **Macros**: eight knobs, each moving up to eight controls over its own range, with a
@@ -498,8 +498,45 @@ Built so far, each with tests:
   input" truncate at 1440 px).
 - Verified under Xvfb in Slate, Midnight, Paper and Daylight. Not yet tried on macOS.
 
-Still to do for 1.4: controller templates and custom shortcuts, instrument plugins as
-sources and MIDI out from the Cycles, signing and notarisation.
+**Controller templates and custom shortcuts**
+
+- **Controller templates** (`app/ControllerTemplates`): a template is a name, a device
+  name and a MIDI map in the session format (`io::midiToJson`). Factory templates for
+  the Korg nanoKONTROL2 (default scene), Akai MIDImix (factory layout), Novation Launch
+  Control XL (factory template 1), a generic 8 knobs + 8 faders on CC 1 to 16, and the
+  built-in CC 21 to 28 layout. Knobs go to the macros, faders to eight source levels
+  (top at 0 dB), and the nanoKONTROL2 transport to fade, panic, record, loop, capture,
+  release and Catch. MIDImix and Launch Control XL buttons are left unmapped (they send
+  notes, which would also reach Bloom); no BeatStep template because its factory encoder
+  layout and modes could not be confirmed.
+- Settings > **Controllers**: Apply (replace, or add with same-control replacement via
+  `mergeMidiJson`), one Undo step (`AppCore::editMidi`, which also saves the rig
+  mapping), save the current mappings as a user template (JSON in "Controller
+  templates" next to the settings file), delete, show folder. The MIDI tab has a
+  Templates button. Enabling a MIDI input whose name matches a template by whole words
+  (`deviceMatches`; "Launch Control XL 3" does not match "Launch Control XL") puts a
+  suggestion in the status bar unless its mappings are already in place; never
+  auto-applied.
+- **Custom shortcuts** (`app/KeyBindings`): one table of 29 actions (id, name, group,
+  default key) drives `MainView::keyPressed`, `MainView::performAction` (the menu bar
+  calls it), the menu labels, the status bar strip and the hover help. Stored as
+  overrides only under the settings key `shortcuts`. Matching tries the exact chord,
+  then without Shift, then without Option/Ctrl, so every old key behaves as before
+  (Shift+F still freezes, Cmd+= and Cmd++ both zoom). Tab, arrows and 1 to 9 stay
+  fixed; in a plugin Space and unbound keys still go to the DAW.
+- Settings > **Keys**: click to record, Reset, Clear, Reset all, clash warnings on both
+  rows, refusal of the fixed keys. Help > Keyboard Shortcuts opens it.
+- Tests: `tests/io/ControllerTemplateTests.cpp` (factory validation, apply through
+  `applyMidiJson`, JSON round trip, validation errors, device matching, merge,
+  library save/replace/suggest/delete) and `tests/io/KeyBindingTests.cpp` (defaults
+  identical to 1.3, shift fallback, clashes, stored overrides, settings file, text
+  round trip, reserved keys). `--self-test` checks every factory template names a
+  MIDI-learnable control and that the default shortcuts never clash. Screenshots of
+  both tabs checked under Xvfb in Slate and Paper. The controller layouts come from
+  the makers' documented defaults and were not tried with the hardware.
+
+Still to do for 1.4: instrument plugins as sources and MIDI out from the Cycles,
+signing and notarisation.
 
 ### 1.3.0: a deeper instrument
 

@@ -1,7 +1,9 @@
 #include "AppCore.h"
 #include "gui/Settings.h"
 #include "AudioHost.h"
+#include "ControllerTemplates.h"
 #include "FactoryContent.h"
+#include "KeyBindings.h"
 #include "gui/MainView.h"
 
 #include <AudioProcessorEffect.h>
@@ -91,6 +93,32 @@ int runSelfTest()
         for (const auto& m : macros.getMacros())
             mapped += static_cast<int>(m.targets.size());
         check(warnings.empty() && mapped >= 12, "starter macros: " + juce::String(mapped) + " targets, all controls known");
+    }
+    {
+        const auto templates = factoryControllerTemplates(engine.getRegistry());
+        int mapped = 0;
+        std::vector<std::string> issues;
+        for (const auto& t : templates)
+        {
+            const auto found = validateControllerTemplate(t, engine.getRegistry());
+            issues.insert(issues.end(), found.begin(), found.end());
+            mapped += countBindings(t.midi);
+        }
+        for (const auto& issue : issues)
+            std::cout << "      " << issue << std::endl;
+        check(templates.size() >= 4 && issues.empty(),
+              "controller templates: " + juce::String(static_cast<int>(templates.size())) + " factory templates, " + juce::String(mapped)
+                  + " mappings, every one names a control MIDI can move");
+    }
+    {
+        KeyBindings keys;
+        int clashes = 0, reserved = 0;
+        for (const auto& info : keyActions())
+        {
+            clashes += static_cast<int>(keys.conflicts(info.action).size());
+            reserved += KeyBindings::reservedUse(keys.get(info.action)).isNotEmpty() ? 1 : 0;
+        }
+        check(clashes == 0 && reserved == 0, "default shortcuts: " + juce::String(kNumKeyActions) + " actions, no clashes");
     }
     engine::FxManager fx(engine);
     fx.loadDefaultLayout();
@@ -205,11 +233,12 @@ public:
             item.shortcutKeyDescription = shortcut;
             menu.addItem(item);
         };
+        auto label = [this](KeyAction a) { return core.keys.label(a); };
         auto* v = view();
         if (index == 0)
         {
-            key(m, newSession, "New Session", juce::String::fromUTF8("\xe2\x8c\x98N"));
-            key(m, open, "Open...", juce::String::fromUTF8("\xe2\x8c\x98O"));
+            key(m, newSession, "New Session", label(KeyAction::NewSession));
+            key(m, open, "Open...", label(KeyAction::Open));
             juce::PopupMenu recent;
             const auto list = core.recentSessions();
             for (int i = 0; i < list.size(); ++i)
@@ -221,8 +250,8 @@ public:
             }
             m.addSubMenu("Open Recent", recent, ! list.isEmpty());
             m.addSeparator();
-            key(m, save, "Save", juce::String::fromUTF8("\xe2\x8c\x98S"));
-            key(m, saveAs, "Save As...", juce::String::fromUTF8("\xe2\x87\xa7\xe2\x8c\x98S"));
+            key(m, save, "Save", label(KeyAction::Save));
+            key(m, saveAs, "Save As...", label(KeyAction::SaveAs));
             m.addSeparator();
             const bool hasPerformance = ! core.performance.get().empty();
             m.addItem(savePerformance, "Save Performance...", hasPerformance);
@@ -230,18 +259,16 @@ public:
             m.addItem(renderLoop, "Render a 5-Minute Loop of the Sound...", ! core.performance.isRendering());
             m.addSeparator();
             const bool recording = core.recorder.getStatus().state == io::Recorder::State::Recording;
-            key(m, record, recording ? "Stop Recording" : "Start Recording", juce::String::fromUTF8("\xe2\x87\xa7R"));
+            key(m, record, recording ? "Stop Recording" : "Start Recording", label(KeyAction::Record));
             m.addItem(showRecordings, "Show Recordings");
         }
         else if (index == 1)
         {
-            key(m, undo, core.undo.canUndo() ? "Undo " + core.undo.getUndoDescription() : juce::String("Undo"), juce::String::fromUTF8("\xe2\x8c\x98Z"),
-                core.undo.canUndo());
-            key(m, redo, core.undo.canRedo() ? "Redo " + core.undo.getRedoDescription() : juce::String("Redo"),
-                juce::String::fromUTF8("\xe2\x87\xa7\xe2\x8c\x98Z"), core.undo.canRedo());
+            key(m, undo, core.undo.canUndo() ? "Undo " + core.undo.getUndoDescription() : juce::String("Undo"), label(KeyAction::Undo), core.undo.canUndo());
+            key(m, redo, core.undo.canRedo() ? "Redo " + core.undo.getRedoDescription() : juce::String("Redo"), label(KeyAction::Redo), core.undo.canRedo());
             m.addSeparator();
-            key(m, capture, "Capture Scene at Cursor", "C");
-            key(m, release, "Release Held Controls", "R");
+            key(m, capture, "Capture Scene at Cursor", label(KeyAction::Capture));
+            key(m, release, "Release Held Controls", label(KeyAction::Release));
         }
         else if (index == 2)
         {
@@ -259,18 +286,18 @@ public:
             }
             m.addSubMenu("Theme", themes);
             m.addSeparator();
-            key(m, zoomIn, "Zoom In", juce::String::fromUTF8("\xe2\x8c\x98+"));
-            key(m, zoomOut, "Zoom Out", juce::String::fromUTF8("\xe2\x8c\x98-"));
-            key(m, zoomReset, "Actual Size", juce::String::fromUTF8("\xe2\x8c\x98""0"));
+            key(m, zoomIn, "Zoom In", label(KeyAction::ZoomIn));
+            key(m, zoomOut, "Zoom Out", label(KeyAction::ZoomOut));
+            key(m, zoomReset, "Actual Size", label(KeyAction::ZoomReset));
             m.addSeparator();
-            key(m, projector, "Projector Window", juce::String::fromUTF8("\xe2\x8c\x98P"), v != nullptr, v != nullptr && v->isProjectorOpen());
+            key(m, projector, "Projector Window", label(KeyAction::Projector), v != nullptr, v != nullptr && v->isProjectorOpen());
             m.addItem(fullScreen, "Full Screen");
         }
         else if (index == 3)
         {
             const auto& f = core.latest();
-            key(m, fade, f.fadeState == engine::FadeState::Silent || f.fadeState == engine::FadeState::FadingOut ? "Fade In" : "Fade Out", "Space");
-            key(m, panic, f.panicActive ? "Resume from Panic" : "Panic", "Esc");
+            key(m, fade, f.fadeState == engine::FadeState::Silent || f.fadeState == engine::FadeState::FadingOut ? "Fade In" : "Fade Out", label(KeyAction::Fade));
+            key(m, panic, f.panicActive ? "Resume from Panic" : "Panic", label(KeyAction::Panic));
             m.addSeparator();
             juce::PopupMenu scenes;
             const auto& list = core.scenes.getScenes();
@@ -278,18 +305,18 @@ public:
                 scenes.addItem(sceneBase + static_cast<int>(i), juce::String(list[i].name) + (i < 9 ? "    " + juce::String(static_cast<int>(i) + 1) : juce::String()));
             m.addSubMenu("Glide to Scene", scenes, ! list.empty());
             m.addSeparator();
-            key(m, keys, "Computer Keyboard Plays Bloom", "M", true, v != nullptr && v->noteMode);
-            key(m, take, "Take: Record, Stop, Play", "G");
-            key(m, catchNow, "Catch the Last Seconds", "K");
-            key(m, freeze, "Freeze All", "F");
-            key(m, loop, "Tape Loop: Record, Close, Overdub", "L");
-            key(m, cycles, "Cycles On or Off", "E");
-            key(m, path, "Draw a Path", "P");
+            key(m, keys, "Computer Keyboard Plays Bloom", label(KeyAction::NoteMode), true, v != nullptr && v->noteMode);
+            key(m, take, "Take: Record, Stop, Play", label(KeyAction::Take));
+            key(m, catchNow, "Catch the Last Seconds", label(KeyAction::Catch));
+            key(m, freeze, "Freeze All", label(KeyAction::Freeze));
+            key(m, loop, "Tape Loop: Record, Close, Overdub", label(KeyAction::LoopRecord));
+            key(m, cycles, "Cycles On or Off", label(KeyAction::Cycles));
+            key(m, path, "Draw a Path", label(KeyAction::DrawPath));
         }
         else if (index == 4)
         {
             m.addItem(manual, "Tidefield Manual");
-            m.addItem(shortcuts, "Keyboard Shortcuts");
+            m.addItem(shortcuts, "Keyboard Shortcuts...");
             m.addSeparator();
             m.addItem(about, "About Tidefield");
         }
@@ -299,9 +326,9 @@ public:
     void menuItemSelected(int id, int) override
     {
         auto* v = view();
-        auto press = [v](int code, juce::ModifierKeys mods = {}) {
+        auto press = [v](KeyAction action) {
             if (v != nullptr)
-                v->performKey(juce::KeyPress(code, mods, 0));
+                v->performAction(action);
         };
         auto& s = core.session;
         if (id >= themeBase && id < themeBase + static_cast<int>(gui::kThemes.size()))
@@ -336,8 +363,8 @@ public:
             case clearRecent: core.clearRecentSessions(); break;
             case undo: core.undo.undo(); break;
             case redo: core.undo.redo(); break;
-            case capture: press('c'); break;
-            case release: press('r'); break;
+            case capture: press(KeyAction::Capture); break;
+            case release: press(KeyAction::Release); break;
             case zoomIn: gui::setInterfaceScale(core, gui::interfaceScale(core) + 0.1f); break;
             case zoomOut: gui::setInterfaceScale(core, gui::interfaceScale(core) - 0.1f); break;
             case zoomReset: gui::setInterfaceScale(core, 1.0f); break;
@@ -347,17 +374,17 @@ public:
                     if (auto* w = dynamic_cast<juce::ResizableWindow*>(v->getTopLevelComponent()))
                         w->setFullScreen(! w->isFullScreen());
                 break;
-            case fade: press(juce::KeyPress::spaceKey); break;
-            case panic: press(juce::KeyPress::escapeKey); break;
-            case keys: press('m'); break;
-            case take: press('g'); break;
-            case catchNow: press('k'); break;
-            case freeze: press('f'); break;
-            case loop: press('l'); break;
-            case cycles: press('e'); break;
-            case path: press('p'); break;
+            case fade: press(KeyAction::Fade); break;
+            case panic: press(KeyAction::Panic); break;
+            case keys: press(KeyAction::NoteMode); break;
+            case take: press(KeyAction::Take); break;
+            case catchNow: press(KeyAction::Catch); break;
+            case freeze: press(KeyAction::Freeze); break;
+            case loop: press(KeyAction::LoopRecord); break;
+            case cycles: press(KeyAction::Cycles); break;
+            case path: press(KeyAction::DrawPath); break;
             case manual: juce::URL("https://github.com/estrangedlovers/Tidefield/blob/main/docs/MANUAL.md").launchInDefaultBrowser(); break;
-            case shortcuts: juce::URL("https://github.com/estrangedlovers/Tidefield/blob/main/docs/MANUAL.md#23-keyboard-reference").launchInDefaultBrowser(); break;
+            case shortcuts: if (v != nullptr) v->openSettings(gui::SettingsTab::Keys); break;
             default: break;
         }
     }
@@ -369,7 +396,7 @@ public:
         m.addSeparator();
         juce::PopupMenu::Item item("Settings...");
         item.itemID = settings;
-        item.shortcutKeyDescription = juce::String::fromUTF8("\xe2\x8c\x98,");
+        item.shortcutKeyDescription = core.keys.label(KeyAction::Settings);
         m.addItem(item);
         return m;
     }

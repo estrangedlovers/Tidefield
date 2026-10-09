@@ -921,9 +921,51 @@ tab.
 - **Default mapping** sets up a generic eight-knob controller on CC 21 to 28: terrain X
   and Y, Tide, Wander, Gravity, reverb return, Cloud 1 density and master level.
 
+- **Templates...** opens Settings > Controllers (see below).
+
 The mappings list shows everything mapped. Click the x on a row to remove it. Mappings
 belong to your setup, so they are kept between sessions, and are also saved in each
 session file.
+
+### Controller templates
+
+A template maps a whole controller in one step. Open **Settings > Controllers** (or
+**Templates...** on the MIDI tab) and click **Apply...** next to a template, then choose:
+
+- **Replace your mappings**: the template's mappings replace all of yours;
+- **Add to your mappings**: the template's mappings are added, and any of your mappings
+  on the same knob, fader or button are replaced. The rest stay.
+
+Applying a template is one step of Undo. The note channel, Notes move the drone and MPE
+settings are never changed by a template. Faders that set a level stop at 0 dB at the
+top, so a fader pushed all the way up never boosts.
+
+| Template | Controller setup | Knobs | Faders | Buttons |
+|---|---|---|---|---|
+| Korg nanoKONTROL2 | default scene, CC mode (faders CC 0 to 7, knobs CC 16 to 23) | Macros 1 to 8 | Drone, Cloud 1, Cloud 2, Cloud 3, Resonator, Bloom, Looper and Weather levels | Play fades, Stop is panic, Record records, Cycle runs the tape loop, Set captures a scene, Rewind releases held controls, Fast forward catches |
+| Akai MIDImix | factory layout | top row Macros 1 to 8, middle row reverb sends, bottom row delay sends | the same eight levels; master fader is the master level | left free to learn |
+| Novation Launch Control XL | factory template 1 | top row Macros 1 to 8, middle row reverb sends, bottom row delay sends | the same eight levels | left free to learn |
+| Generic 8 knobs + 8 faders | knobs on CC 1 to 8, faders on CC 9 to 16 | Macros 1 to 8 | the same eight levels | none |
+| Tidefield default | eight knobs on CC 21 to 28 | the Default mapping: terrain X and Y, Tide, Wander, Gravity, reverb return, Cloud 1 density, master level | none | none |
+
+Templates listen on any MIDI channel. The MIDImix and Launch Control XL send their
+buttons as notes, which also reach Bloom, so their buttons are left for you to learn.
+On the Generic template, CC 1 is also the mod wheel modulation source. There is no
+template for the Arturia BeatStep yet: its factory encoder numbers and modes differ
+between firmware versions, so use the Generic template after setting its encoders to
+absolute CC 1 to 16 in Arturia's MIDI Control Center, or learn the knobs you want.
+
+**Your own templates.** Set up your mappings, then click **Save current mappings as a
+template...**, give it a name and choose which connected input it is for. Templates are
+JSON files in the **Controller templates** folder next to the settings file
+(**Show templates folder**); copy them between computers or share them. A template you
+saved shows **(yours)** and a **Delete** button.
+
+**Suggestions.** When you enable or plug in a MIDI input whose name matches a template
+(your own first, then the factory ones), the status bar names the template. Nothing
+changes until you apply it, and nothing is suggested once the template's mappings are
+already in place. A connected controller's template is marked **Connected** in the
+list.
 
 ### Sync and remote control
 
@@ -1012,6 +1054,8 @@ in the menu bar. The window has a tab for each area:
 | Look and Feel | the theme (click a tile), zoom from 80% to 150%, and whether the status bar explains what is under the mouse |
 | Audio | the interface, sample rate, buffer size and which inputs and outputs are on (up to eight outputs for the speaker ring), with the output and CPU load |
 | MIDI, Sync and Remote | which MIDI inputs Tidefield listens to, whether the tempo follows MIDI clock, MIDI clock out, MPE, OSC and Ableton Link (when built in) |
+| Controllers | controller templates: apply a factory or saved template, save your mappings as a template, delete your templates, and the templates folder ([section 18](#controller-templates)) |
+| Keys | every keyboard shortcut, which you can change ([section 23](#23-keyboard-reference)) |
 | Plug-ins | which formats to use (VST3, Audio Units), whether to scan the standard folders, extra folders to scan, Rescan, Rescan everything, and plug-ins that crashed while being scanned, with Retry |
 | Files and Startup | the recordings folder, the presets folder, whether Tidefield opens the starter session or the last session, the recent list, autosave, and installation mode |
 | Record and Render | whether recordings include stems, and the sample rate for timeline renders and loops |
@@ -1028,7 +1072,9 @@ On macOS the menu bar at the top of the screen works like any other app's:
 - **Edit**: undo and redo (naming what they will undo), capture a scene, release held controls.
 - **View**: jump to any device tab, pick a theme, zoom, the projector window and full screen.
 - **Play**: fade, panic, glide to any scene, the computer keyboard, take, Catch, Freeze all, the tape loop, Cycles and path drawing.
-- **Help**: the manual and the keyboard shortcuts.
+- **Help**: the manual and the keyboard shortcuts (Settings > Keys).
+
+The menus always show the shortcuts you have set.
 
 ### Themes
 
@@ -1074,6 +1120,15 @@ differences.
 ---
 
 ## 23. Keyboard reference
+
+These are the default keys. Change any of them in **Settings > Keys**: click the key
+next to an action, then press the new key, with Cmd, Shift, Option or Ctrl if you like.
+**Reset** puts one back, **Clear** leaves the action without a key, and **Reset all to
+the defaults** puts every one back. If two actions share a key, both rows say so in
+orange and the key does the one higher in the list. Tab, the arrow keys and 1 to 9 are
+fixed. Shortcuts are kept between launches; the menus, the status bar and the help
+text all show the keys you set. In a DAW, Space and keys without a shortcut always go
+to the DAW.
 
 | Key | Action |
 |---|---|

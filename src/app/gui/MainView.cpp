@@ -29,6 +29,40 @@ std::vector<MainView*> openViews;
 constexpr const char* kThemeKey = "theme";
 constexpr int kThemeMenuBase = 100;
 
+juce::String keyList(const KeyBindings& keys, std::initializer_list<KeyAction> actions)
+{
+    juce::StringArray bound;
+    for (const auto a : actions)
+        if (keys.get(a).isValid())
+            bound.add(KeyBindings::describe(keys.get(a), false));
+    return bound.isEmpty() ? juce::String() : " (" + bound.joinIntoString(", ") + ")";
+}
+
+juce::String idleHelp(const KeyBindings& keys)
+{
+    juce::StringArray parts;
+    auto add = [&](KeyAction a, const char* what) {
+        if (const auto k = keys.text(a); k.isNotEmpty())
+            parts.add(k + " " + what);
+    };
+    add(KeyAction::Fade, "fade");
+    add(KeyAction::Panic, "panic");
+    parts.add("drag the terrain to move");
+    parts.add("1-9 scenes");
+    add(KeyAction::Capture, "capture");
+    juce::StringArray holds;
+    for (const auto a : { KeyAction::Swell, KeyAction::Hush, KeyAction::Slow })
+        if (const auto k = keys.text(a); k.isNotEmpty())
+            holds.add(k);
+    if (! holds.isEmpty())
+        parts.add(holds.joinIntoString("/") + " hold gestures");
+    add(KeyAction::Take, "record a take");
+    add(KeyAction::DrawPath, "draw a path");
+    add(KeyAction::NoteMode, "keys");
+    parts.add("Tab pages");
+    return parts.joinIntoString("   ");
+}
+
 void gestureToggle(AppCore& core, bool recordNew)
 {
     const auto state = core.latest().gestureState;
@@ -37,7 +71,8 @@ void gestureToggle(AppCore& core, bool recordNew)
     else if (recordNew || ! core.gestures.hasTake())
     {
         core.gestures.record();
-        core.status("Recording a take: play, move, turn. Press G again to stop.");
+        const auto k = core.keys.text(KeyAction::Take);
+        core.status("Recording a take: play, move, turn." + (k.isEmpty() ? juce::String(" Press the pad again to stop.") : " Press " + k + " again to stop."));
     }
     else
         core.gestures.play();
@@ -139,7 +174,7 @@ public:
         repaint();
         if (model.onHover)
             model.onHover("Record what you hear to " + model.core.getRecordingsFolder().getFullPathName()
-                          + " (Shift+R). Right-click for stems and the folder.");
+                          + model.core.keys.hint(KeyAction::Record) + ". Right-click for stems and the folder.");
     }
     void mouseExit(const juce::MouseEvent&) override { repaint(); }
     void mouseDown(const juce::MouseEvent& e) override
@@ -338,7 +373,7 @@ public:
     TopBar(Model& m, MainView& v) : model(m), view(v), meter(m, -1, true), rec(m), autoMaster(m, P::MasterAuto, "Auto master", {}, colour::good()), tempo(m)
     {
         model.add(this);
-        sessionButton.setHelp(&model, shortcut("new, open, save (Cmd+N, Cmd+O, Cmd+S)"));
+        sessionButton.setHelp(&model, "new, open, save" + keyList(model.core.keys, { KeyAction::NewSession, KeyAction::Open, KeyAction::Save }));
         sessionButton.onClick = [this] {
             juce::PopupMenu menu;
             menu.addItem(1, "New session");
@@ -347,11 +382,11 @@ public:
             menu.addItem(3, "Save");
             menu.addItem(4, "Save as...");
             menu.addSeparator();
-            menu.addItem(5, shortcut("Projector window (Cmd+P)"), true, view.isProjectorOpen());
-            menu.addItem(6, shortcut("Settings...  (Cmd+,)"));
+            menu.addItem(5, "Projector window" + model.core.keys.hint(KeyAction::Projector), true, view.isProjectorOpen());
+            menu.addItem(6, "Settings..." + model.core.keys.hint(KeyAction::Settings));
             menu.addSeparator();
-            menu.addItem(8, "Undo " + model.core.undo.getUndoDescription() + shortcut("  (Cmd+Z)"), model.core.undo.canUndo());
-            menu.addItem(9, "Redo " + model.core.undo.getRedoDescription() + shortcut("  (Shift+Cmd+Z)"), model.core.undo.canRedo());
+            menu.addItem(8, "Undo " + model.core.undo.getUndoDescription() + model.core.keys.hint(KeyAction::Undo), model.core.undo.canUndo());
+            menu.addItem(9, "Redo " + model.core.undo.getRedoDescription() + model.core.keys.hint(KeyAction::Redo), model.core.undo.canRedo());
             juce::PopupMenu appearance;
             for (bool light : { false, true })
             {
@@ -375,16 +410,16 @@ public:
                     MainView::switchTheme(model.core, kThemes[static_cast<std::size_t>(r - kThemeMenuBase)]);
             });
         };
-        fade.setHelp(&model, "fade the whole instrument in or out over the fade length (Space)");
+        fade.setHelp(&model, "fade the whole instrument in or out over the fade length" + model.core.keys.hint(KeyAction::Fade));
         fade.onClick = [this] {
             const auto st = model.frame().fadeState;
             model.engine.command(st == engine::FadeState::Silent || st == engine::FadeState::FadingOut ? engine::Command::FadeIn : engine::Command::FadeOut);
         };
-        panic.setHelp(&model, "silence everything at once and clear every tail; press again to resume (Esc)");
+        panic.setHelp(&model, "silence everything at once and clear every tail; press again to resume" + model.core.keys.hint(KeyAction::Panic));
         panic.onClick = [this] { model.engine.command(model.frame().panicActive ? engine::Command::ResumeFromPanic : engine::Command::Panic); };
-        keys.setHelp(&model, "play Bloom from the computer keyboard: A W S E D F T G Y H U J K, Z/X octave, C/V velocity (M)");
+        keys.setHelp(&model, "play Bloom from the computer keyboard: A W S E D F T G Y H U J K, Z/X octave, C/V velocity" + model.core.keys.hint(KeyAction::NoteMode));
         keys.onClick = [this] { view.noteMode = ! view.noteMode; };
-        audio.setHelp(&model, shortcut("theme, zoom, audio device, MIDI and sync, plug-in folders, files, recording and rendering (Cmd+,)"));
+        audio.setHelp(&model, "theme, zoom, audio device, MIDI and sync, controllers, keys, plug-in folders, files, recording and rendering" + model.core.keys.hint(KeyAction::Settings));
         audio.onClick = [this] { view.openSettings(); };
         for (auto* c : std::initializer_list<juce::Component*> { &sessionButton, &fade, &panic, &keys, &audio, &meter, &rec, &autoMaster, &tempo })
             addAndMakeVisible(c);
@@ -931,7 +966,7 @@ private:
         else if (row->kind == Row::AddPlace)
             model.onHover("Add a folder of your own sounds to Places (or drop a folder from Finder onto the browser)");
         else if (row->kind == Row::Capture)
-            model.onHover("Capture: store everything you hear now as a scene at the cursor (C)");
+            model.onHover("Capture: store everything you hear now as a scene at the cursor" + model.core.keys.hint(KeyAction::Capture));
     }
 
     void toggleFavourite(const juce::String& key)
@@ -1392,7 +1427,7 @@ public:
         }
         g.setColour(colour::textDim());
         g.drawText(help.isNotEmpty() ? help
-                                     : juce::String("Space fade   Esc panic   drag the terrain to move   1-9 scenes   C capture   S/H/T hold gestures   G record a take   P draw a path   M keys   Tab pages"),
+                                     : idleHelp(model.core.keys),
                    r, juce::Justification::centredLeft, true);
     }
 
@@ -1424,6 +1459,7 @@ MainView::MainView(AppCore& c) : core(c), model(c)
             status->setHelp(h);
     };
     core.onStatus = [this](const juce::String& m, bool warning) { status->showMessage(m, warning); };
+    core.onKeysChanged = [] { keysChanged(); };
     core.onSessionChanged = [this] {
         if (auto* w = findParentComponentOfClass<juce::DocumentWindow>())
             w->setName("Tidefield - " + core.session.getName());
@@ -1447,6 +1483,7 @@ MainView::~MainView()
     vblank.reset();
     releaseHolds();
     core.onStatus = nullptr;
+    core.onKeysChanged = nullptr;
     core.onSessionChanged = nullptr;
     if (core.osc != nullptr)
         core.osc->onScene = oscSceneFallback;
@@ -1660,42 +1697,21 @@ bool MainView::keyPressed(const juce::KeyPress& key)
 {
     const auto mods = key.getModifiers();
     const int code = juce::CharacterFunctions::toUpperCase(static_cast<juce::juce_wchar>(key.getKeyCode()));
+    const bool plugin = core.host.isPlugin();
+    const auto action = core.keys.find(key);
 
     if (mods.isCommandDown())
     {
-        if (code == 'Z')
-            mods.isShiftDown() ? core.undo.redo() : core.undo.undo();
-        else if (code == 'S')
-            mods.isShiftDown() ? core.session.saveAs() : core.session.save();
-        else if (code == 'O')
-            core.session.open();
-        else if (code == 'N')
-            core.session.newSession();
-        else if (code == ',')
-            openSettings();
-        else if (code == '=' || code == '+' || code == '-' || code == '0')
-            setInterfaceScale(core, code == '0' ? 1.0f : interfaceScale(core) + (code == '-' ? -0.1f : 0.1f));
-        else if (code == 'P')
-            toggleProjector();
-        else
+        if (! action)
             return false;
+        performAction(*action);
         return true;
     }
-
-    if (key == juce::KeyPress::spaceKey && ! core.host.isPlugin())
-    {
-        const auto st = model.frame().fadeState;
-        core.engine.command(st == engine::FadeState::Silent || st == engine::FadeState::FadingOut ? engine::Command::FadeIn : engine::Command::FadeOut);
-        return true;
-    }
+    if (plugin && key.getKeyCode() == juce::KeyPress::spaceKey)
+        return false;
     if (key == juce::KeyPress::escapeKey && terrain->isDrawMode())
     {
         terrain->setDrawMode(false);
-        return true;
-    }
-    if (key == juce::KeyPress::escapeKey)
-    {
-        core.engine.command(model.frame().panicActive ? engine::Command::ResumeFromPanic : engine::Command::Panic);
         return true;
     }
     if (key.getKeyCode() == juce::KeyPress::tabKey)
@@ -1720,20 +1736,20 @@ bool MainView::keyPressed(const juce::KeyPress& key)
         glideToScene(code - '1', mods.isShiftDown());
         return true;
     }
-    if (code == 'M')
+    if (action == KeyAction::NoteMode)
     {
-        noteMode = ! noteMode;
-        if (! noteMode)
-            releaseHolds();
-        core.status(noteMode ? "Keys on: A W S E D F T G Y H U J K play Bloom, Z/X octave, C/V velocity. M to leave." : "Keys off: letters are gestures again");
+        performAction(*action);
         return true;
     }
     if (noteMode && handleNoteKey(key))
         return true;
+    if (! action)
+        return ! plugin;
 
     for (auto& h : holds)
-        if (code == h.keyCode)
+        if (h.action == *action)
         {
+            h.keyCode = code;
             if (! h.down)
             {
                 h.down = true;
@@ -1741,29 +1757,68 @@ bool MainView::keyPressed(const juce::KeyPress& key)
             }
             return true;
         }
+    performAction(*action);
+    return true;
+}
 
-    switch (code)
+void MainView::performAction(KeyAction action)
+{
+    switch (action)
     {
-        case 'F': model.toggle(P::FreezeOn); break;
-        case 'I': model.toggle(P::InputFreeze); break;
-        case 'E': model.toggle(P::LoopsOn); break;
-        case 'L': core.engine.command(mods.isShiftDown() ? engine::Command::LoopClear : engine::Command::LoopRecord); break;
-        case 'K': core.engine.command(engine::Command::Catch); break;
-        case 'G': gestureToggle(core, mods.isShiftDown()); break;
-        case 'P': terrain->setDrawMode(! terrain->isDrawMode()); break;
-        case 'C': core.captureSceneAtCursor(); break;
-        case 'R':
-            if (mods.isShiftDown())
-                core.toggleRecording();
-            else
-            {
-                core.scenes.releaseLiveLayer();
-                core.status("Every held control handed back to the terrain");
-            }
+        case KeyAction::NewSession: core.session.newSession(); break;
+        case KeyAction::Open: core.session.open(); break;
+        case KeyAction::Save: core.session.save(); break;
+        case KeyAction::SaveAs: core.session.saveAs(); break;
+        case KeyAction::Undo: core.undo.undo(); break;
+        case KeyAction::Redo: core.undo.redo(); break;
+        case KeyAction::Settings: openSettings(); break;
+        case KeyAction::ZoomIn: setInterfaceScale(core, interfaceScale(core) + 0.1f); break;
+        case KeyAction::ZoomOut: setInterfaceScale(core, interfaceScale(core) - 0.1f); break;
+        case KeyAction::ZoomReset: setInterfaceScale(core, 1.0f); break;
+        case KeyAction::Projector: toggleProjector(); break;
+        case KeyAction::Fade:
+        {
+            const auto st = model.frame().fadeState;
+            core.engine.command(st == engine::FadeState::Silent || st == engine::FadeState::FadingOut ? engine::Command::FadeIn : engine::Command::FadeOut);
             break;
-        default: break;
+        }
+        case KeyAction::Panic: core.engine.command(model.frame().panicActive ? engine::Command::ResumeFromPanic : engine::Command::Panic); break;
+        case KeyAction::Capture: core.captureSceneAtCursor(); break;
+        case KeyAction::Release:
+            core.scenes.releaseLiveLayer();
+            core.status("Every held control handed back to the terrain");
+            break;
+        case KeyAction::Record: core.toggleRecording(); break;
+        case KeyAction::NoteMode:
+        {
+            noteMode = ! noteMode;
+            if (! noteMode)
+                releaseHolds();
+            const auto k = core.keys.text(KeyAction::NoteMode);
+            core.status(noteMode ? "Keys on: A W S E D F T G Y H U J K play Bloom, Z/X octave, C/V velocity." + (k.isEmpty() ? juce::String() : " " + k + " to leave.")
+                                 : juce::String("Keys off: letters are gestures again"));
+            break;
+        }
+        case KeyAction::Freeze: model.toggle(P::FreezeOn); break;
+        case KeyAction::InputFreeze: model.toggle(P::InputFreeze); break;
+        case KeyAction::Cycles: model.toggle(P::LoopsOn); break;
+        case KeyAction::LoopRecord: core.engine.command(engine::Command::LoopRecord); break;
+        case KeyAction::LoopClear: core.engine.command(engine::Command::LoopClear); break;
+        case KeyAction::Catch: core.engine.command(engine::Command::Catch); break;
+        case KeyAction::Take: gestureToggle(core, false); break;
+        case KeyAction::NewTake: gestureToggle(core, true); break;
+        case KeyAction::DrawPath: terrain->setDrawMode(! terrain->isDrawMode()); break;
+        case KeyAction::Swell:
+        case KeyAction::Hush:
+        case KeyAction::Slow:
+        case KeyAction::Count: break;
     }
-    return ! core.host.isPlugin() || std::string_view("FIELKCRPSHTMG").find(static_cast<char>(code)) != std::string_view::npos;
+}
+
+void MainView::keysChanged()
+{
+    for (auto* v : openViews)
+        later(v, [v] { v->rebuildInterface(); });
 }
 
 namespace {
@@ -2121,18 +2176,6 @@ bool MainView::shouldDropFilesWhenDraggedExternally(const SourceDetails& details
     files.add(d.fromFirstOccurrenceOf(kDragFile, false, false));
     canMoveFiles = false;
     return true;
-}
-
-bool MainView::performKey(const juce::KeyPress& key)
-{
-    const bool notes = noteMode;
-    const bool togglesNotes = juce::CharacterFunctions::toUpperCase(static_cast<juce::juce_wchar>(key.getKeyCode())) == 'M';
-    if (! togglesNotes)
-        noteMode = false;
-    const bool handled = keyPressed(key);
-    if (! togglesNotes)
-        noteMode = notes;
-    return handled;
 }
 
 void MainView::showAudioSettings() { openSettings(SettingsTab::Audio); }

@@ -106,9 +106,14 @@ resources/fonts/Quicksand-Medium.ttf`.
   `-DJUCE_ENABLE_REPAINT_DEBUGGING=1` to see what repaints.
 - Preferences live in `gui/Settings.cpp`: one tab per area, each a `FormPage` of labelled
   rows. The macOS menu bar is `AppMenu` in `Main.cpp`; its Play items call
-  `MainView::performKey` so menu and keyboard share one path.
+  `MainView::performAction` so menu and keyboard share one path.
 - Keys live in `MainView::keyPressed`; standalone every key is consumed (no macOS
-  beep), in a plugin leave Space and unused keys to the DAW.
+  beep), in a plugin leave Space and unused keys to the DAW. A rebindable key is a row
+  in `keyActions()` (`app/KeyBindings.cpp`) plus a case in `MainView::performAction`;
+  never compare key codes directly, and show keys with `core.keys.hint()`/`label()`.
+- Controller templates: factory ones in `app/ControllerTemplates.cpp` (the self-test
+  checks every one names a MIDI-learnable parameter); user ones are JSON files in
+  "Controller templates" next to the settings file.
 - Check the look under Xvfb on Linux: build with `-DTIDEFIELD_BUILD_APP=ON`, run the
   app under `xvfb-run` and capture the screen (`import -window root`). Without an
   audio device there is no telemetry; values come from the seeded targets.

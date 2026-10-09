@@ -90,7 +90,7 @@ TerrainView::TerrainView(Model& m, bool present) : model(m), presentation(presen
 {
     model.add(this);
     setOpaque(false);
-    drawButton.setHelp(&model, "draw a loop on the terrain and the sound travels it by itself; Wander sets how closely (P)");
+    drawButton.setHelp(&model, "draw a loop on the terrain and the sound travels it by itself; Wander sets how closely" + model.core.keys.hint(KeyAction::DrawPath));
     drawButton.onClick = [this] { setDrawMode(! drawMode); };
     clearButton.setHelp(&model, "forget the drawn path; the sound wanders freely again");
     clearButton.onClick = [this] {

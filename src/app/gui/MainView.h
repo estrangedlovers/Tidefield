@@ -54,7 +54,8 @@ public:
     void openSettings(SettingsTab tab = SettingsTab::Look);
     void showPage(int page) { devices->show(page); }
     int getPage() const { return devices->getPage(); }
-    bool performKey(const juce::KeyPress& key);
+    void performAction(KeyAction action);
+    static void keysChanged();
     void glideTo(int scene) { glideToScene(scene, false); }
     void toggleProjector();
     bool isProjectorOpen() const noexcept { return projector != nullptr; }
@@ -100,11 +101,12 @@ private:
 
     struct Hold
     {
-        int keyCode;
+        KeyAction action;
         engine::P param;
+        int keyCode = 0;
         bool down = false;
     };
-    std::array<Hold, 3> holds { { { 'S', engine::P::SwellHold }, { 'H', engine::P::HushHold }, { 'T', engine::P::SlowHold } } };
+    std::array<Hold, 3> holds { { { KeyAction::Swell, engine::P::SwellHold }, { KeyAction::Hush, engine::P::HushHold }, { KeyAction::Slow, engine::P::SlowHold } } };
 
 public:
     bool noteMode = false;

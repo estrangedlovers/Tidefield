@@ -9,6 +9,8 @@
 #include "../LinkSync.h"
 #include "../PluginHost.h"
 
+#include <io/Session.h>
+
 #include <juce_audio_utils/juce_audio_utils.h>
 
 namespace tf::app::gui {
@@ -25,6 +27,8 @@ const char* tabName(SettingsTab t)
         case SettingsTab::Look: return "Look and Feel";
         case SettingsTab::Audio: return "Audio";
         case SettingsTab::Midi: return "MIDI, Sync and Remote";
+        case SettingsTab::Controllers: return "Controllers";
+        case SettingsTab::Keys: return "Keys";
         case SettingsTab::Plugins: return "Plug-ins";
         case SettingsTab::Files: return "Files and Startup";
         case SettingsTab::Record: return "Record and Render";
@@ -521,6 +525,305 @@ private:
     juce::String shown;
 };
 
+void rebuildSettingsPage();
+
+juce::StringArray connectedInputNames(AppCore& core)
+{
+    juce::StringArray names;
+    if (core.midiInputs != nullptr)
+        for (const auto& d : core.midiInputs->getDevices())
+            if (d.enabled && d.open)
+                names.add(d.info.name);
+    return names;
+}
+
+class TemplateList final : public juce::Component, private juce::Timer
+{
+public:
+    explicit TemplateList(AppCore& c) : core(c), templates(c.controllers.list()), shownVersion(c.controllers.getVersion())
+    {
+        for (std::size_t i = 0; i < templates.size(); ++i)
+        {
+            auto apply = std::make_unique<FlatButton>("Apply...");
+            apply->onClick = [this, i] { chooseHow(i); };
+            addAndMakeVisible(*apply);
+            applyButtons.push_back(std::move(apply));
+            auto remove = std::make_unique<FlatButton>("Delete");
+            remove->onClick = [this, i] { confirmDelete(i); };
+            addChildComponent(*remove);
+            remove->setVisible(! templates[i].factory);
+            deleteButtons.push_back(std::move(remove));
+        }
+        connected = connectedInputNames(core);
+        startTimer(1000);
+    }
+
+    static int heightFor(std::size_t count) { return static_cast<int>(count) * kRowH; }
+
+    void resized() override
+    {
+        for (std::size_t i = 0; i < templates.size(); ++i)
+        {
+            auto r = rowBounds(i).reduced(0, 10).removeFromRight(150);
+            applyButtons[i]->setBounds(r.removeFromLeft(78).withHeight(24));
+            r.removeFromLeft(6);
+            deleteButtons[i]->setBounds(r.withHeight(24));
+        }
+    }
+
+    void paint(juce::Graphics& g) override
+    {
+        for (std::size_t i = 0; i < templates.size(); ++i)
+        {
+            const auto& t = templates[i];
+            auto r = rowBounds(i);
+            g.setColour(colour::line());
+            g.fillRect(r.removeFromBottom(1));
+            auto text = r.reduced(0, 8).withTrimmedRight(160);
+            auto title = text.removeFromTop(18);
+            const auto titleFont = font(12.5f, 600);
+            const auto titleText = t.name + (t.factory ? juce::String() : juce::String("  (yours)"));
+            g.setFont(titleFont);
+            g.setColour(colour::text());
+            g.drawText(titleText, title, juce::Justification::centredLeft, true);
+            if (isConnected(t))
+            {
+                const int w = juce::GlyphArrangement::getStringWidthInt(titleFont, titleText) + 10;
+                auto tag = title.withTrimmedLeft(w).removeFromLeft(78).reduced(0, 1).toFloat();
+                g.setColour(colour::good());
+                g.fillRoundedRectangle(tag, 3.0f);
+                g.setColour(colour::well());
+                g.setFont(caps(9.5f));
+                g.drawText("CONNECTED", tag, juce::Justification::centred, false);
+            }
+            g.setFont(font(11.5f));
+            g.setColour(colour::textDim());
+            g.drawFittedText(t.description, text.withTrimmedTop(2), juce::Justification::topLeft, 3, 1.0f);
+        }
+    }
+
+private:
+    static constexpr int kRowH = 78;
+
+    juce::Rectangle<int> rowBounds(std::size_t i) const { return { 0, static_cast<int>(i) * kRowH, getWidth(), kRowH }; }
+
+    bool isConnected(const ControllerTemplate& t) const
+    {
+        for (const auto& name : connected)
+            if (deviceMatches(t.device, name))
+                return true;
+        return false;
+    }
+
+    void timerCallback() override
+    {
+        if (core.controllers.getVersion() != shownVersion)
+            return rebuildSettingsPage();
+        if (const auto now = connectedInputNames(core); now != connected)
+        {
+            connected = now;
+            repaint();
+        }
+    }
+
+    void chooseHow(std::size_t i)
+    {
+        juce::PopupMenu m;
+        m.addSectionHeader(templates[i].name);
+        m.addItem(1, "Replace your mappings with this template");
+        m.addItem(2, "Add to your mappings (the same controls are replaced)");
+        const auto t = templates[i];
+        showMenu(m, this, [this, t](int r) { core.applyControllerTemplate(t, r == 1); });
+    }
+
+    void confirmDelete(std::size_t i)
+    {
+        const auto name = templates[i].name;
+        auto options = juce::MessageBoxOptions()
+                           .withIconType(juce::MessageBoxIconType::QuestionIcon)
+                           .withTitle("Delete controller template")
+                           .withMessage("Delete \"" + name + "\"? Your current mappings stay as they are.")
+                           .withButton("Delete")
+                           .withButton("Cancel");
+        juce::AlertWindow::showAsync(options, [safe = juce::Component::SafePointer<TemplateList>(this), name](int result) {
+            if (safe == nullptr || result != 1)
+                return;
+            if (safe->core.controllers.remove(name))
+                safe->core.status("Deleted the controller template " + name);
+        });
+    }
+
+    AppCore& core;
+    std::vector<ControllerTemplate> templates;
+    std::vector<std::unique_ptr<FlatButton>> applyButtons, deleteButtons;
+    juce::StringArray connected;
+    int shownVersion = 0;
+};
+
+void saveControllerTemplate(AppCore& core)
+{
+    const auto devices = connectedInputNames(core);
+    auto* w = new juce::AlertWindow("Save controller template", "Save your current MIDI mappings as a template.", juce::MessageBoxIconType::NoIcon);
+    w->addTextEditor("name", devices.isEmpty() ? juce::String("My controller") : devices[0]);
+    juce::StringArray choices { "Any controller (never suggested)" };
+    choices.addArray(devices);
+    w->addComboBox("device", choices, "Suggest it when this input is enabled");
+    if (auto* box = w->getComboBoxComponent("device"))
+        box->setSelectedItemIndex(devices.isEmpty() ? 0 : 1, juce::dontSendNotification);
+    w->addButton("Save", 1, juce::KeyPress(juce::KeyPress::returnKey));
+    w->addButton("Cancel", 0, juce::KeyPress(juce::KeyPress::escapeKey));
+    w->enterModalState(true, juce::ModalCallbackFunction::create([&core, w, devices](int ok) {
+                           if (ok != 1)
+                               return;
+                           const auto name = w->getTextEditorContents("name").trim();
+                           const auto* box = w->getComboBoxComponent("device");
+                           const int choice = box != nullptr ? box->getSelectedItemIndex() : 0;
+                           const auto device = choice > 0 ? devices[choice - 1] : juce::String();
+                           const bool replacing = core.controllers.exists(name);
+                           juce::String error;
+                           if (core.controllers.save(name, device, io::midiToJson(core.midi, core.engine.getRegistry()), error))
+                               core.status((replacing ? "Replaced the controller template " : "Saved the controller template ") + name);
+                           else
+                               core.status(error, true);
+                       }),
+                       true);
+}
+
+class KeyRow final : public juce::Component, private juce::Timer
+{
+public:
+    KeyRow(AppCore& c, KeyAction a) : core(c), action(a)
+    {
+        setWantsKeyboardFocus(true);
+        reset.onClick = [this] {
+            message.clear();
+            core.setKey(action, keyActionInfo(action).defaultKey);
+        };
+        clear.onClick = [this] {
+            message.clear();
+            core.setKey(action, {});
+        };
+        reset.setWantsKeyboardFocus(false);
+        clear.setWantsKeyboardFocus(false);
+        addAndMakeVisible(reset);
+        addAndMakeVisible(clear);
+        shownVersion = core.keys.getVersion();
+        startTimerHz(4);
+    }
+
+    void resized() override
+    {
+        auto r = getLocalBounds().withTrimmedLeft(kBoxW + 8);
+        reset.setBounds(r.removeFromLeft(56));
+        r.removeFromLeft(4);
+        clear.setBounds(r.removeFromLeft(52));
+    }
+
+    void paint(juce::Graphics& g) override
+    {
+        const auto box = boxBounds().toFloat().reduced(0.5f);
+        g.setColour(hover && ! recording ? colour::lift(colour::well(), 0.08f) : colour::well());
+        g.fillRoundedRectangle(box, metric::radius);
+        g.setColour(recording ? colour::accent() : colour::wellLine());
+        g.drawRoundedRectangle(box, metric::radius, recording ? 1.5f : 1.0f);
+        const auto key = core.keys.get(action);
+        g.setFont(font(12.0f, recording ? 400 : 600));
+        g.setColour(recording ? colour::accent() : key.isValid() ? colour::wellText() : colour::wellTextDim());
+        g.drawText(recording ? juce::String("Press a key...") : KeyBindings::describe(key, false), box.reduced(8.0f, 0.0f), juce::Justification::centredLeft, true);
+
+        auto note = getLocalBounds().withTrimmedLeft(kBoxW + 8 + 56 + 4 + 52 + 10);
+        juce::String text = message;
+        bool warning = message.isNotEmpty();
+        if (text.isEmpty())
+        {
+            juce::StringArray others;
+            for (const auto a : core.keys.conflicts(action))
+                others.add(keyActionInfo(a).name);
+            if (! others.isEmpty())
+            {
+                text = "Same key as " + others.joinIntoString(", ");
+                warning = true;
+            }
+            else if (! core.keys.isDefault(action))
+                text = "Default: " + KeyBindings::describe(keyActionInfo(action).defaultKey, false);
+        }
+        g.setFont(font(11.0f));
+        g.setColour(warning ? colour::warn() : colour::textFaint());
+        g.drawFittedText(text, note, juce::Justification::centredLeft, 2, 1.0f);
+    }
+
+    void mouseUp(const juce::MouseEvent& e) override
+    {
+        if (! boxBounds().contains(e.getPosition()))
+            return;
+        recording = ! recording;
+        message.clear();
+        if (recording)
+            grabKeyboardFocus();
+        repaint();
+    }
+
+    void mouseMove(const juce::MouseEvent& e) override { setHover(boxBounds().contains(e.getPosition())); }
+    void mouseExit(const juce::MouseEvent&) override { setHover(false); }
+
+    bool keyPressed(const juce::KeyPress& key) override
+    {
+        if (! recording)
+            return false;
+        recording = false;
+        if (const auto reserved = KeyBindings::reservedUse(key); reserved.isNotEmpty())
+        {
+            message = reserved + ", so it cannot be used here.";
+            repaint();
+            return true;
+        }
+        message.clear();
+        core.setKey(action, key);
+        repaint();
+        return true;
+    }
+
+    void focusLost(FocusChangeType) override
+    {
+        if (recording)
+        {
+            recording = false;
+            repaint();
+        }
+    }
+
+private:
+    static constexpr int kBoxW = 150;
+
+    juce::Rectangle<int> boxBounds() const { return getLocalBounds().removeFromLeft(kBoxW); }
+
+    void setHover(bool on)
+    {
+        if (on != hover)
+        {
+            hover = on;
+            repaint();
+        }
+    }
+
+    void timerCallback() override
+    {
+        if (core.keys.getVersion() != shownVersion)
+        {
+            shownVersion = core.keys.getVersion();
+            repaint();
+        }
+    }
+
+    AppCore& core;
+    KeyAction action;
+    FlatButton reset { "Reset" }, clear { "Clear" };
+    juce::String message;
+    bool recording = false;
+    bool hover = false;
+    int shownVersion = 0;
+};
+
 std::unique_ptr<FormPage> lookPage(AppCore& core, int width)
 {
     auto page = std::make_unique<FormPage>();
@@ -578,7 +881,9 @@ std::unique_ptr<FormPage> midiPage(Model& model)
     auto list = std::make_unique<MidiDeviceList>(core);
     const int h = list->preferredHeight();
     page->row("Listen to", std::move(list), h);
-    page->note("Learn knobs, buttons and notes on the MIDI tab: right-click any control and choose MIDI learn.", 20);
+    page->note("Learn knobs, buttons and notes on the MIDI tab: right-click any control and choose MIDI learn. Ready-made layouts for "
+               "common controllers are under Controllers.",
+               34);
     page->header("Tempo source");
     page->row("Follow", std::make_unique<ChoiceRow>(juce::StringArray { "Internal tempo", "MIDI clock" },
                                                     juce::roundToInt(model.value(engine::P::SyncSource)),
@@ -587,6 +892,61 @@ std::unique_ptr<FormPage> midiPage(Model& model)
     page->full(createRemoteView(model), 230);
     if (! LinkSync::isAvailable())
         page->note("Ableton Link is not in this build. It is published under the GPL, so it is a build option (TIDEFIELD_WITH_LINK).", 20);
+    return page;
+}
+
+std::unique_ptr<FormPage> controllersPage(Model& model)
+{
+    auto& core = model.core;
+    auto page = std::make_unique<FormPage>();
+    page->header("Controller templates");
+    page->note("A template maps a controller's knobs, faders and buttons in one step. Factory templates follow each controller's "
+                   "factory layout; Apply replaces your mappings or adds to them, and Undo"
+                   + core.keys.hint(KeyAction::Undo) + " takes it back.",
+               34);
+    const auto count = core.controllers.list().size();
+    page->full(std::make_unique<TemplateList>(core), TemplateList::heightFor(count));
+    page->header("Your templates");
+    page->row("Current mappings", std::make_unique<Label>([&core] {
+                  const auto n = static_cast<int>(core.midi.getBindings().size());
+                  return n == 0 ? juce::String("No MIDI mappings yet") : juce::String(n) + (n == 1 ? " control mapped" : " controls mapped");
+              }));
+    page->row("", button("Save current mappings as a template...", [&core] { saveControllerTemplate(core); }));
+    page->row("", button("Show templates folder", [&core] {
+                  core.controllers.getFolder().createDirectory();
+                  core.controllers.getFolder().revealToUser();
+              }));
+    page->note("Templates are JSON files in the Controller templates folder next to the settings file. When an input whose name "
+               "matches a template is enabled, the status bar suggests it; nothing changes until you apply it.",
+               34);
+    if (core.midiInputs == nullptr)
+        page->note("MIDI inputs are handled by the DAW, so templates are never suggested here; they still apply.", 20);
+    return page;
+}
+
+std::unique_ptr<FormPage> keysPage(Model& model)
+{
+    auto& core = model.core;
+    auto page = std::make_unique<FormPage>();
+    page->header("Keyboard shortcuts");
+    page->note("Click a shortcut and press the new key, with any modifier keys you like.", 20);
+    page->note("Tab, the arrow keys and 1 to 9 stay fixed. While the computer keyboard plays Bloom, its letter rows play notes.", 20);
+    if (core.host.isPlugin())
+        page->note("Inside a DAW, Space and every key without a shortcut go to the DAW.", 20);
+    page->row("All shortcuts", button("Reset all to the defaults", [&core] {
+                  core.resetKeys();
+                  core.status("Every shortcut is back to its default");
+              }));
+    juce::String group;
+    for (const auto& info : keyActions())
+    {
+        if (group != info.group)
+        {
+            group = info.group;
+            page->header(group);
+        }
+        page->row(info.name, std::make_unique<KeyRow>(core, info.action));
+    }
     return page;
 }
 
@@ -740,6 +1100,13 @@ public:
         repaint();
     }
 
+    void rebuild()
+    {
+        const int scroll = viewport.getViewPositionY();
+        build();
+        viewport.setViewPosition(0, scroll);
+    }
+
     void paint(juce::Graphics& g) override
     {
         g.fillAll(colour::panel());
@@ -818,6 +1185,8 @@ private:
             case SettingsTab::Look: page = lookPage(model.core, width); break;
             case SettingsTab::Audio: page = audioPage(model.core); break;
             case SettingsTab::Midi: page = midiPage(model); break;
+            case SettingsTab::Controllers: page = controllersPage(model); break;
+            case SettingsTab::Keys: page = keysPage(model); break;
             case SettingsTab::Plugins: page = pluginsPage(model.core); break;
             case SettingsTab::Files: page = filesPage(model); break;
             case SettingsTab::Record: page = recordPage(model.core); break;
@@ -873,6 +1242,12 @@ std::unique_ptr<SettingsWindow>& window()
     static std::unique_ptr<SettingsWindow> w;
     return w;
 }
+
+void rebuildSettingsPage()
+{
+    if (auto& w = window(); w != nullptr)
+        later(w->content, [content = w->content] { content->rebuild(); });
+}
 }
 
 void openSettings(MainView& view, Model& model, SettingsTab tab)
@@ -885,6 +1260,12 @@ void openSettings(MainView& view, Model& model, SettingsTab tab)
         return;
     }
     w = std::make_unique<SettingsWindow>(view, model, tab);
+}
+
+void openSettingsFrom(juce::Component& component, SettingsTab tab)
+{
+    if (auto* v = component.findParentComponentOfClass<MainView>())
+        v->openSettings(tab);
 }
 
 void closeSettings() { window().reset(); }

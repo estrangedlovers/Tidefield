@@ -89,6 +89,7 @@ bool writeSession(const SessionData& session, juce::OutputStream& out, juce::Str
 std::optional<SessionData> readSession(const void* data, std::size_t size, juce::String& error);
 
 juce::var sessionToJson(const SessionData& session);
+bool sameContent(const SessionData& a, const SessionData& b);
 std::optional<SessionData> sessionFromJson(const juce::var& json, juce::String& error);
 
 inline constexpr const char* kSessionExtension = ".tide";

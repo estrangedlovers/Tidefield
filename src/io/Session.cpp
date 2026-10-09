@@ -2,6 +2,9 @@
 
 #include "AudioFileIO.h"
 
+#include <algorithm>
+#include <cmath>
+
 #include <engine/Engine.h>
 #include <engine/midi/MidiManager.h>
 #include <engine/mix/FxManager.h>
@@ -541,6 +544,34 @@ std::vector<std::string> applySession(const SessionData& session, engine::Engine
             warnings.push_back(std::move(w));
     }
     return warnings;
+}
+
+bool sameContent(const SessionData& a, const SessionData& b)
+{
+    constexpr float kTolerance = 1.0e-5f;
+    if (a.params.size() != b.params.size())
+        return false;
+    for (const auto& [id, value] : a.params)
+    {
+        const auto it = b.params.find(id);
+        if (it == b.params.end() || std::abs(it->second - value) > kTolerance * std::max(1.0f, std::abs(value)))
+            return false;
+    }
+    if (a.samples.size() != b.samples.size())
+        return false;
+    for (const auto& [id, buffer] : a.samples)
+        if (const auto it = b.samples.find(id); it == b.samples.end() || it->second != buffer)
+            return false;
+    const auto structure = [](const SessionData& s) {
+        SessionData copy = s;
+        copy.name.clear();
+        copy.params.clear();
+        copy.samples.clear();
+        copy.performance = juce::var();
+        copy.warnings.clear();
+        return juce::JSON::toString(sessionToJson(copy), true);
+    };
+    return structure(a) == structure(b);
 }
 
 juce::var sessionToJson(const SessionData& s)

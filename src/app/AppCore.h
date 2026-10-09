@@ -5,6 +5,7 @@
 #include "MidiInputs.h"
 #include "PerformanceController.h"
 #include "PluginHost.h"
+#include "Recovery.h"
 #include "Remote.h"
 #include "Undo.h"
 #include "SessionController.h"
@@ -50,6 +51,7 @@ public:
     std::unique_ptr<OscRemote> osc;
     PerformanceController performance { *this };
     std::unique_ptr<Installation> installation;
+    std::unique_ptr<Recovery> recovery;
 
     const engine::TelemetryFrame& latest() const noexcept { return lastFrame; }
 

@@ -589,3 +589,23 @@ TEST_CASE("Macro names, targets and ranges survive a save and reload")
     CHECK(m.targets[0].to == Approx(-0.7f));
     CHECK(mod2.getMacros()[0].name == "Macro 1");
 }
+
+TEST_CASE("A session counts as changed only when its content changes")
+{
+    Rig a;
+    engine::ModRouteManager mod(a.engine);
+    const auto saved = io::captureSession(a.engine, a.last, a.scenes, a.fx, nullptr, nullptr, nullptr, nullptr, &mod);
+    auto renamed = saved;
+    renamed.name = "Another name";
+    CHECK(io::sameContent(saved, renamed));
+
+    auto nudged = saved;
+    nudged.params.at("drone.cutoff") += 1.0e-7f;
+    CHECK(io::sameContent(saved, nudged));
+    nudged.params.at("drone.cutoff") += 50.0f;
+    CHECK_FALSE(io::sameContent(saved, nudged));
+
+    REQUIRE(mod.addMacroTarget(0, engine::idx(engine::P::DroneCutoff), 0.0f, 0.5f));
+    const auto withMacro = io::captureSession(a.engine, a.last, a.scenes, a.fx, nullptr, nullptr, nullptr, nullptr, &mod);
+    CHECK_FALSE(io::sameContent(saved, withMacro));
+}

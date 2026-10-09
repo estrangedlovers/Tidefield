@@ -781,6 +781,26 @@ Cmd+O, Cmd+S and Shift+Cmd+S. Opening a session crossfades to it.
 Sessions saved by Tidefield 1.3 and earlier end in `.tidefield`. They still open, and
 pressing Save writes a `.tide` copy beside the original, which is left untouched.
 
+If the session has changes that are not saved, quitting, starting a new session or
+opening another one asks first: **Save**, **Don't Save** or **Cancel**. A change is
+anything that would end up in the file, so a knob moved and moved back again does not
+count. The starter session is treated like any other: change it and Tidefield asks.
+Inside a DAW the host saves the plug-in's state, so the plug-in never asks.
+
+### Autosave and crash recovery
+
+Every two minutes Tidefield quietly keeps a copy of the session, separate from your
+own file. When Tidefield quits normally the copy is removed. If it stops unexpectedly
+(a crash, a power cut, the computer restarting), the next launch offers the copy:
+
+- **Restore** opens it under the session's original name. It is not saved over your
+  file until you press Save.
+- **Discard** throws it away.
+- **Keep for later** moves it into the recordings folder as "Recovered ...".
+
+Turn this off or change how often it happens in **Settings > Files and Startup**. In installation
+mode the installation session reopens on its own instead.
+
 ### Sounds
 
 The **Browser** lists 90 factory sounds in five groups. Every one is synthesised, so
@@ -945,7 +965,7 @@ in the menu bar. The window has a tab for each area:
 | Audio | the interface, sample rate, buffer size and which inputs and outputs are on (up to eight outputs for the speaker ring), with the output and CPU load |
 | MIDI, Sync and Remote | which MIDI inputs Tidefield listens to, whether the tempo follows MIDI clock, MIDI clock out, MPE, OSC and Ableton Link (when built in) |
 | Plug-ins | which formats to use (VST3, Audio Units), whether to scan the standard folders, extra folders to scan, Rescan, Rescan everything, and plug-ins that crashed while being scanned, with Retry |
-| Files and Startup | the recordings folder, the presets folder, whether Tidefield opens the starter session or the last session, the recent list, and installation mode |
+| Files and Startup | the recordings folder, the presets folder, whether Tidefield opens the starter session or the last session, the recent list, autosave, and installation mode |
 | Record and Render | whether recordings include stems, and the sample rate for timeline renders and loops |
 | About | the version, the manual and the settings file |
 

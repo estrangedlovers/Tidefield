@@ -556,6 +556,24 @@ std::unique_ptr<FormPage> filesPage(Model& model)
                   core.clearRecentSessions();
                   core.status("Recent sessions cleared.");
               }));
+    if (auto* recovery = core.recovery.get())
+    {
+        page->header("Autosave");
+        page->row("Recovery copy", toggle("Keep a copy to restore after a crash", recovery->isEnabled(), [recovery](bool on) { recovery->setEnabled(on); }));
+        juce::StringArray every;
+        int chosen = 0;
+        for (std::size_t i = 0; i < std::size(Recovery::kIntervals); ++i)
+        {
+            every.add(juce::String(Recovery::kIntervals[i]) + " min");
+            if (Recovery::kIntervals[i] == recovery->getMinutes())
+                chosen = static_cast<int>(i);
+        }
+        page->row("Every", std::make_unique<ChoiceRow>(every, chosen, [recovery](int i) {
+                      recovery->setMinutes(Recovery::kIntervals[static_cast<std::size_t>(i)]);
+                  }));
+        page->row("", std::make_unique<Label>([recovery] { return recovery->describe(); }));
+        page->note("The copy is separate from your session file and is removed when Tidefield quits normally.", 20);
+    }
     if (auto installation = createInstallationView(model))
     {
         page->header("Installation mode");

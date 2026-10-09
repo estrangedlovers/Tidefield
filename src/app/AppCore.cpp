@@ -63,6 +63,7 @@ AppCore::AppCore(Host& h)
         if (onSessionChanged)
             onSessionChanged();
     };
+    session.askBeforeDiscard = ! host.isPlugin();
     if (! host.isPlugin())
     {
         plugins = std::make_unique<PluginHost>(host.getSettings(), host.getSettings().getFile().getSiblingFile("PluginScanCrashes.txt"));
@@ -79,6 +80,7 @@ AppCore::AppCore(Host& h)
             engine.setParam(engine::P::TerrainX, list[static_cast<std::size_t>(index)].position.x);
             engine.setParam(engine::P::TerrainY, list[static_cast<std::size_t>(index)].position.y);
         };
+        recovery = std::make_unique<Recovery>(*this);
         installation = std::make_unique<Installation>(*this);
         installation->launch();
         if (! installation->isEnabled() && getOpenLastSession())
@@ -93,6 +95,7 @@ AppCore::~AppCore()
     stopTimer();
     performance.cancelRender();
     installation.reset();
+    recovery.reset();
     osc.reset();
     clockOut.reset();
     fx.setExternal(nullptr);
@@ -339,6 +342,7 @@ void AppCore::setEffect(int slot, const std::string& type)
 
 void AppCore::timerCallback()
 {
+    session.tick();
     scenes.tick();
     fx.tick();
     midi.tick();

@@ -409,6 +409,11 @@ public:
         auto* view = new gui::MainView(*core);
         window = std::make_unique<MainWindow>(getApplicationName() + " - " + core->session.getName(), view);
         openProjectsIn(commandLine);
+        if (core->recovery != nullptr && ! commandLine.contains("--ui-test"))
+            juce::Timer::callAfterDelay(600, [this] {
+                if (core != nullptr && core->recovery != nullptr)
+                    core->recovery->offerRestore();
+            });
         menu = std::make_unique<AppMenu>(*core, [this]() -> gui::MainView* {
             return window != nullptr ? dynamic_cast<gui::MainView*>(window->getContentComponent()) : nullptr;
         });
@@ -463,7 +468,7 @@ public:
                     if (v->isProjectorOpen())
                         v->toggleProjector();
                 std::cout << "UI test passed: every page and settings tab shown, every theme, projector opened and closed" << std::endl;
-                systemRequestedQuit();
+                quit();
             });
         }
     }
@@ -517,7 +522,15 @@ public:
         settings.closeFiles();
     }
 
-    void systemRequestedQuit() override { quit(); }
+    void systemRequestedQuit() override
+    {
+        if (core == nullptr)
+        {
+            quit();
+            return;
+        }
+        core->session.whenSafeToDiscard("quitting", [] { juce::JUCEApplication::quit(); });
+    }
 
 private:
     juce::ApplicationProperties settings;

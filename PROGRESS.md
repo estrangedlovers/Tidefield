@@ -431,6 +431,28 @@ CI; every macOS CI run green on Apple Silicon.
 whether the auto master's target shape suits your material, how the new gestures
 feel, CPU on the M1 Pro under real load, and the app on your interface and controller.
 
+### 1.4 (in progress, not released)
+
+Built so far, each with tests:
+- **Settings window** with seven tabs (Look and Feel, Audio, MIDI and Sync, Plug-ins,
+  Files and Startup, Record and Render, About), a working macOS menu bar, and sixteen
+  themes.
+- **`.tide` project files**, registered with Finder; `.tidefield` still opens.
+- **Macros**: eight knobs, each moving up to eight controls over its own range, with a
+  Macros tab, Map to macro on every knob, undo, and four starter macros.
+- **Autosave and crash recovery** (`app/Recovery`): a copy of the session every 1, 2,
+  5 or 10 minutes, written on a worker next to the settings file; a marker file
+  written at launch and removed on a clean quit; the next launch after a crash offers
+  Restore, Discard or Keep for later. Off in the plugin.
+- **Unsaved changes**: quitting, New and Open ask Save / Don't Save / Cancel when the
+  session differs from what was last opened or saved. The baseline is a capture taken
+  half a second after a session is applied (so telemetry reflects it) or the data
+  just saved; `io::sameContent` compares parameters with a tolerance and everything
+  else structurally, ignoring the name and the timeline take.
+
+Still to do for 1.4: controller templates and custom shortcuts, instrument plugins as
+sources and MIDI out from the Cycles, built-in lessons, signing and notarisation.
+
 ### 1.3.0: a deeper instrument
 
 Built in this round, each with tests:

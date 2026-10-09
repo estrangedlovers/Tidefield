@@ -27,8 +27,15 @@ public:
     void newSession();
     void open();
     void openFile(const juce::File& file);
-    void save();
-    void saveAs();
+    void save(std::function<void(bool)> then = nullptr);
+    void saveAs(std::function<void(bool)> then = nullptr);
+    void autosaveTo(const juce::File& file, std::function<void(bool)> done);
+    void openRecovered(const juce::File& recovery, const juce::File& original);
+
+    bool hasUnsavedChanges() const;
+    void whenSafeToDiscard(const juce::String& action, std::function<void()> proceed);
+    void tick();
+    bool askBeforeDiscard = true;
 
     void handleNotice(const engine::EngineNotice& notice);
     void setLatest(const engine::TelemetryFrame& frame) { latest = frame; }
@@ -47,7 +54,10 @@ public:
 private:
     void apply(std::shared_ptr<io::SessionData> data);
     void applyNow();
-    void saveTo(const juce::File& file);
+    void saveTo(const juce::File& file, std::function<void(bool)> then);
+    void openFileNow(const juce::File& file);
+    void newSessionNow();
+    io::SessionData captureNow() const;
 
     engine::Engine& engine;
     engine::SceneManager& scenes;
@@ -63,6 +73,13 @@ private:
     std::shared_ptr<io::SessionData> pending;
     bool waitingForFadeOut = false;
     bool busy = false;
+    bool autosaving = false;
+    juce::File afterOpen;
+    bool replaceAfterOpen = false;
+    bool asking = false;
+    bool changedSinceSave = false;
+    int baselineDue = 0;
+    std::shared_ptr<const io::SessionData> baseline;
     juce::ThreadPool* workers = nullptr;
     void runInBackground(std::function<void()> job);
     std::shared_ptr<bool> alive = std::make_shared<bool>(true);

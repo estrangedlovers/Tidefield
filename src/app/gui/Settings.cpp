@@ -3,6 +3,7 @@
 #include "Controls.h"
 #include "MainView.h"
 #include "Pages.h"
+#include "Places.h"
 #include "Style.h"
 
 #include "../LinkSync.h"
@@ -348,6 +349,108 @@ private:
     std::unique_ptr<juce::FileChooser> chooser;
 };
 
+class PlaceList final : public juce::Component, private juce::Timer
+{
+public:
+    explicit PlaceList(juce::PropertiesFile& s) : settings(s)
+    {
+        add.onClick = [this] {
+            chooser = std::make_unique<juce::FileChooser>("Add a folder to Places", juce::File::getSpecialLocation(juce::File::userHomeDirectory));
+            chooser->launchAsync(juce::FileBrowserComponent::openMode | juce::FileBrowserComponent::canSelectDirectories,
+                                 [safe = juce::Component::SafePointer<PlaceList>(this)](const juce::FileChooser& fc) {
+                                     if (safe != nullptr && fc.getResult().isDirectory())
+                                         places::add(safe->settings, fc.getResult());
+                                 });
+        };
+        addAndMakeVisible(add);
+        startTimerHz(2);
+    }
+
+    void resized() override { add.setBounds(getLocalBounds().removeFromBottom(24).removeFromLeft(140)); }
+
+    void paint(juce::Graphics& g) override
+    {
+        shown = places::version();
+        auto r = getLocalBounds().toFloat().withTrimmedBottom(30.0f);
+        g.setColour(colour::well());
+        g.fillRect(r);
+        const auto list = places::get(settings);
+        g.setFont(font(11.5f));
+        if (list.isEmpty())
+        {
+            g.setColour(colour::wellTextDim());
+            g.drawText("No places yet. Add the folders where you keep your own sounds.", r.reduced(8.0f), juce::Justification::centredLeft, true);
+            return;
+        }
+        const int fits = std::max(1, static_cast<int>((r.getHeight() - 8.0f) / kLineH));
+        for (int i = 0; i < list.size() && i < fits; ++i)
+        {
+            auto line = juce::Rectangle<float>(r.getX(), r.getY() + 4.0f + kLineH * static_cast<float>(i), r.getWidth(), kLineH);
+            if (i == fits - 1 && list.size() > fits)
+            {
+                g.setColour(colour::wellTextDim());
+                g.drawText("and " + juce::String(list.size() - fits + 1) + " more in the browser", line.reduced(8.0f, 0.0f), juce::Justification::centredLeft, true);
+                break;
+            }
+            const bool missing = ! juce::File(list[i]).isDirectory();
+            g.setColour(missing ? colour::wellTextDim() : colour::wellText());
+            const auto text = line.reduced(8.0f, 0.0f).withTrimmedRight(24.0f);
+            g.drawText(elideStart(list[i] + (missing ? "  (not found)" : ""), g.getCurrentFont(), text.getWidth()), text, juce::Justification::centredLeft, false);
+            g.setColour(i == hover ? colour::lift(colour::wellText(), 0.3f) : colour::wellTextDim());
+            g.drawText("x", line.removeFromRight(24.0f), juce::Justification::centred);
+        }
+    }
+
+    void mouseMove(const juce::MouseEvent& e) override
+    {
+        const int h = e.x > getWidth() - 28 && e.y < getHeight() - 30 ? static_cast<int>((static_cast<float>(e.y) - 4.0f) / kLineH) : -1;
+        if (h != hover)
+        {
+            hover = h;
+            repaint();
+        }
+    }
+
+    void mouseExit(const juce::MouseEvent&) override
+    {
+        hover = -1;
+        repaint();
+    }
+
+    void mouseUp(const juce::MouseEvent& e) override
+    {
+        const int i = static_cast<int>((static_cast<float>(e.y) - 4.0f) / kLineH);
+        const auto list = places::get(settings);
+        if (i >= 0 && i < list.size() && e.x > getWidth() - 28 && e.y < getHeight() - 30)
+            places::remove(settings, list[i]);
+    }
+
+private:
+    static juce::String elideStart(const juce::String& s, const juce::Font& f, float width)
+    {
+        if (juce::GlyphArrangement::getStringWidth(f, s) <= width)
+            return s;
+        const auto dots = juce::String::fromUTF8("\xe2\x80\xa6");
+        auto tail = s;
+        while (tail.length() > 4 && juce::GlyphArrangement::getStringWidth(f, dots + tail) > width)
+            tail = tail.substring(1);
+        return dots + tail;
+    }
+
+    void timerCallback() override
+    {
+        if (shown != places::version())
+            repaint();
+    }
+
+    static constexpr float kLineH = 20.0f;
+    juce::PropertiesFile& settings;
+    FlatButton add { "Add folder..." };
+    std::unique_ptr<juce::FileChooser> chooser;
+    int shown = -1;
+    int hover = -1;
+};
+
 class MidiDeviceList final : public juce::Component, private juce::Timer
 {
 public:
@@ -549,6 +652,11 @@ std::unique_ptr<FormPage> filesPage(Model& model)
                   folder.createDirectory();
                   folder.revealToUser();
               }));
+    page->header("Places");
+    page->row("Places", std::make_unique<PlaceList>(core.host.getSettings()), 140);
+    page->note("Places are your own sound folders. They appear in the browser, where each one opens to list its audio files, subfolders included. "
+               "You can also drop a folder from Finder onto the browser.",
+               34);
     page->header("Startup");
     page->row("When Tidefield opens", std::make_unique<ChoiceRow>(juce::StringArray { "Starter session", "Last session" }, core.getOpenLastSession() ? 1 : 0,
                                                                    [&core](int i) { core.setOpenLastSession(i == 1); }));

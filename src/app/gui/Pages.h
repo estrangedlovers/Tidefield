@@ -79,6 +79,7 @@ public:
     int getPage() const noexcept { return page; }
     int getEffectsChain() const noexcept { return fxChain; }
     void showEffectsFor(int chain);
+    juce::Rectangle<int> tabBounds(int i) const;
 
     std::function<void(int slot)> onLoadSample;
 
@@ -89,7 +90,6 @@ public:
     void mouseExit(const juce::MouseEvent& e) override;
 
 private:
-    juce::Rectangle<int> tabBounds(int i) const;
     void build();
     void layoutRow();
 

@@ -13,7 +13,11 @@ class MacroPanel;
 class PadRow;
 class StatusBar;
 
-class MainView final : public juce::Component, private juce::Timer
+class MainView final : public juce::Component,
+                       public juce::DragAndDropContainer,
+                       public juce::DragAndDropTarget,
+                       public juce::FileDragAndDropTarget,
+                       private juce::Timer
 {
 public:
     explicit MainView(AppCore& core);
@@ -25,9 +29,27 @@ public:
     bool keyStateChanged(bool isKeyDown) override;
     void focusLost(FocusChangeType cause) override;
     void parentHierarchyChanged() override;
+    void paintOverChildren(juce::Graphics& g) override;
+
+    bool isInterestedInFileDrag(const juce::StringArray& files) override;
+    void fileDragEnter(const juce::StringArray& files, int x, int y) override;
+    void fileDragMove(const juce::StringArray& files, int x, int y) override;
+    void fileDragExit(const juce::StringArray& files) override;
+    void filesDropped(const juce::StringArray& files, int x, int y) override;
+
+    bool isInterestedInDragSource(const SourceDetails& details) override;
+    void itemDragEnter(const SourceDetails& details) override;
+    void itemDragMove(const SourceDetails& details) override;
+    void itemDragExit(const SourceDetails& details) override;
+    void itemDropped(const SourceDetails& details) override;
+    bool shouldDropFilesWhenDraggedExternally(const SourceDetails& details, juce::StringArray& files, bool& canMoveFiles) override;
 
     void chooseSample(int slot);
     void loadFactory(int soundIndex, int slot);
+    void loadFiles(const juce::Array<juce::File>& files, int slot);
+    void showLoadMenu(const juce::String& title, bool canAddToKeyboard, std::function<void(int slot)> chosen);
+    static juce::var dragFactorySound(int soundIndex);
+    static juce::var dragFile(const juce::File& file);
     void showAudioSettings();
     void openSettings(SettingsTab tab = SettingsTab::Look);
     void showPage(int page) { devices->show(page); }
@@ -47,6 +69,19 @@ private:
     void releaseHolds();
     bool handleNoteKey(const juce::KeyPress& key);
     void glideToScene(int index, bool jump);
+
+    struct DropTarget
+    {
+        enum Kind { None, Ask, Slot, Open, Place } kind = None;
+        int slot = -1;
+        juce::Rectangle<int> area;
+    };
+    enum class DragContent { Nothing, Audio, Session, Folder };
+    static DragContent classify(const juce::StringArray& files);
+    DropTarget dropTargetAt(juce::Point<int> p, DragContent content) const;
+    void showDropTarget(const DropTarget& target);
+    void dropAudio(const juce::Array<juce::File>& files, const DropTarget& target);
+    void dropFactory(int soundIndex, const DropTarget& target);
 
     AppCore& core;
     juce::SharedResourcePointer<LookAndFeel> lookAndFeel;
@@ -79,5 +114,10 @@ public:
 private:
     std::array<int, 128> keyNote {};
     double lastFrameTime = 0.0;
+    juce::Rectangle<int> dropHighlight;
+    DropTarget::Kind dropKind = DropTarget::None;
+    int dropSlot = -1;
+    int dropCount = 0;
+    juce::String dropLabel;
 };
 }

@@ -450,6 +450,28 @@ Built so far, each with tests:
   just saved; `io::sameContent` compares parameters with a tolerance and everything
   else structurally, ignoring the name and the timeline take.
 
+**Browser Places and drag and drop**
+
+- **Places** in the Browser: user folders (settings key `browserPlaces`, open state in
+  `browserPlacesOpen`), added from the Browser, by dropping a folder, or in Settings >
+  Files and Startup (`PlaceList`). Each place scans on a worker thread with
+  `io::listAudioFiles` (recursive, hidden files skipped, natural sort, 500 listed, scan
+  stops at 20000 files or 200000 entries, cancellable) and lists files flat with their
+  relative paths. Search covers scanned places (200 results). File rows load, preview,
+  favourite (stored as full paths beside factory names), add to Bloom's keyboard and
+  reveal.
+- **Drag and drop** on `MainView` (`FileDragAndDropTarget`, `DragAndDropContainer`,
+  `DragAndDropTarget`): audio from Finder or a Browser row onto the terrain or Clouds
+  page asks for a target, onto a cloud device loads that cloud, onto Bloom loads Bloom
+  (several files spread across the keyboard). Project files open. The target is
+  outlined in `colour::accent` with a label (`paintOverChildren`).
+- `MainView::loadFiles` is the one path for user files (choosers, places, drops),
+  including pitch detection and adding to Bloom's keyboard.
+- Tests: `tests/io/AudioFolderTests.cpp` (recognition, recursion, sorting, cap,
+  cancel, search, places round trip). `--ui-test` also drives a file drag across the
+  window. Verified under Xvfb in dark and light themes; not yet tried with real
+  Finder drags on macOS.
+
 Still to do for 1.4: controller templates and custom shortcuts, instrument plugins as
 sources and MIDI out from the Cycles, built-in lessons, signing and notarisation.
 

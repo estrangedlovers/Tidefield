@@ -447,6 +447,16 @@ public:
                     if (auto* v = dynamic_cast<gui::MainView*>(window->getContentComponent()))
                         v->toggleProjector();
             });
+            juce::Timer::callAfterDelay(650, [this] {
+                if (auto* v = window != nullptr ? dynamic_cast<gui::MainView*>(window->getContentComponent()) : nullptr)
+                {
+                    const juce::StringArray dragged { juce::File::getSpecialLocation(juce::File::tempDirectory).getChildFile("tidefield-ui-test.wav").getFullPathName() };
+                    for (const auto& p : { juce::Point<int>(v->getWidth() / 2, v->getHeight() / 3), juce::Point<int>(v->getWidth() / 2, v->getHeight() - 120),
+                                           juce::Point<int>(100, v->getHeight() / 2) })
+                        v->fileDragMove(dragged, p.x, p.y);
+                    v->fileDragExit(dragged);
+                }
+            });
             const auto original = gui::theme();
             for (std::size_t i = 0; i <= gui::kThemes.size(); ++i)
             {

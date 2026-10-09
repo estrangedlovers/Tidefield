@@ -1,13 +1,18 @@
 #include "MainView.h"
 
+#include "Places.h"
+
 #include "../FactoryContent.h"
 
 #include <dsp/analysis/PitchDetect.h>
 #include <io/AudioFileIO.h>
+#include <io/AudioFolder.h>
 
 #include <juce_audio_utils/juce_audio_utils.h>
 
 #include <algorithm>
+#include <atomic>
+#include <map>
 #include <string_view>
 #include <thread>
 
@@ -480,7 +485,7 @@ public:
         viewport.setScrollBarsShown(true, false);
         addAndMakeVisible(viewport);
         list.owner = this;
-        search.setTextToShowWhenEmpty("Search sounds", colour::textFaint());
+        search.setTextToShowWhenEmpty("Search sounds and places", colour::textFaint());
         search.setFont(font(12.0f));
         search.setColour(juce::TextEditor::backgroundColourId, colour::panelHi());
         search.setColour(juce::TextEditor::outlineColourId, juce::Colours::transparentBlack);
@@ -493,13 +498,26 @@ public:
             unfocusAllComponents();
         };
         addAndMakeVisible(search);
-        favourites.addTokens(model.core.host.getSettings().getValue(kFavouritesKey), "\n", {});
+        auto& settings = model.core.host.getSettings();
+        favourites.addTokens(settings.getValue(kFavouritesKey), "\n", {});
         favourites.removeEmptyStrings();
+        openPlaces.addTokens(settings.getValue(places::kOpenKey), "\n", {});
+        openPlaces.removeEmptyStrings();
+        reloadPlaces();
     }
-    ~Browser() override { model.remove(this); }
+    ~Browser() override
+    {
+        cancelScans->store(true);
+        model.remove(this);
+    }
 
     void tick() override
     {
+        if (places::version() != shownPlacesVersion)
+        {
+            reloadPlaces();
+            layout();
+        }
         const auto& scenes = model.core.scenes.getScenes();
         const auto& f = model.frame();
         bool weightsMoved = false;
@@ -528,22 +546,59 @@ public:
 
     void paint(juce::Graphics& g) override { drawPanel(g, getLocalBounds().toFloat(), "Browser"); }
 
+    void addPlace(const juce::File& folder)
+    {
+        openPlaces.addIfNotAlreadyThere(folder.getFullPathName());
+        saveOpenPlaces();
+        if (places::add(model.core.host.getSettings(), folder))
+            model.core.status("Added " + folder.getFileName() + " to Places");
+    }
+
+    void chooseFolder()
+    {
+        chooser = std::make_unique<juce::FileChooser>("Add a folder to Places", juce::File::getSpecialLocation(juce::File::userHomeDirectory));
+        juce::Component::SafePointer<Browser> safe(this);
+        chooser->launchAsync(juce::FileBrowserComponent::openMode | juce::FileBrowserComponent::canSelectDirectories, [safe](const juce::FileChooser& fc) {
+            if (safe != nullptr && fc.getResult().isDirectory())
+                safe->addPlace(fc.getResult());
+        });
+    }
+
 private:
     struct Row
     {
-        enum Kind { Header, Scene, Capture, Sound, Disk } kind;
+        enum Kind { Header, Scene, Capture, Sound, Disk, Place, AddPlace, File, Note } kind;
         int index = -1;
         juce::String text, detail;
+        juce::File file;
+        int depth = 0;
     };
 
     struct List final : public juce::Component
     {
         Browser* owner = nullptr;
         int hover = -1;
+        bool dragging = false;
         void paint(juce::Graphics& g) override { owner->paintRows(g); }
         void mouseMove(const juce::MouseEvent& e) override { setHover(e.y / kRowH); }
         void mouseExit(const juce::MouseEvent&) override { setHover(-1); }
-        void mouseDown(const juce::MouseEvent& e) override { owner->clicked(e.y / kRowH, e); }
+        void mouseDown(const juce::MouseEvent& e) override
+        {
+            dragging = false;
+            if (e.mods.isPopupMenu())
+                owner->clicked(e.y / kRowH, e);
+        }
+        void mouseDrag(const juce::MouseEvent& e) override
+        {
+            if (! dragging && ! e.mods.isPopupMenu() && e.getDistanceFromDragStart() > 5)
+                dragging = owner->startDrag(e.getMouseDownY() / kRowH);
+        }
+        void mouseUp(const juce::MouseEvent& e) override
+        {
+            if (! dragging && ! e.mods.isPopupMenu() && e.getDistanceFromDragStart() <= 5)
+                owner->clicked(e.getMouseDownY() / kRowH, e);
+            dragging = false;
+        }
         void mouseDoubleClick(const juce::MouseEvent& e) override { owner->doubleClicked(e.y / kRowH); }
         void setHover(int h)
         {
@@ -556,6 +611,86 @@ private:
         }
     };
     static constexpr int kRowH = 22;
+    static constexpr int kMaxPlaceFiles = 500;
+    static constexpr int kScanLimit = 20000;
+    static constexpr int kMaxSearchFiles = 200;
+
+    static bool interactive(Row::Kind k) { return k != Row::Header && k != Row::Note; }
+
+    void reloadPlaces()
+    {
+        shownPlacesVersion = places::version();
+        placeList = places::get(model.core.host.getSettings());
+        for (auto it = listings.begin(); it != listings.end();)
+            it = placeList.contains(it->first) ? std::next(it) : listings.erase(it);
+        for (const auto& p : placeList)
+            if (openPlaces.contains(p))
+                requestScan(p, false);
+    }
+
+    void saveOpenPlaces() { model.core.host.getSettings().setValue(places::kOpenKey, openPlaces.joinIntoString("\n")); }
+
+    void requestScan(const juce::String& path, bool force)
+    {
+        if (scanning.contains(path) || (! force && listings.count(path) > 0))
+            return;
+        scanning.add(path);
+        juce::Component::SafePointer<Browser> safe(this);
+        model.core.workers.addJob([safe, path, cancel = cancelScans] {
+            auto listing = std::make_shared<const io::AudioFolderListing>(io::listAudioFiles(juce::File(path), kMaxPlaceFiles, kScanLimit, cancel.get()));
+            if (cancel->load())
+                return;
+            juce::MessageManager::callAsync([safe, path, listing] {
+                if (safe == nullptr)
+                    return;
+                safe->scanning.removeString(path);
+                if (! safe->placeList.contains(path))
+                    return;
+                safe->listings[path] = listing;
+                safe->layout();
+            });
+        });
+    }
+
+    const io::AudioFolderListing* listingFor(const juce::String& path) const
+    {
+        const auto it = listings.find(path);
+        return it != listings.end() ? it->second.get() : nullptr;
+    }
+
+    juce::String countText(const juce::String& path) const
+    {
+        if (const auto* l = listingFor(path))
+            return juce::String(l->found) + (l->complete ? "" : "+");
+        return scanning.contains(path) ? juce::String::fromUTF8("\xe2\x80\xa6") : juce::String();
+    }
+
+    void addPlaceRows()
+    {
+        rows.push_back({ Row::Header, -1, "PLACES", {} });
+        for (int i = 0; i < placeList.size(); ++i)
+        {
+            const juce::File folder(placeList[i]);
+            const bool open = openPlaces.contains(placeList[i]);
+            rows.push_back({ Row::Place, i, folder.getFileName().isNotEmpty() ? folder.getFileName() : folder.getFullPathName(), countText(placeList[i]), folder });
+            if (! open)
+                continue;
+            const auto* l = listingFor(placeList[i]);
+            if (l == nullptr)
+            {
+                rows.push_back({ Row::Note, -1, folder.isDirectory() ? "Scanning..." : "Folder not found", {}, {}, 1 });
+                continue;
+            }
+            for (const auto& e : l->entries)
+                rows.push_back({ Row::File, -1, e.relativePath, {}, e.file, 1 });
+            if (l->entries.empty())
+                rows.push_back({ Row::Note, -1, folder.isDirectory() ? "No audio files here" : "Folder not found", {}, {}, 1 });
+            else if (l->truncated())
+                rows.push_back({ Row::Note, -1, "Showing " + juce::String(static_cast<int>(l->entries.size())) + " of " + juce::String(l->found) + (l->complete ? "" : "+") + " files",
+                                 {}, {}, 1 });
+        }
+        rows.push_back({ Row::AddPlace, -1, "+ Add folder...", {} });
+    }
 
     void layout()
     {
@@ -581,20 +716,49 @@ private:
                     rows.push_back(soundRow(k));
                     ++found;
                 }
-            if (found == 0)
+            int files = 0;
+            bool pending = false;
+            for (const auto& p : placeList)
+            {
+                requestScan(p, false);
+                pending = pending || scanning.contains(p);
+                if (const auto* l = listingFor(p))
+                    for (const auto* e : io::matchAudioFiles(*l, query, kMaxSearchFiles - files))
+                    {
+                        if (files == 0)
+                            rows.push_back({ Row::Header, -1, "MATCHING FILES", {} });
+                        rows.push_back({ Row::File, -1, e->file.getFileName(), {}, e->file });
+                        ++files;
+                    }
+            }
+            if (pending)
+                rows.push_back({ Row::Note, -1, "Searching places...", {} });
+            else if (files >= kMaxSearchFiles)
+                rows.push_back({ Row::Note, -1, "First " + juce::String(kMaxSearchFiles) + " matching files", {} });
+            if (found + files == 0 && ! pending)
                 rows.push_back({ Row::Header, -1, "NOTHING MATCHES", {} });
         }
         else
         {
             bool anyFavourite = false;
+            auto favouriteHeader = [&] {
+                if (! anyFavourite)
+                    rows.push_back({ Row::Header, -1, "FAVOURITES", {} });
+                anyFavourite = true;
+            };
             for (std::size_t k = 0; k < sounds.size(); ++k)
                 if (favourites.contains(sounds[k].name))
                 {
-                    if (! anyFavourite)
-                        rows.push_back({ Row::Header, -1, "FAVOURITES", {} });
-                    anyFavourite = true;
+                    favouriteHeader();
                     rows.push_back(soundRow(k));
                 }
+            for (const auto& f : favourites)
+                if (juce::File::isAbsolutePath(f))
+                {
+                    favouriteHeader();
+                    rows.push_back({ Row::File, -1, juce::File(f).getFileName(), {}, juce::File(f) });
+                }
+            addPlaceRows();
             const char* category = "";
             for (std::size_t k = 0; k < sounds.size(); ++k)
             {
@@ -612,25 +776,47 @@ private:
         list.repaint();
     }
 
+    bool isFavourite(const Row& row) const
+    {
+        return row.kind == Row::File ? favourites.contains(row.file.getFullPathName()) : favourites.contains(row.text);
+    }
+
+    void drawPlay(juce::Graphics& g, juce::Rectangle<float> play, bool playing)
+    {
+        juce::Path p;
+        const auto box = play.withSizeKeepingCentre(9.0f, 9.0f);
+        if (playing)
+            p.addRectangle(box);
+        else
+            p.addTriangle(box.getX(), box.getY(), box.getX(), box.getBottom(), box.getRight(), box.getCentreY());
+        g.setColour(playing ? colour::accent() : colour::textDim());
+        g.fillPath(p);
+    }
+
     void paintRows(juce::Graphics& g)
     {
         for (std::size_t i = 0; i < rows.size(); ++i)
         {
             const auto& row = rows[i];
             auto r = juce::Rectangle<float>(0.0f, static_cast<float>(i) * kRowH, static_cast<float>(list.getWidth()), static_cast<float>(kRowH));
-            const bool hover = static_cast<int>(i) == list.hover && row.kind != Row::Header;
+            const bool hover = static_cast<int>(i) == list.hover && interactive(row.kind);
             if (hover)
             {
                 g.setColour(colour::panelHi());
                 g.fillRoundedRectangle(r.reduced(2.0f, 1.0f), metric::radius);
             }
-            r = r.reduced(8.0f, 0.0f);
+            r = r.reduced(8.0f, 0.0f).withTrimmedLeft(12.0f * static_cast<float>(row.depth));
             switch (row.kind)
             {
                 case Row::Header:
                     g.setFont(caps(10.0f));
                     g.setColour(colour::textFaint());
                     g.drawText(row.text, r.withTrimmedTop(6.0f), juce::Justification::centredLeft, true);
+                    break;
+                case Row::Note:
+                    g.setFont(font(11.0f));
+                    g.setColour(colour::textFaint());
+                    g.drawText(row.text, r.withTrimmedLeft(18.0f), juce::Justification::centredLeft, true);
                     break;
                 case Row::Scene:
                 {
@@ -654,43 +840,62 @@ private:
                 }
                 case Row::Capture:
                 case Row::Disk:
+                case Row::AddPlace:
                     g.setColour(hover ? colour::accent() : colour::textDim());
                     g.setFont(font(12.0f, 500));
                     g.drawText(row.text, r, juce::Justification::centredLeft, true);
                     g.setColour(colour::textFaint());
                     g.drawText(row.detail, r, juce::Justification::centredRight);
                     break;
-                case Row::Sound:
+                case Row::Place:
                 {
-                    juce::Path note;
-                    const auto icon = r.removeFromLeft(10.0f).withSizeKeepingCentre(8.0f, 8.0f);
-                    note.addEllipse(icon);
-                    g.setColour(colour::tide().withAlpha(0.8f));
-                    g.fillPath(note);
+                    const bool open = openPlaces.contains(row.file.getFullPathName());
+                    const auto box = r.removeFromLeft(10.0f).withSizeKeepingCentre(8.0f, 8.0f);
+                    juce::Path p;
+                    if (open)
+                        p.addTriangle(box.getX(), box.getY() + 1.0f, box.getRight(), box.getY() + 1.0f, box.getCentreX(), box.getBottom() - 0.5f);
+                    else
+                        p.addTriangle(box.getX() + 1.0f, box.getY(), box.getX() + 1.0f, box.getBottom(), box.getRight(), box.getCentreY());
+                    g.setColour(hover ? colour::lift(colour::textDim(), 0.4f) : colour::textDim());
+                    g.fillPath(p);
                     r.removeFromLeft(8.0f);
-                    const bool playing = row.index == previewing;
-                    auto play = r.removeFromRight(kPlayW);
-                    if (hover || playing)
-                    {
-                        juce::Path p;
-                        const auto box = play.withSizeKeepingCentre(9.0f, 9.0f);
-                        if (playing)
-                            p.addRectangle(box);
-                        else
-                            p.addTriangle(box.getX(), box.getY(), box.getX(), box.getBottom(), box.getRight(), box.getCentreY());
-                        g.setColour(playing ? colour::accent() : colour::textDim());
-                        g.fillPath(p);
-                    }
                     g.setColour(colour::textFaint());
                     g.setFont(font(10.5f, 500));
-                    g.drawText(row.detail, r.removeFromRight(30.0f), juce::Justification::centredRight);
-                    if (favourites.contains(row.text))
+                    g.drawText(row.detail, r.removeFromRight(40.0f), juce::Justification::centredRight);
+                    g.setColour(row.file.isDirectory() ? colour::text() : colour::textFaint());
+                    g.setFont(font(12.5f, 600));
+                    g.drawText(row.text, r, juce::Justification::centredLeft, true);
+                    break;
+                }
+                case Row::Sound:
+                case Row::File:
+                {
+                    const bool isFile = row.kind == Row::File;
+                    const auto icon = r.removeFromLeft(10.0f).withSizeKeepingCentre(8.0f, 8.0f);
+                    g.setColour(colour::tide().withAlpha(0.8f));
+                    if (isFile)
+                        g.drawEllipse(icon.reduced(0.5f), 1.2f);
+                    else
+                        g.fillEllipse(icon);
+                    r.removeFromLeft(8.0f);
+                    const bool playing = previewKey.isNotEmpty() && previewKey == keyFor(row);
+                    auto play = r.removeFromRight(kPlayW);
+                    if (hover || playing)
+                        drawPlay(g, play, playing);
+                    if (! isFile)
+                    {
+                        g.setColour(colour::textFaint());
+                        g.setFont(font(10.5f, 500));
+                        g.drawText(row.detail, r.removeFromRight(30.0f), juce::Justification::centredRight);
+                    }
+                    if (isFavourite(row))
                     {
                         g.setColour(colour::accent());
+                        g.setFont(font(12.0f, 500));
                         g.drawText(juce::String::fromUTF8("\xe2\x98\x85"), r.removeFromRight(14.0f), juce::Justification::centred);
                     }
                     g.setColour(colour::text());
-                    g.setFont(font(12.5f, 500));
+                    g.setFont(font(isFile ? 12.0f : 12.5f, 500));
                     g.drawText(row.text, r, juce::Justification::centredLeft, true);
                     break;
                 }
@@ -698,109 +903,238 @@ private:
         }
     }
 
+    static juce::String keyFor(const Row& row)
+    {
+        if (row.kind == Row::Sound)
+            return "sound:" + juce::String(row.index);
+        if (row.kind == Row::File)
+            return "file:" + row.file.getFullPathName();
+        return {};
+    }
+
+    const Row* rowAt(int i) const { return i >= 0 && i < static_cast<int>(rows.size()) ? &rows[static_cast<std::size_t>(i)] : nullptr; }
+
     void hovered(int i)
     {
-        if (model.onHover == nullptr || i < 0 || i >= static_cast<int>(rows.size()))
+        const auto* row = rowAt(i);
+        if (model.onHover == nullptr || row == nullptr)
             return;
-        const auto& row = rows[static_cast<std::size_t>(i)];
-        if (row.kind == Row::Scene)
-            model.onHover("Scene \"" + row.text + "\": click to glide there (or press " + row.detail + "), double-click to rename, right-click for more");
-        else if (row.kind == Row::Sound)
-            model.onHover(row.text + ": click to load it into a cloud or Bloom, the triangle to preview, right-click to favourite"
-                          + (row.detail.isNotEmpty() ? " (sounds at " + row.detail + ")" : juce::String()));
-        else if (row.kind == Row::Capture)
+        if (row->kind == Row::Scene)
+            model.onHover("Scene \"" + row->text + "\": click to glide there (or press " + row->detail + "), double-click to rename, right-click for more");
+        else if (row->kind == Row::Sound)
+            model.onHover(row->text + ": click to load it into a cloud or Bloom, drag it onto the terrain or a device, the triangle to preview, right-click to favourite"
+                          + (row->detail.isNotEmpty() ? " (sounds at " + row->detail + ")" : juce::String()));
+        else if (row->kind == Row::File)
+            model.onHover(row->file.getFullPathName() + ": click to load, drag onto the terrain or a device, the triangle to preview, right-click for more");
+        else if (row->kind == Row::Place)
+            model.onHover(row->file.getFullPathName() + ": click to open or close, right-click to rescan, show or remove");
+        else if (row->kind == Row::AddPlace)
+            model.onHover("Add a folder of your own sounds to Places (or drop a folder from Finder onto the browser)");
+        else if (row->kind == Row::Capture)
             model.onHover("Capture: store everything you hear now as a scene at the cursor (C)");
+    }
+
+    void toggleFavourite(const juce::String& key)
+    {
+        favourites.contains(key) ? favourites.removeString(key) : favourites.add(key);
+        model.core.host.getSettings().setValue(kFavouritesKey, favourites.joinIntoString("\n"));
+        layout();
+    }
+
+    void showFileMenu(const Row& row)
+    {
+        juce::PopupMenu m;
+        m.addSectionHeader(row.file.getFileName());
+        const auto key = row.file.getFullPathName();
+        const bool fav = favourites.contains(key);
+        m.addItem(1, fav ? "Remove from favourites" : "Add to favourites");
+        m.addItem(2, previewKey == keyFor(row) ? "Stop preview" : "Preview");
+        m.addItem(3, "Add to Bloom's keyboard", model.engine.getBloomSample() != nullptr);
+        m.addSeparator();
+        m.addItem(4, places::revealName());
+        juce::Component::SafePointer<Browser> safe(this);
+        showMenu(m, this, [safe, row, key](int r) {
+            if (r == 1)
+                safe->toggleFavourite(key);
+            else if (r == 2)
+                safe->togglePreview(row);
+            else if (r == 3)
+                safe->view.loadFiles({ row.file }, engine::kNumClouds + 1);
+            else if (r == 4)
+                row.file.revealToUser();
+        });
+    }
+
+    void showPlaceMenu(const Row& row)
+    {
+        juce::PopupMenu m;
+        const auto path = row.file.getFullPathName();
+        m.addSectionHeader(path);
+        m.addItem(1, openPlaces.contains(path) ? "Close" : "Open");
+        m.addItem(2, "Rescan", row.file.isDirectory());
+        m.addItem(3, places::revealName(), row.file.isDirectory());
+        m.addSeparator();
+        m.addItem(4, "Remove place");
+        juce::Component::SafePointer<Browser> safe(this);
+        showMenu(m, this, [safe, row, path](int r) {
+            if (r == 1)
+                safe->togglePlace(path);
+            else if (r == 2)
+            {
+                safe->requestScan(path, true);
+                safe->layout();
+            }
+            else if (r == 3)
+                row.file.revealToUser();
+            else if (r == 4)
+            {
+                safe->openPlaces.removeString(path);
+                safe->saveOpenPlaces();
+                places::remove(safe->model.core.host.getSettings(), path);
+            }
+        });
+    }
+
+    void togglePlace(const juce::String& path)
+    {
+        if (openPlaces.contains(path))
+            openPlaces.removeString(path);
+        else
+        {
+            openPlaces.add(path);
+            requestScan(path, true);
+        }
+        saveOpenPlaces();
+        layout();
     }
 
     void clicked(int i, const juce::MouseEvent& e)
     {
-        if (i < 0 || i >= static_cast<int>(rows.size()))
+        const auto* found = rowAt(i);
+        if (found == nullptr)
             return;
-        const auto row = rows[static_cast<std::size_t>(i)];
+        const auto row = *found;
+        const bool popup = e.mods.isPopupMenu();
+        const bool onPlay = e.getMouseDownX() >= list.getWidth() - 8 - static_cast<int>(kPlayW);
+        auto& v = view;
         if (row.kind == Row::Scene)
         {
-            if (e.mods.isPopupMenu())
+            if (popup)
                 return showSceneMenu(model, row.index, this);
             const auto p = model.core.scenes.getScenes()[static_cast<std::size_t>(row.index)].position;
             model.set(P::TerrainX, p.x);
             model.set(P::TerrainY, p.y);
         }
-        else if (row.kind == Row::Capture)
+        else if (row.kind == Row::Capture && ! popup)
             model.core.captureSceneAtCursor();
-        else if (row.kind == Row::Sound && e.mods.isPopupMenu())
+        else if (row.kind == Row::Place)
+            popup ? showPlaceMenu(row) : togglePlace(row.file.getFullPathName());
+        else if (row.kind == Row::AddPlace && ! popup)
+            chooseFolder();
+        else if (row.kind == Row::File && popup)
+            showFileMenu(row);
+        else if (row.kind == Row::Sound && popup)
         {
             juce::PopupMenu m;
             m.addSectionHeader(row.text);
             const bool fav = favourites.contains(row.text);
             m.addItem(1, fav ? "Remove from favourites" : "Add to favourites");
-            m.addItem(2, row.index == previewing ? "Stop preview" : "Preview");
-            showMenu(m, this, [this, row, fav](int r) {
+            m.addItem(2, previewKey == keyFor(row) ? "Stop preview" : "Preview");
+            juce::Component::SafePointer<Browser> safe(this);
+            showMenu(m, this, [safe, row](int r) {
                 if (r == 1)
-                {
-                    fav ? favourites.removeString(row.text) : favourites.add(row.text);
-                    model.core.host.getSettings().setValue(kFavouritesKey, favourites.joinIntoString("\n"));
-                    layout();
-                }
+                    safe->toggleFavourite(row.text);
                 else if (r == 2)
-                    togglePreview(row.index);
+                    safe->togglePreview(row);
             });
         }
-        else if (row.kind == Row::Sound && e.x >= list.getWidth() - 8 - static_cast<int>(kPlayW))
-            togglePreview(row.index);
-        else if (row.kind == Row::Sound || row.kind == Row::Disk)
+        else if ((row.kind == Row::Sound || row.kind == Row::File) && onPlay)
+            togglePreview(row);
+        else if (row.kind == Row::Sound)
+            v.showLoadMenu("Load " + row.text + " into", factorySounds()[static_cast<std::size_t>(row.index)].rootNote >= 0,
+                           [&v, index = row.index](int slot) { v.loadFactory(index, slot); });
+        else if (row.kind == Row::File)
+            v.showLoadMenu("Load " + row.file.getFileName() + " into", true, [&v, file = row.file](int slot) { v.loadFiles({ file }, slot); });
+        else if (row.kind == Row::Disk && ! popup)
+            v.showLoadMenu("Load a sound from disk into", false, [&v](int slot) { v.chooseSample(slot); });
+    }
+
+    bool startDrag(int i)
+    {
+        const auto* row = rowAt(i);
+        if (row == nullptr || (row->kind != Row::Sound && row->kind != Row::File))
+            return false;
+        auto* container = juce::DragAndDropContainer::findParentDragContainerFor(this);
+        if (container == nullptr)
+            return false;
+        const auto description = row->kind == Row::Sound ? MainView::dragFactorySound(row->index) : MainView::dragFile(row->file);
+        const auto name = row->kind == Row::Sound ? row->text : row->file.getFileName();
+        const float scale = 2.0f;
+        const int w = juce::jlimit(60, 220, juce::GlyphArrangement::getStringWidthInt(font(12.5f, 500), name) + 34);
+        juce::Image image(juce::Image::ARGB, juce::roundToInt(static_cast<float>(w) * scale), juce::roundToInt(static_cast<float>(kRowH) * scale), true);
         {
-            juce::PopupMenu m;
-            m.addSectionHeader(row.kind == Row::Sound ? "Load " + row.text + " into" : "Load a sound from disk into");
-            for (int c = 0; c < engine::kNumClouds; ++c)
-            {
-                const auto current = model.engine.getCloudSample(c);
-                m.addItem(c + 1, "Cloud " + juce::String(c + 1) + (current != nullptr ? "   (" + juce::String(current->name) + ")" : juce::String()));
-            }
-            const auto bloom = model.engine.getBloomSample();
-            m.addItem(engine::kNumClouds + 1, "Bloom" + (bloom != nullptr ? "   (" + juce::String(bloom->name) + ")" : juce::String()));
-            if (row.kind == Row::Sound && bloom != nullptr && factorySounds()[static_cast<std::size_t>(row.index)].rootNote >= 0)
-                m.addItem(engine::kNumClouds + 2, "Add to Bloom's keyboard");
-            showMenu(m, this, [this, row](int r) {
-                if (r <= 0)
-                    return;
-                if (row.kind == Row::Sound)
-                    view.loadFactory(row.index, r - 1);
-                else
-                    view.chooseSample(r - 1);
-            });
+            juce::Graphics g(image);
+            g.addTransform(juce::AffineTransform::scale(scale));
+            const auto r = juce::Rectangle<float>(0.0f, 0.0f, static_cast<float>(w), static_cast<float>(kRowH)).reduced(1.0f);
+            g.setColour(colour::panelHi().withAlpha(0.95f));
+            g.fillRoundedRectangle(r, metric::radius);
+            g.setColour(colour::accent());
+            g.drawRoundedRectangle(r, metric::radius, 1.0f);
+            g.setColour(colour::tide());
+            g.fillEllipse(r.getX() + 8.0f, r.getCentreY() - 4.0f, 8.0f, 8.0f);
+            g.setColour(colour::text());
+            g.setFont(font(12.5f, 500));
+            g.drawText(name, r.withTrimmedLeft(24.0f).withTrimmedRight(6.0f), juce::Justification::centredLeft, true);
         }
+        container->startDragging(description, &list, juce::ScaledImage(image, scale), row->kind == Row::File);
+        return true;
     }
 
     void doubleClicked(int i)
     {
-        if (i >= 0 && i < static_cast<int>(rows.size()) && rows[static_cast<std::size_t>(i)].kind == Row::Scene)
-            showSceneMenu(model, rows[static_cast<std::size_t>(i)].index, this);
+        if (const auto* row = rowAt(i); row != nullptr && row->kind == Row::Scene)
+            showSceneMenu(model, row->index, this);
     }
 
-    void togglePreview(int soundIndex)
+    void togglePreview(const Row& row)
     {
-        if (soundIndex == previewing)
+        const auto key = keyFor(row);
+        if (key == previewKey)
         {
             model.engine.previewSample(nullptr);
-            previewing = -1;
+            previewKey = {};
+            ++previewToken;
             list.repaint();
             return;
         }
-        previewing = soundIndex;
+        previewKey = key;
         const int token = ++previewToken;
         list.repaint();
         juce::Component::SafePointer<Browser> safe(this);
-        const auto sound = factorySounds()[static_cast<std::size_t>(soundIndex)];
-        model.core.workers.addJob([safe, sound, token] {
-            auto buffer = loadFactorySound(sound);
+        std::function<std::shared_ptr<const dsp::SampleBuffer>()> load;
+        if (row.kind == Row::Sound)
+            load = [sound = factorySounds()[static_cast<std::size_t>(row.index)]] { return loadFactorySound(sound); };
+        else
+            load = [file = row.file]() -> std::shared_ptr<const dsp::SampleBuffer> {
+                juce::String error;
+                return std::shared_ptr<const dsp::SampleBuffer>(io::loadSample(file, error, 60.0));
+            };
+        model.core.workers.addJob([safe, load, token] {
+            auto buffer = load();
             juce::MessageManager::callAsync([safe, buffer, token] {
-                if (safe == nullptr || token != safe->previewToken || buffer == nullptr)
+                if (safe == nullptr || token != safe->previewToken)
                     return;
+                if (buffer == nullptr)
+                {
+                    safe->previewKey = {};
+                    safe->list.repaint();
+                    return safe->model.core.status("Could not read that file", true);
+                }
                 safe->model.engine.previewSample(buffer);
                 juce::Timer::callAfterDelay(static_cast<int>(buffer->seconds() * 1000.0) + 50, [safe, token] {
                     if (safe != nullptr && token == safe->previewToken)
                     {
-                        safe->previewing = -1;
+                        safe->previewKey = {};
                         safe->list.repaint();
                     }
                 });
@@ -815,7 +1149,12 @@ private:
     MainView& view;
     juce::TextEditor search;
     juce::StringArray favourites;
-    int previewing = -1;
+    juce::StringArray placeList, openPlaces, scanning;
+    std::map<juce::String, std::shared_ptr<const io::AudioFolderListing>> listings;
+    std::shared_ptr<std::atomic<bool>> cancelScans = std::make_shared<std::atomic<bool>>(false);
+    int shownPlacesVersion = -1;
+    std::unique_ptr<juce::FileChooser> chooser;
+    juce::String previewKey;
     int previewToken = 0;
     juce::Viewport viewport;
     List list;
@@ -1427,73 +1766,116 @@ bool MainView::keyPressed(const juce::KeyPress& key)
     return ! core.host.isPlugin() || std::string_view("FIELKCRPSHTMG").find(static_cast<char>(code)) != std::string_view::npos;
 }
 
+namespace {
+constexpr const char* kDragSound = "tidefield-sound:";
+constexpr const char* kDragFile = "tidefield-file:";
+constexpr int kAddToKeyboard = engine::kNumClouds + 1;
+
+void addZonesToBloom(AppCore& core, Model& model, std::vector<engine::Engine::BloomZone> added, const juce::String& what)
+{
+    auto zones = core.engine.getBloomZones();
+    if (zones.size() == 1 && zones.front().root < 0.0f)
+        zones.front().root = model.value(P::BloomRoot);
+    const auto maxZones = static_cast<std::size_t>(dsp::BloomSampler::kMaxZones);
+    if (zones.size() >= maxZones)
+        return core.status("Bloom already plays 8 sounds; load one sound to start again.", true);
+    if (added.size() > maxZones - zones.size())
+        added.resize(maxZones - zones.size());
+    zones.insert(zones.end(), added.begin(), added.end());
+    std::sort(zones.begin(), zones.end(), [](const auto& x, const auto& y) { return x.root < y.root; });
+    core.engine.loadBloomZones(zones);
+    core.status("Added " + what + " to Bloom's keyboard (" + juce::String(static_cast<int>(zones.size())) + " sounds)");
+}
+
+juce::String slotName(int slot)
+{
+    if (slot == engine::kNumClouds)
+        return "Bloom";
+    if (slot == kAddToKeyboard)
+        return "Bloom's keyboard";
+    return "Cloud " + juce::String(slot + 1);
+}
+}
+
 void MainView::chooseSample(int slot)
 {
     const bool isBloom = slot == engine::kNumClouds;
     chooser = std::make_unique<juce::FileChooser>(isBloom ? juce::String("Load one or more sounds into Bloom") : "Load a sample into Cloud " + juce::String(slot + 1),
-                                                  juce::File(), "*.wav;*.aif;*.aiff;*.flac;*.ogg;*.mp3");
+                                                  juce::File(), io::kAudioFileWildcard);
     juce::Component::SafePointer<MainView> safe(this);
     const int flags = juce::FileBrowserComponent::openMode | juce::FileBrowserComponent::canSelectFiles
                       | (isBloom ? juce::FileBrowserComponent::canSelectMultipleItems : 0);
     chooser->launchAsync(flags, [safe, slot](const juce::FileChooser& fc) {
-        const auto files = fc.getResults();
-        if (safe == nullptr || files.isEmpty())
-            return;
-        safe->core.workers.addJob([safe, slot, files] {
-            std::vector<engine::Engine::BloomZone> zones;
-            juce::String error, firstName;
-            std::optional<dsp::PitchEstimate> firstPitch;
-            for (const auto& file : files)
+        if (safe != nullptr)
+            safe->loadFiles(fc.getResults(), slot);
+    });
+}
+
+void MainView::loadFiles(const juce::Array<juce::File>& files, int slot)
+{
+    if (files.isEmpty() || slot < 0 || slot > kAddToKeyboard)
+        return;
+    juce::Component::SafePointer<MainView> safe(this);
+    core.workers.addJob([safe, slot, files] {
+        const bool forBloom = slot >= engine::kNumClouds;
+        std::vector<engine::Engine::BloomZone> zones;
+        juce::String error, firstName;
+        std::optional<dsp::PitchEstimate> firstPitch;
+        for (const auto& file : files)
+        {
+            juce::String fileError;
+            std::shared_ptr<dsp::SampleBuffer> buffer(io::loadSample(file, fileError).release());
+            if (buffer == nullptr)
             {
-                juce::String fileError;
-                std::shared_ptr<dsp::SampleBuffer> buffer(io::loadSample(file, fileError).release());
-                if (buffer == nullptr)
-                {
-                    error = fileError;
-                    continue;
-                }
-                const auto pitch = slot == engine::kNumClouds ? dsp::detectPitch(*buffer) : std::nullopt;
-                if (zones.empty())
-                {
-                    firstName = buffer->name;
-                    firstPitch = pitch;
-                }
-                zones.push_back({ buffer, pitch.has_value() ? std::round(pitch->midiNote) : 60.0f });
-                if (zones.size() >= static_cast<std::size_t>(dsp::BloomSampler::kMaxZones) || slot != engine::kNumClouds)
-                    break;
+                error = fileError;
+                continue;
             }
-            juce::MessageManager::callAsync([safe, slot, zones, error, firstName, firstPitch]() mutable {
-                if (safe == nullptr)
-                    return;
-                if (zones.empty())
-                    return safe->core.status(error, true);
-                if (slot != engine::kNumClouds)
-                {
-                    safe->core.engine.loadCloudSample(slot, zones.front().buffer);
-                    const auto level = engine::kStrips[static_cast<std::size_t>(slot + 1)].level;
-                    if (safe->model.value(level) <= -59.0f)
-                        safe->model.set(level, -6.0f);
-                    return safe->core.status("Loaded " + firstName);
-                }
-                if (zones.size() == 1)
-                {
-                    zones.front().root = -1.0f;
-                    safe->core.engine.loadBloomZones(zones);
-                    if (firstPitch.has_value())
-                    {
-                        const float root = std::round(firstPitch->midiNote);
-                        safe->model.set(P::BloomRoot, root);
-                        return safe->core.status("Loaded " + firstName + ", tuned to " + Model::noteName(root));
-                    }
-                    return safe->core.status("Loaded " + firstName + ", no clear pitch: set Sample Root by ear");
-                }
-                std::sort(zones.begin(), zones.end(), [](const auto& x, const auto& y) { return x.root < y.root; });
+            const auto pitch = forBloom ? dsp::detectPitch(*buffer) : std::nullopt;
+            if (zones.empty())
+            {
+                firstName = buffer->name;
+                firstPitch = pitch;
+            }
+            zones.push_back({ buffer, pitch.has_value() ? std::round(pitch->midiNote) : 60.0f });
+            if (zones.size() >= static_cast<std::size_t>(dsp::BloomSampler::kMaxZones) || ! forBloom)
+                break;
+        }
+        juce::MessageManager::callAsync([safe, slot, zones, error, firstName, firstPitch]() mutable {
+            if (safe == nullptr)
+                return;
+            if (zones.empty())
+                return safe->core.status(error.isNotEmpty() ? error : juce::String("Nothing to load"), true);
+            if (slot < engine::kNumClouds)
+            {
+                safe->core.engine.loadCloudSample(slot, zones.front().buffer);
+                const auto level = engine::kStrips[static_cast<std::size_t>(slot + 1)].level;
+                if (safe->model.value(level) <= -59.0f)
+                    safe->model.set(level, -6.0f);
+                return safe->core.status("Loaded " + firstName + " into Cloud " + juce::String(slot + 1));
+            }
+            if (slot == kAddToKeyboard)
+            {
+                const auto what = zones.size() == 1 ? firstName : juce::String(static_cast<int>(zones.size())) + " sounds";
+                return addZonesToBloom(safe->core, safe->model, std::move(zones), what);
+            }
+            if (zones.size() == 1)
+            {
+                zones.front().root = -1.0f;
                 safe->core.engine.loadBloomZones(zones);
-                juce::String roots;
-                for (const auto& z : zones)
-                    roots << (roots.isEmpty() ? "" : ", ") << Model::noteName(z.root);
-                safe->core.status("Bloom now plays " + juce::String(static_cast<int>(zones.size())) + " sounds across the keyboard, rooted at " + roots);
-            });
+                if (firstPitch.has_value())
+                {
+                    const float root = std::round(firstPitch->midiNote);
+                    safe->model.set(P::BloomRoot, root);
+                    return safe->core.status("Loaded " + firstName + " into Bloom, tuned to " + Model::noteName(root));
+                }
+                return safe->core.status("Loaded " + firstName + " into Bloom, no clear pitch: set Sample Root by ear");
+            }
+            std::sort(zones.begin(), zones.end(), [](const auto& x, const auto& y) { return x.root < y.root; });
+            safe->core.engine.loadBloomZones(zones);
+            juce::String roots;
+            for (const auto& z : zones)
+                roots << (roots.isEmpty() ? "" : ", ") << Model::noteName(z.root);
+            safe->core.status("Bloom now plays " + juce::String(static_cast<int>(zones.size())) + " sounds across the keyboard, rooted at " + roots);
         });
     });
 }
@@ -1511,18 +1893,8 @@ void MainView::loadFactory(int soundIndex, int slot)
             if (safe == nullptr || buffer == nullptr)
                 return;
             auto& core = safe->core;
-            if (slot == engine::kNumClouds + 1)
-            {
-                auto zones = core.engine.getBloomZones();
-                if (zones.size() == 1 && zones.front().root < 0.0f)
-                    zones.front().root = safe->model.value(P::BloomRoot);
-                if (zones.size() >= static_cast<std::size_t>(dsp::BloomSampler::kMaxZones))
-                    return core.status("Bloom already plays 8 sounds; load one sound to start again.", true);
-                zones.push_back({ buffer, sound.rootNote >= 0 ? static_cast<float>(sound.rootNote) : 60.0f });
-                std::sort(zones.begin(), zones.end(), [](const auto& x, const auto& y) { return x.root < y.root; });
-                core.engine.loadBloomZones(zones);
-                return core.status("Added " + juce::String(sound.name) + " to Bloom's keyboard (" + juce::String(static_cast<int>(zones.size())) + " sounds)");
-            }
+            if (slot == kAddToKeyboard)
+                return addZonesToBloom(core, safe->model, { { buffer, sound.rootNote >= 0 ? static_cast<float>(sound.rootNote) : 60.0f } }, sound.name);
             if (slot == engine::kNumClouds)
             {
                 core.engine.loadBloomSample(buffer);
@@ -1539,6 +1911,216 @@ void MainView::loadFactory(int soundIndex, int slot)
             core.status("Loaded " + juce::String(sound.name) + (slot == engine::kNumClouds ? " into Bloom" : " into Cloud " + juce::String(slot + 1)));
         });
     });
+}
+
+void MainView::showLoadMenu(const juce::String& title, bool canAddToKeyboard, std::function<void(int slot)> chosen)
+{
+    juce::PopupMenu m;
+    m.addSectionHeader(title);
+    for (int c = 0; c < engine::kNumClouds; ++c)
+    {
+        const auto current = model.engine.getCloudSample(c);
+        m.addItem(c + 1, "Cloud " + juce::String(c + 1) + (current != nullptr ? "   (" + juce::String(current->name) + ")" : juce::String()));
+    }
+    const auto bloom = model.engine.getBloomSample();
+    m.addItem(engine::kNumClouds + 1, "Bloom" + (bloom != nullptr ? "   (" + juce::String(bloom->name) + ")" : juce::String()));
+    if (canAddToKeyboard && bloom != nullptr)
+        m.addItem(kAddToKeyboard + 1, "Add to Bloom's keyboard");
+    showMenu(m, this, [chosen = std::move(chosen)](int r) { chosen(r - 1); });
+}
+
+juce::var MainView::dragFactorySound(int soundIndex) { return kDragSound + juce::String(soundIndex); }
+
+juce::var MainView::dragFile(const juce::File& file) { return kDragFile + file.getFullPathName(); }
+
+MainView::DragContent MainView::classify(const juce::StringArray& files)
+{
+    bool audio = false, folder = false;
+    for (const auto& path : files)
+    {
+        const juce::File f(path);
+        if (io::isSessionFile(f))
+            return DragContent::Session;
+        audio = audio || io::isAudioFile(f);
+        folder = folder || f.isDirectory();
+    }
+    return audio ? DragContent::Audio : folder ? DragContent::Folder : DragContent::Nothing;
+}
+
+MainView::DropTarget MainView::dropTargetAt(juce::Point<int> p, DragContent content) const
+{
+    if (content == DragContent::Session)
+        return { DropTarget::Open, -1, getLocalBounds() };
+    if (content == DragContent::Folder)
+        return { DropTarget::Place, -1, browser->getBounds() };
+    if (content != DragContent::Audio)
+        return {};
+    if (terrain->getBounds().contains(p))
+        return { DropTarget::Ask, -1, terrain->getBounds() };
+    if (! devices->getBounds().contains(p))
+        return {};
+    const auto local = p - devices->getPosition();
+    const auto clouds = devices->tabBounds(DeviceView::Clouds);
+    const auto bloom = devices->tabBounds(DeviceView::Bloom);
+    if (clouds.contains(local))
+        return { DropTarget::Ask, -1, clouds + devices->getPosition() };
+    if (bloom.contains(local))
+        return { DropTarget::Slot, engine::kNumClouds, bloom + devices->getPosition() };
+    for (auto* c = devices->getComponentAt(local); c != nullptr && c != devices.get(); c = c->getParentComponent())
+        if (auto* device = dynamic_cast<Device*>(c))
+            for (auto* child : device->getChildren())
+                if (auto* wave = dynamic_cast<Waveform*>(child))
+                    return { DropTarget::Slot, wave->getSlot(), getLocalArea(device, device->getLocalBounds()) };
+    const int page = devices->getPage();
+    if (page == DeviceView::Bloom)
+        return { DropTarget::Slot, engine::kNumClouds, devices->getBounds().withTrimmedTop(clouds.getBottom()) };
+    if (page == DeviceView::Clouds)
+        return { DropTarget::Ask, -1, devices->getBounds().withTrimmedTop(clouds.getBottom()) };
+    return {};
+}
+
+void MainView::showDropTarget(const DropTarget& target)
+{
+    if (target.area == dropHighlight && target.kind == dropKind && target.slot == dropSlot)
+        return;
+    repaint(dropHighlight.expanded(4));
+    dropHighlight = target.kind == DropTarget::None ? juce::Rectangle<int>() : target.area;
+    dropKind = target.kind;
+    dropSlot = target.slot;
+    if (target.kind == DropTarget::Open)
+        dropLabel = "Drop to open the project";
+    else if (target.kind == DropTarget::Place)
+        dropLabel = "Drop to add to Places";
+    else if (target.kind == DropTarget::Ask)
+        dropLabel = "Drop, then choose where it plays";
+    else if (target.kind == DropTarget::Slot)
+        dropLabel = dropCount > 1 && target.slot == engine::kNumClouds ? "Drop to spread across Bloom's keyboard" : "Drop into " + slotName(target.slot);
+    else
+        dropLabel = {};
+    repaint(dropHighlight.expanded(4));
+}
+
+void MainView::paintOverChildren(juce::Graphics& g)
+{
+    if (dropHighlight.isEmpty())
+        return;
+    const auto r = dropHighlight.toFloat().reduced(1.5f);
+    g.setColour(colour::accent().withAlpha(0.10f));
+    g.fillRoundedRectangle(r, metric::radius);
+    g.setColour(colour::accent());
+    g.drawRoundedRectangle(r, metric::radius, 2.0f);
+    if (dropLabel.isEmpty() || r.getHeight() < 40.0f)
+        return;
+    const auto f = font(12.0f, 600);
+    const float w = std::min(r.getWidth() - 16.0f, static_cast<float>(juce::GlyphArrangement::getStringWidthInt(f, dropLabel)) + 24.0f);
+    const auto pill = juce::Rectangle<float>(w, 24.0f).withCentre({ r.getCentreX(), r.getY() + 22.0f });
+    g.setColour(colour::accent());
+    g.fillRoundedRectangle(pill, 12.0f);
+    g.setColour(colour::window());
+    g.setFont(f);
+    g.drawText(dropLabel, pill, juce::Justification::centred, true);
+}
+
+void MainView::dropAudio(const juce::Array<juce::File>& files, const DropTarget& target)
+{
+    if (files.isEmpty())
+        return;
+    if (target.kind == DropTarget::Slot)
+        return loadFiles(target.slot == engine::kNumClouds ? files : juce::Array<juce::File> { files.getFirst() }, target.slot);
+    if (target.kind != DropTarget::Ask)
+        return core.status("Drop sounds on the terrain, a cloud or Bloom.", true);
+    const auto title = files.size() == 1 ? "Load " + files.getFirst().getFileName() + " into" : "Load " + juce::String(files.size()) + " sounds into";
+    juce::Component::SafePointer<MainView> safe(this);
+    showLoadMenu(title, true, [safe, files](int slot) {
+        safe->loadFiles(slot >= engine::kNumClouds ? files : juce::Array<juce::File> { files.getFirst() }, slot);
+    });
+}
+
+void MainView::dropFactory(int soundIndex, const DropTarget& target)
+{
+    const auto& sounds = factorySounds();
+    if (soundIndex < 0 || soundIndex >= static_cast<int>(sounds.size()))
+        return;
+    if (target.kind == DropTarget::Slot)
+        return loadFactory(soundIndex, target.slot);
+    if (target.kind != DropTarget::Ask)
+        return;
+    const auto& sound = sounds[static_cast<std::size_t>(soundIndex)];
+    juce::Component::SafePointer<MainView> safe(this);
+    showLoadMenu("Load " + juce::String(sound.name) + " into", sound.rootNote >= 0, [safe, soundIndex](int slot) { safe->loadFactory(soundIndex, slot); });
+}
+
+bool MainView::isInterestedInFileDrag(const juce::StringArray& files) { return classify(files) != DragContent::Nothing; }
+
+void MainView::fileDragEnter(const juce::StringArray& files, int x, int y) { fileDragMove(files, x, y); }
+
+void MainView::fileDragMove(const juce::StringArray& files, int x, int y)
+{
+    dropCount = files.size();
+    showDropTarget(dropTargetAt({ x, y }, classify(files)));
+}
+
+void MainView::fileDragExit(const juce::StringArray&) { showDropTarget({}); }
+
+void MainView::filesDropped(const juce::StringArray& files, int x, int y)
+{
+    const auto content = classify(files);
+    const auto target = dropTargetAt({ x, y }, content);
+    showDropTarget({});
+    if (content == DragContent::Session)
+    {
+        for (const auto& path : files)
+            if (io::isSessionFile(juce::File(path)))
+                return core.session.openFile(juce::File(path));
+    }
+    juce::Array<juce::File> audio;
+    for (const auto& path : files)
+    {
+        const juce::File f(path);
+        if (f.isDirectory())
+            browser->addPlace(f);
+        else if (io::isAudioFile(f))
+            audio.add(f);
+    }
+    if (content == DragContent::Audio)
+        dropAudio(audio, target);
+}
+
+bool MainView::isInterestedInDragSource(const SourceDetails& details)
+{
+    const auto d = details.description.toString();
+    return d.startsWith(kDragSound) || d.startsWith(kDragFile);
+}
+
+void MainView::itemDragEnter(const SourceDetails& details) { itemDragMove(details); }
+
+void MainView::itemDragMove(const SourceDetails& details)
+{
+    dropCount = 1;
+    showDropTarget(dropTargetAt(details.localPosition.toInt(), DragContent::Audio));
+}
+
+void MainView::itemDragExit(const SourceDetails&) { showDropTarget({}); }
+
+void MainView::itemDropped(const SourceDetails& details)
+{
+    const auto target = dropTargetAt(details.localPosition.toInt(), DragContent::Audio);
+    showDropTarget({});
+    const auto d = details.description.toString();
+    if (d.startsWith(kDragSound))
+        dropFactory(d.fromFirstOccurrenceOf(kDragSound, false, false).getIntValue(), target);
+    else if (d.startsWith(kDragFile))
+        dropAudio({ juce::File(d.fromFirstOccurrenceOf(kDragFile, false, false)) }, target);
+}
+
+bool MainView::shouldDropFilesWhenDraggedExternally(const SourceDetails& details, juce::StringArray& files, bool& canMoveFiles)
+{
+    const auto d = details.description.toString();
+    if (! d.startsWith(kDragFile))
+        return false;
+    files.add(d.fromFirstOccurrenceOf(kDragFile, false, false));
+    canMoveFiles = false;
+    return true;
 }
 
 bool MainView::performKey(const juce::KeyPress& key)

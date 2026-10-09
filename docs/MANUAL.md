@@ -524,12 +524,17 @@ effect slots use, see [Your own plugins](#your-own-plugins)).
 
 The instrument hears notes about 3 ms after they are played (it is given audio in steady
 blocks of 128 samples, which keeps its timing exact). Changing Play From, loading another
-instrument or pressing panic releases every note it holds. Its full state and your knob
+instrument or pressing panic releases every note it holds. When the keyboard, a MIDI
+device and the Cycles play the same note at once, the instrument hears it start again
+each time, and it only stops when the last of them lets go, so a Cycles note never cuts
+short a note you are holding (and the other way round). Its full state and your knob
 choices are saved with the session; a session that names an instrument this computer
 does not have opens with the Guest silent, says which plugin is missing, and keeps the
 settings so the session still has them when it is saved again. Instrument plugins play
-in the app only, not when Tidefield runs inside a DAW, and offline renders from the
-timeline leave the Guest out.
+in the app only, not when Tidefield runs inside a DAW. Renders from the timeline play
+the Guest too: Tidefield opens a second copy of the instrument from the state the
+performance started with, so the render sounds like what you heard. If the instrument
+cannot be opened the render goes on without it and the status bar says so.
 
 ---
 
@@ -686,7 +691,8 @@ says which plugin was missing.
 
 The same scan finds instrument plugins for the [Guest](#guest-an-instrument-plugin) tab.
 Plugins are not available when Tidefield itself runs inside a DAW; use the DAW's
-effects there. Offline renders from the timeline cannot include plugins and say so.
+effects there. Offline renders from the timeline cannot include effect plugins yet and
+say so; the Guest instrument is included.
 
 ---
 
@@ -825,7 +831,9 @@ WAV files in a folder you choose:
   recorded performance at all.
 
 The button shows progress and cancels the render if pressed again. A render sounds the
-same every time, because Tidefield's randomness is seeded.
+same every time, because Tidefield's randomness is seeded. A Guest instrument plays in
+the render from a fresh copy of the plugin (as long as the plugin itself is repeatable);
+if it cannot be opened, the render leaves it out and warns.
 
 ---
 
@@ -866,7 +874,11 @@ pressing Save writes a `.tide` copy beside the original, which is left untouched
 If the session has changes that are not saved, quitting, starting a new session or
 opening another one asks first: **Save**, **Don't Save** or **Cancel**. A change is
 anything that would end up in the file, so a knob moved and moved back again does not
-count. The starter session is treated like any other: change it and Tidefield asks.
+count. Some plugins change their saved data on their own (counters, random seeds, the
+size of their window), so a plugin's own state only counts once you have done
+something to it: loaded it, chosen its controls, or changed it in its window. Its
+knobs count like any other knob. The starter session is treated like any other: change
+it and Tidefield asks.
 Inside a DAW the host saves the plug-in's state, so the plug-in never asks.
 
 ### Autosave and crash recovery

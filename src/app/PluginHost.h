@@ -9,6 +9,7 @@
 
 #include <array>
 #include <atomic>
+#include <cstdint>
 #include <functional>
 #include <map>
 #include <memory>
@@ -38,6 +39,9 @@ public:
     const engine::InstrumentInfo* findInstrument(std::string_view typeId) const override;
     engine::InstrumentPtr createInstrument(std::string_view typeId, const std::string& state, const dsp::ProcessSpec& spec) override;
     std::string captureInstrumentState() const override { return captureState(kGuestSlot); }
+    std::shared_ptr<engine::Instrument> createRenderInstrument(std::string_view typeId, const std::string& state, const dsp::ProcessSpec& spec,
+                                                               juce::String& error);
+    std::uint64_t editRevision(int slot) const;
 
     static std::string typeIdFor(const juce::PluginDescription& d);
     static juce::String slotName(int slot);
@@ -98,7 +102,7 @@ private:
     std::optional<juce::PluginDescription> describe(std::string_view typeId) const;
     InfoHolder& infoFor(const std::string& typeId, const juce::PluginDescription& d) const;
     std::unique_ptr<juce::AudioPluginInstance> instantiate(const juce::PluginDescription& d, const std::string& state, std::string& choices,
-                                                           const dsp::ProcessSpec& spec);
+                                                           const dsp::ProcessSpec& spec, juce::String& error);
     std::vector<juce::PluginDescription> listed(bool instrumentsOnly) const;
     void status(const juce::String& message, bool warning = false) const;
 
@@ -109,6 +113,7 @@ private:
     mutable std::map<std::string, std::unique_ptr<InfoHolder>> infos;
     mutable std::map<std::string, std::unique_ptr<engine::InstrumentInfo>> instrumentInfos;
     std::shared_ptr<Registry> registry = std::make_shared<Registry>();
+    std::array<std::uint32_t, kNumHostSlots> loads {};
     std::vector<juce::AudioPluginFormat*> formatsToScan;
     std::unique_ptr<juce::PluginDirectoryScanner> scanner;
     float progress = 0.0f;
@@ -116,7 +121,7 @@ private:
     int listVersion = 0;
 };
 
-class HostedPlugin
+class HostedPlugin : private juce::AudioProcessorListener
 {
 public:
     HostedPlugin(std::weak_ptr<PluginHost::Registry> registry, int slot, std::unique_ptr<juce::AudioPluginInstance> instance);
@@ -132,6 +137,8 @@ public:
     void choose(int control, int index) noexcept;
     std::string describeChoices() const;
     void applyChoices(const std::string& text) noexcept;
+    void watchEdits(bool watch) noexcept { watching.store(watch, std::memory_order_relaxed); }
+    std::uint32_t getEdits() const noexcept { return edits.load(std::memory_order_relaxed); }
 
 protected:
     void sendControls(const std::array<float, 6>& controls) noexcept;
@@ -143,6 +150,14 @@ protected:
     std::array<std::atomic<int>, 6> choice {};
     std::array<int, 6> applied {};
     std::array<float, 6> sent {};
+
+private:
+    void audioProcessorParameterChanged(juce::AudioProcessor*, int, float) override;
+    void audioProcessorChanged(juce::AudioProcessor*, const ChangeDetails& details) override;
+    void audioProcessorParameterChangeGestureBegin(juce::AudioProcessor*, int) override;
+
+    std::atomic<std::uint32_t> edits { 0 };
+    std::atomic<bool> watching { false };
 };
 
 class HostedPluginEffect final : public dsp::Processor, public HostedPlugin
@@ -174,7 +189,7 @@ public:
     static constexpr int kMaxChannels = 8;
     static constexpr int kMidiBytes = 8192;
 
-    HostedInstrument(std::weak_ptr<PluginHost::Registry> registry, std::unique_ptr<juce::AudioPluginInstance> instance);
+    HostedInstrument(std::weak_ptr<PluginHost::Registry> registry, std::unique_ptr<juce::AudioPluginInstance> instance, bool offline = false);
 
     void prepare(const dsp::ProcessSpec& spec) override;
     void reset() noexcept override;
@@ -189,5 +204,6 @@ private:
     int channels = 2;
     int outputs = 2;
     bool usable = true;
+    bool offline = false;
 };
 }

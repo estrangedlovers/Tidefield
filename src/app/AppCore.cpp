@@ -81,6 +81,7 @@ AppCore::AppCore(Host& h)
         plugins->onStatus = [this](const juce::String& m, bool warning) { status(m, warning); };
         fx.setExternal(plugins.get());
         guest.setExternal(plugins.get());
+        session.pluginEdits = [this](int slot) { return plugins->editRevision(slot); };
         clockOut = std::make_unique<MidiClockOut>(host.getSettings());
         cycleOut = std::make_unique<CycleMidiOut>(engine, host.getSettings(), host.getBlockClock());
         if (auto* link = host.getLink(); link != nullptr && LinkSync::isAvailable())
@@ -114,6 +115,7 @@ AppCore::~AppCore()
     cycleOut.reset();
     fx.setExternal(nullptr);
     guest.setExternal(nullptr);
+    session.pluginEdits = nullptr;
     recorder.onFinished = nullptr;
     saveRigMidi();
 }

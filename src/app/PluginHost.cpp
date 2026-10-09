@@ -109,13 +109,12 @@ juce::String PluginHost::slotName(int slot)
 }
 
 std::unique_ptr<juce::AudioPluginInstance> PluginHost::instantiate(const juce::PluginDescription& d, const std::string& state, std::string& choices,
-                                                                   const dsp::ProcessSpec& spec)
+                                                                   const dsp::ProcessSpec& spec, juce::String& error)
 {
-    juce::String error;
     auto instance = formats.createPluginInstance(d, spec.sampleRate, spec.maxBlockSize, error);
     if (instance == nullptr)
     {
-        status(d.name + " could not be opened: " + (error.isNotEmpty() ? error : juce::String("unknown error")), true);
+        error = d.name + " could not be opened: " + (error.isNotEmpty() ? error : juce::String("unknown error"));
         return nullptr;
     }
     std::string pluginState = state;
@@ -141,9 +140,13 @@ dsp::ProcessorPtr PluginHost::create(int slot, std::string_view typeId, const st
     if (! d.has_value() || slot < 0 || slot >= engine::kNumFxSlots)
         return nullptr;
     std::string choices;
-    auto instance = instantiate(*d, state, choices, spec);
+    juce::String error;
+    auto instance = instantiate(*d, state, choices, spec, error);
     if (instance == nullptr)
+    {
+        status(error, true);
         return nullptr;
+    }
 
     auto& holder = infoFor(std::string(typeId), *d);
     auto params = controllableParameters(*instance);
@@ -173,6 +176,7 @@ dsp::ProcessorPtr PluginHost::create(int slot, std::string_view typeId, const st
         effect->applyChoices(choices);
     effect->prepare(spec);
     registry->live[static_cast<std::size_t>(slot)] = effect.get();
+    ++loads[static_cast<std::size_t>(slot)];
     return effect;
 }
 
@@ -197,9 +201,13 @@ engine::InstrumentPtr PluginHost::createInstrument(std::string_view typeId, cons
     if (! d.has_value() || ! d->isInstrument)
         return nullptr;
     std::string choices;
-    auto instance = instantiate(*d, state, choices, spec);
+    juce::String error;
+    auto instance = instantiate(*d, state, choices, spec, error);
     if (instance == nullptr)
+    {
+        status(error, true);
         return nullptr;
+    }
 
     findInstrument(typeId);
     auto& info = *instrumentInfos[std::string(typeId)];
@@ -217,7 +225,36 @@ engine::InstrumentPtr PluginHost::createInstrument(std::string_view typeId, cons
     }
     instrument->prepare(spec);
     registry->live[static_cast<std::size_t>(kGuestSlot)] = instrument.get();
+    ++loads[static_cast<std::size_t>(kGuestSlot)];
     return instrument;
+}
+
+std::shared_ptr<engine::Instrument> PluginHost::createRenderInstrument(std::string_view typeId, const std::string& state, const dsp::ProcessSpec& spec,
+                                                                       juce::String& error)
+{
+    const auto d = describe(typeId);
+    if (! d.has_value() || ! d->isInstrument)
+    {
+        error = "it is not installed here, or not found by a plugin scan yet";
+        return nullptr;
+    }
+    std::string choices;
+    auto instance = instantiate(*d, state, choices, spec, error);
+    if (instance == nullptr)
+        return nullptr;
+    auto instrument = std::make_shared<HostedInstrument>(std::weak_ptr<Registry>(), std::move(instance), true);
+    if (! choices.empty())
+        instrument->applyChoices(choices);
+    instrument->prepare(spec);
+    return instrument;
+}
+
+std::uint64_t PluginHost::editRevision(int slot) const
+{
+    if (slot < 0 || slot >= kNumHostSlots)
+        return 0;
+    const auto* live = registry->live[static_cast<std::size_t>(slot)];
+    return (static_cast<std::uint64_t>(loads[static_cast<std::size_t>(slot)]) << 32) | (live != nullptr ? live->getEdits() : 0u);
 }
 
 std::string PluginHost::captureState(int slot) const
@@ -432,11 +469,14 @@ void PluginHost::openEditor(int slot)
             if (auto r = weak.lock())
             {
                 r->editors[s].reset();
+                if (r->editorOwner[s] != nullptr)
+                    r->editorOwner[s]->watchEdits(false);
                 r->editorOwner[s] = nullptr;
             }
         });
     });
     registry->editorOwner[s] = fx;
+    fx->watchEdits(true);
 }
 
 void PluginHost::closeEditor(int slot)
@@ -444,6 +484,8 @@ void PluginHost::closeEditor(int slot)
     if (slot < 0 || slot >= kNumHostSlots)
         return;
     registry->editors[static_cast<std::size_t>(slot)].reset();
+    if (auto* owner = registry->editorOwner[static_cast<std::size_t>(slot)])
+        owner->watchEdits(false);
     registry->editorOwner[static_cast<std::size_t>(slot)] = nullptr;
 }
 
@@ -490,8 +532,13 @@ int PluginHost::chosenParameter(int slot, int control) const
 
 void PluginHost::chooseParameter(int slot, int control, int index)
 {
-    if (hasInstance(slot))
-        registry->live[static_cast<std::size_t>(slot)]->choose(control, index);
+    if (! hasInstance(slot))
+        return;
+    auto* live = registry->live[static_cast<std::size_t>(slot)];
+    if (live->chosen(control) == index)
+        return;
+    live->choose(control, index);
+    ++loads[static_cast<std::size_t>(slot)];
 }
 
 void PluginHost::status(const juce::String& message, bool warning) const
@@ -503,6 +550,7 @@ void PluginHost::status(const juce::String& message, bool warning) const
 HostedPlugin::HostedPlugin(std::weak_ptr<PluginHost::Registry> r, int s, std::unique_ptr<juce::AudioPluginInstance> i)
     : registry(std::move(r)), slot(s), instance(std::move(i))
 {
+    instance->addListener(this);
     all = controllableParameters(*instance);
     for (int k = 0; k < kMaxControls; ++k)
     {
@@ -560,8 +608,23 @@ HostedPlugin::~HostedPlugin()
         if (r->live[s] == this)
             r->live[s] = nullptr;
     }
+    instance->removeListener(this);
     instance->releaseResources();
 }
+
+void HostedPlugin::audioProcessorParameterChanged(juce::AudioProcessor*, int, float)
+{
+    if (watching.load(std::memory_order_relaxed))
+        edits.fetch_add(1, std::memory_order_relaxed);
+}
+
+void HostedPlugin::audioProcessorChanged(juce::AudioProcessor*, const ChangeDetails& details)
+{
+    if (watching.load(std::memory_order_relaxed) && (details.programChanged || details.nonParameterStateChanged))
+        edits.fetch_add(1, std::memory_order_relaxed);
+}
+
+void HostedPlugin::audioProcessorParameterChangeGestureBegin(juce::AudioProcessor*, int) { edits.fetch_add(1, std::memory_order_relaxed); }
 
 void HostedPluginEffect::prepare(const dsp::ProcessSpec& spec)
 {
@@ -655,8 +718,8 @@ float HostedPluginEffect::getTailSeconds() const noexcept { return static_cast<f
 }
 
 namespace tf::app {
-HostedInstrument::HostedInstrument(std::weak_ptr<PluginHost::Registry> r, std::unique_ptr<juce::AudioPluginInstance> i)
-    : HostedPlugin(std::move(r), PluginHost::kGuestSlot, std::move(i))
+HostedInstrument::HostedInstrument(std::weak_ptr<PluginHost::Registry> r, std::unique_ptr<juce::AudioPluginInstance> i, bool renderOffline)
+    : HostedPlugin(std::move(r), PluginHost::kGuestSlot, std::move(i)), offline(renderOffline)
 {
 }
 
@@ -680,7 +743,7 @@ void HostedInstrument::prepare(const dsp::ProcessSpec& spec)
     channels = std::max(instance->getTotalNumInputChannels(), outputs);
     usable = outputs >= 1 && channels <= kMaxChannels;
     maxBlock = std::max(1, spec.maxBlockSize);
-    instance->setNonRealtime(false);
+    instance->setNonRealtime(offline);
     instance->setRateAndBufferSizeDetails(spec.sampleRate, maxBlock);
     instance->prepareToPlay(spec.sampleRate, maxBlock);
     scratch.setSize(std::max(1, channels), maxBlock, false, true, true);

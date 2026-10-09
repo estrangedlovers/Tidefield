@@ -272,17 +272,42 @@ void PerformanceController::startRender(std::shared_ptr<const io::Performance> c
     rendering = true;
     cancel.store(false);
     progress.store(0.0f);
-    core.status(loopCrossfadeSeconds > 0.0 ? "Rendering a seamless loop..." : "Rendering the performance...");
-    core.workers.addJob([this, copy, folder, stems, loopCrossfadeSeconds, token = std::weak_ptr<bool>(alive)] {
-        io::RenderOptions options;
-        options.folder = folder;
-        options.stems = stems;
-        options.sampleRate = core.getRenderSampleRate();
-        options.loopCrossfadeSeconds = loopCrossfadeSeconds;
-        options.cancel = &cancel;
-        options.onProgress = [this](float p) { progress.store(p); };
-        const auto result = io::renderPerformance(*copy, options);
-        juce::MessageManager::callAsync([this, token, result] {
+    const double rate = core.getRenderSampleRate();
+    const auto& guestData = copy->start.guest;
+    std::shared_ptr<engine::Instrument> guestInstrument;
+    juce::String guestError;
+    if (! guestData.type.empty())
+    {
+        if (core.plugins != nullptr)
+            guestInstrument = core.plugins->createRenderInstrument(guestData.type, guestData.state, { rate, engine::Engine::kGuestBlock }, guestError);
+        else
+            guestError = "instrument plugins only play in the app";
+    }
+    const juce::String what = loopCrossfadeSeconds > 0.0 ? "a seamless loop" : "the performance";
+    core.status(guestInstrument != nullptr ? "Rendering " + what + " with " + juce::String(guestData.name.empty() ? "the Guest instrument" : guestData.name) + "..."
+                                           : "Rendering " + what + "...");
+    core.workers.addJob([this, copy, folder, stems, loopCrossfadeSeconds, rate, guestInstrument, guestError, token = std::weak_ptr<bool>(alive)]() mutable {
+        io::RenderResult result;
+        {
+            io::RenderOptions options;
+            options.folder = folder;
+            options.stems = stems;
+            options.sampleRate = rate;
+            options.loopCrossfadeSeconds = loopCrossfadeSeconds;
+            options.cancel = &cancel;
+            options.onProgress = [this](float p) { progress.store(p); };
+            options.makeGuest = [guestInstrument, guestError](const io::SessionData::GuestData&, const dsp::ProcessSpec&, std::string& error) -> engine::InstrumentPtr {
+                if (guestInstrument == nullptr)
+                {
+                    error = guestError.toStdString();
+                    return nullptr;
+                }
+                return std::make_unique<engine::SharedInstrument>(guestInstrument);
+            };
+            result = io::renderPerformance(*copy, options);
+        }
+        juce::MessageManager::callAsync([this, token, result, guestInstrument = std::move(guestInstrument)]() mutable {
+            guestInstrument.reset();
             if (token.expired())
                 return;
             rendering = false;

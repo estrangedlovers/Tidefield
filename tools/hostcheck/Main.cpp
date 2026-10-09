@@ -2,9 +2,14 @@
 #include <engine/Engine.h>
 #include <engine/guest/GuestManager.h>
 #include <engine/mix/FxManager.h>
+#include <io/Performance.h>
 
+#include <juce_audio_formats/juce_audio_formats.h>
+
+#include <atomic>
 #include <cmath>
 #include <iostream>
+#include <thread>
 #include <vector>
 
 namespace {
@@ -38,6 +43,48 @@ float renderRms(tf::engine::Engine& engine, tf::engine::FxManager& fx, double se
             }
     }
     return count > 0 ? static_cast<float>(std::sqrt(sum / count)) : 0.0f;
+}
+
+float filePeak(const juce::File& file, double fromSeconds, double toSeconds)
+{
+    juce::AudioFormatManager formats;
+    formats.registerBasicFormats();
+    std::unique_ptr<juce::AudioFormatReader> reader(formats.createReaderFor(file));
+    if (reader == nullptr)
+        return -1.0f;
+    const auto from = static_cast<int>(fromSeconds * reader->sampleRate);
+    const auto to = std::min(static_cast<int>(toSeconds * reader->sampleRate), static_cast<int>(reader->lengthInSamples));
+    if (to <= from)
+        return -1.0f;
+    juce::AudioBuffer<float> audio(2, to - from);
+    reader->read(&audio, 0, to - from, from, true, true);
+    return audio.getMagnitude(0, to - from);
+}
+
+tf::io::RenderResult renderOnWorker(const tf::io::Performance& performance, tf::io::RenderOptions options)
+{
+    tf::io::RenderResult result;
+    std::atomic<bool> done { false };
+    std::thread worker([&] {
+        result = tf::io::renderPerformance(performance, options);
+        done.store(true);
+    });
+    while (! done.load())
+        juce::MessageManager::getInstance()->runDispatchLoopUntil(5);
+    worker.join();
+    return result;
+}
+
+tf::io::RenderOptions::GuestFactory lend(std::shared_ptr<tf::engine::Instrument> instrument, juce::String failure)
+{
+    return [instrument, failure](const tf::io::SessionData::GuestData&, const tf::dsp::ProcessSpec&, std::string& error) -> tf::engine::InstrumentPtr {
+        if (instrument == nullptr)
+        {
+            error = failure.toStdString();
+            return nullptr;
+        }
+        return std::make_unique<tf::engine::SharedInstrument>(instrument);
+    };
 }
 }
 
@@ -194,6 +241,71 @@ int main(int argc, char** argv)
             renderRms(e4, fx4, 0.1, &guest2);
             check(host.hasInstance(app::PluginHost::kGuestSlot) && host.chosenParameter(app::PluginHost::kGuestSlot, 2) == 1,
                   "it reopens from the saved state with its chosen controls");
+
+            const auto guestSlot = app::PluginHost::kGuestSlot;
+            const auto liveRevision = host.editRevision(guestSlot);
+            io::Performance performance;
+            performance.start = io::defaultSession(e4);
+            performance.start.guest = { synthType, "Tidefield Test Sine", synthState };
+            performance.sampleRate = 48000.0;
+            performance.length = static_cast<std::uint64_t>(1.5 * 48000.0);
+            performance.events.push_back({ static_cast<std::uint64_t>(0.4 * 48000.0), engine::ControlEvent::note(69, 0.9f), 0 });
+            performance.events.push_back({ static_cast<std::uint64_t>(1.0 * 48000.0), engine::ControlEvent::note(69, 0.0f), 0 });
+            const dsp::ProcessSpec renderSpec { 48000.0, engine::Engine::kGuestBlock };
+            std::vector<juce::MemoryBlock> guestStems;
+            for (int pass = 0; pass < 2; ++pass)
+            {
+                juce::String error;
+                auto lent = host.createRenderInstrument(synthType, synthState, renderSpec, error);
+                if (pass == 0)
+                {
+                    check(lent != nullptr, "a fresh instance of the instrument opens for a render");
+                    check(host.editRevision(guestSlot) == liveRevision && host.chosenParameter(guestSlot, 2) == 1,
+                          "and leaves the live Guest instrument alone");
+                }
+                io::RenderOptions render;
+                render.folder = dir.getChildFile("render" + juce::String(pass));
+                render.stems = true;
+                render.makeGuest = lend(std::move(lent), error);
+                const auto result = renderOnWorker(performance, render);
+                const auto stem = render.folder.getChildFile("stems").getChildFile("guest.wav");
+                if (pass == 0)
+                {
+                    check(result.ok && result.warnings.empty(), "a performance with the instrument in the Guest renders without warnings");
+                    check(filePeak(stem, 0.0, 0.35) < 1.0e-5f, "the rendered Guest is silent before its note");
+                    check(filePeak(stem, 0.5, 0.95) > 0.01f, "the render plays the instrument's note");
+                    check(filePeak(render.folder.getChildFile("master.wav"), 0.5, 0.95) > 0.01f, "and the master has it");
+                }
+                juce::MemoryBlock bytes;
+                stem.loadFileAsData(bytes);
+                guestStems.push_back(bytes);
+            }
+            check(guestStems.size() == 2 && guestStems[0].getSize() > 0 && guestStems[0] == guestStems[1],
+                  "two renders of the instrument are identical");
+            {
+                juce::String error;
+                auto none = host.createRenderInstrument("plugin:VST3-Not Installed-0-0", {}, renderSpec, error);
+                io::RenderOptions render;
+                render.folder = dir.getChildFile("renderMissing");
+                render.makeGuest = lend(std::move(none), error);
+                auto gone = performance;
+                gone.start.guest = { "plugin:VST3-Not Installed-0-0", "Not Installed", "kept" };
+                const auto result = renderOnWorker(gone, render);
+                check(result.ok && result.warnings.size() == 1 && juce::String(result.warnings.front()).contains("Not Installed"),
+                      "a missing instrument leaves the render going with a warning");
+            }
+
+            auto snapshot = [&] {
+                io::SessionData s;
+                s.guest = { synthType, guest2.getName(), guest2.getState() };
+                s.pluginEdits["guest"] = host.editRevision(guestSlot);
+                return s;
+            };
+            const auto untouched = snapshot();
+            renderRms(e4, fx4, 0.3, &guest2);
+            check(io::sameContent(untouched, snapshot()), "an untouched instrument does not count as a change to the session");
+            host.chooseParameter(guestSlot, 3, 0);
+            check(! io::sameContent(untouched, snapshot()), "choosing another parameter for a knob does");
 
             engine::GuestManager missing(e4);
             missing.setExternal(&host);

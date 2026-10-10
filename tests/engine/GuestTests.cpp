@@ -593,3 +593,88 @@ TEST_CASE("A note-off from one origin never ends a Guest note another origin sti
         REQUIRE(fake->held() == 0);
     }
 }
+
+TEST_CASE("A note queued just before an instrument swap never sticks in the new instrument")
+{
+    GuestRig rig(64);
+    rig.load();
+    rig.run(0.1);
+    float* outs[2] = { rig.l.data(), rig.r.data() };
+    if (rig.engine.getSampleTime() % static_cast<std::uint64_t>(Engine::kGuestBlock) != 0)
+        rig.engine.process(nullptr, 0, outs, 2, 64);
+    REQUIRE(rig.engine.getSampleTime() % static_cast<std::uint64_t>(Engine::kGuestBlock) == 0);
+    rig.engine.noteOn(60, 0.8f);
+    rig.engine.process(nullptr, 0, outs, 2, 64);
+    auto* second = rig.load();
+    rig.run(0.3);
+    REQUIRE(second->blocks > 0);
+    REQUIRE(second->held() == 0);
+    rig.engine.noteOff(60);
+    rig.run(0.1);
+    REQUIRE(second->held() == 0);
+}
+
+TEST_CASE("Switching Play From or panic lifts the sustain pedal and pitch bend the Guest was given")
+{
+    auto lastValue = [](const FakeInstrument& fake, int type, int data1) {
+        int value = -1;
+        for (int k = 0; k < fake.logged; ++k)
+        {
+            const auto& e = fake.log[static_cast<std::size_t>(k)].event;
+            if (e.type() == type && (type == 0xe0 || e.data1 == data1))
+                value = e.data2;
+        }
+        return value;
+    };
+    for (int how = 0; how < 2; ++how)
+    {
+        GuestRig rig;
+        auto* fake = rig.load();
+        rig.engine.setParam(P::GuestPlayFrom, static_cast<float>(Engine::kFromMidi));
+        rig.run(0.1);
+        rig.engine.postMidi(0, { 0xb0, 64, 127, 0 });
+        rig.engine.postMidi(0, { 0xe0, 0, 100, 0 });
+        rig.engine.postMidi(0, { 0x90, 60, 100, 0 });
+        rig.run(0.1);
+        REQUIRE(lastValue(*fake, 0xb0, 64) == 127);
+        REQUIRE(lastValue(*fake, 0xe0, 0) == 100);
+        if (how == 0)
+            rig.engine.setParam(P::GuestPlayFrom, static_cast<float>(Engine::kFromCycles));
+        else
+            rig.engine.command(Command::Panic);
+        rig.run(0.1);
+        REQUIRE(lastValue(*fake, 0xb0, 64) == 0);
+        REQUIRE(lastValue(*fake, 0xe0, 0) == 64);
+        REQUIRE(fake->held() == 0);
+    }
+}
+
+TEST_CASE("Restarting the audio device releases every Cycles note on the Guest and on MIDI out")
+{
+    GuestRig rig;
+    auto* fake = rig.load();
+    oneCycle(rig, 8.0f);
+    rig.engine.setParam(P::LoopsMidiOut, 1.0f);
+    rig.run(2.5);
+    REQUIRE(fake->held() > 0);
+    REQUIRE(rig.last.cycleMidiNotes > 0);
+    rig.engine.prepare(kRate, rig.blockSize);
+    rig.engine.setParam(P::LoopsOn, 0.0f);
+    rig.run(0.2);
+    REQUIRE(fake->held() == 0);
+    std::map<int, int> held;
+    for (const auto& m : rig.midi)
+    {
+        const int key = (m.status & 0x0f) * 128 + m.data1;
+        if ((m.status & 0xf0) == 0x90)
+            ++held[key];
+        else if ((m.status & 0xf0) == 0x80)
+            held[key] = 0;
+        else if ((m.status & 0xf0) == 0xb0 && m.data1 == 123)
+            for (auto& [k, n] : held)
+                if (k / 128 == (m.status & 0x0f))
+                    n = 0;
+    }
+    for (const auto& [k, n] : held)
+        REQUIRE(n == 0);
+}

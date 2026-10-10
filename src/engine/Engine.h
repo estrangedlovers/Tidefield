@@ -308,6 +308,7 @@ private:
     std::array<CycleHold, 8> cycleHolds {};
     std::array<std::uint16_t, 16> midiOutHeld {};
     int guestFrom = kFromBloomNotes;
+    std::uint16_t guestSustain = 0, guestBent = 0;
     int cycleMidiMode = -1;
     bool cycleMidiOn = false;
     SpscQueue<MidiOutEvent> midiOut { 1024 };
@@ -318,6 +319,7 @@ private:
     void guestNoteOn(int channel, int note, std::uint8_t velocity) noexcept;
     void guestNoteOff(int channel, int note) noexcept;
     void releaseGuestKeys() noexcept;
+    void releaseGuestControllers() noexcept;
     void releaseCycleNotes(bool guest, bool midi) noexcept;
     void pushMidiOut(std::uint8_t status, std::uint8_t data1, std::uint8_t data2) noexcept;
     void renderGuest() noexcept;

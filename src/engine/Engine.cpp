@@ -103,6 +103,14 @@ void Engine::prepare(double newSampleRate, int maxBlockSize)
         k.fill(0);
     for (auto& o : guestOwners)
         o.fill(0);
+    if (guestSlot.hasInstrument())
+    {
+        releaseGuestControllers();
+        for (int ch = 0; ch < 16; ++ch)
+            pushGuest(static_cast<std::uint8_t>(0xb0 | ch), 123, 0);
+    }
+    guestSustain = guestBent = 0;
+    releaseCycleNotes(false, true);
     cycleHolds.fill({});
     midiOutHeld.fill(0);
     guestFrom = std::clamp(toInt(params.current(P::GuestPlayFrom)), 0, 3);
@@ -450,6 +458,8 @@ void Engine::drainControl() noexcept
         slot.acquire();
     if (guestSlot.acquire())
     {
+        guestPendingCount = 0;
+        guestSustain = guestBent = 0;
         for (auto& k : guestKeys)
             k.fill(0);
         for (auto& o : guestOwners)
@@ -931,6 +941,7 @@ void Engine::applyCommand(Command c) noexcept
             master.panic();
             releaseGuestKeys();
             releaseCycleNotes(true, true);
+            releaseGuestControllers();
             for (auto& o : guestOwners)
                 o.fill(0);
             for (int ch = 0; ch < 16; ++ch)
@@ -1550,6 +1561,16 @@ void Engine::pushGuest(std::uint8_t status, std::uint8_t data1, std::uint8_t dat
 {
     if (guestPendingCount >= kMaxGuestPending)
         return;
+    const auto bit = static_cast<std::uint16_t>(1u << (status & 0x0f));
+    if ((status & 0xf0) == 0xb0 && data1 == 64)
+        guestSustain = static_cast<std::uint16_t>(data2 >= 64 ? guestSustain | bit : guestSustain & ~bit);
+    else if ((status & 0xf0) == 0xb0 && data1 == 121)
+    {
+        guestSustain = static_cast<std::uint16_t>(guestSustain & ~bit);
+        guestBent = static_cast<std::uint16_t>(guestBent & ~bit);
+    }
+    else if ((status & 0xf0) == 0xe0)
+        guestBent = static_cast<std::uint16_t>(data1 == 0 && data2 == 64 ? guestBent & ~bit : guestBent | bit);
     guestPending[static_cast<std::size_t>(guestPendingCount++)] = { sampleTime, GuestEvent { 0, status, data1, data2 } };
 }
 
@@ -1601,6 +1622,18 @@ void Engine::releaseGuestKeys() noexcept
             }
 }
 
+void Engine::releaseGuestControllers() noexcept
+{
+    for (int c = 0; c < 16; ++c)
+    {
+        const auto bit = static_cast<std::uint16_t>(1u << c);
+        if ((guestSustain & bit) != 0)
+            pushGuest(static_cast<std::uint8_t>(0xb0 | c), 64, 0);
+        if ((guestBent & bit) != 0)
+            pushGuest(static_cast<std::uint8_t>(0xe0 | c), 0, 64);
+    }
+}
+
 void Engine::releaseCycleNotes(bool guest, bool midi) noexcept
 {
     for (auto& h : cycleHolds)
@@ -1636,6 +1669,7 @@ void Engine::updateGuest() noexcept
     if (from != guestFrom)
     {
         releaseGuestKeys();
+        releaseGuestControllers();
         guestFrom = from;
     }
     if (guestSlot.hasInstrument())

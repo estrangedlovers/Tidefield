@@ -2,7 +2,7 @@
 
 Read `CLAUDE.md` (rules) and `docs/ARCHITECTURE.md` (design) first.
 
-## Status: 1.2.0, tempo sync, gestures, projector window, device presets; debugged and optimised
+## Status: 1.4.0, macros, Guest instrument, Windows build, lessons, autosave
 
 ### Phase 1: skeleton, device settings, safety chain, drone, render harness
 
@@ -431,7 +431,7 @@ CI; every macOS CI run green on Apple Silicon.
 whether the auto master's target shape suits your material, how the new gestures
 feel, CPU on the M1 Pro under real load, and the app on your interface and controller.
 
-### 1.4 (in progress, not released)
+### 1.4.0: a studio-ready instrument
 
 Built so far, each with tests:
 - **Settings window** with nine tabs (Look and Feel, Audio, MIDI and Sync, Controllers,
@@ -645,8 +645,18 @@ Built so far, each with tests:
   tracking with real plugin editors (no display here; the Linux hostcheck has none).
   Effect plugins in slots are still left out of renders, with a warning, as before.
 
-Still to do for 1.4: signing, notarisation and auto-update (needs the Apple Developer
-account).
+**Final review and optimisation (partial, by choice to ship sooner)**: the integration
+review fixed Guest note release across swaps, Play From changes and restarts; macro offset
+glides (no zipper) and the control audit covering every macro; destruction of a render's
+Guest plugin on the message thread at quit; owner counting for Cycles MIDI out note-offs;
+restoring a recovered session while another file is opening. The optimisation pass added
+`tools/bench` and render timing, advanced only moving parameters, skipped unchanged
+coefficient work, reused the limiter's true-peak estimate and skipped silent strips.
+
+Deferred to 1.4.1 or later: the per-strip CPU readout in the Mixer (unfinished), the rest
+of the review's ASan/UBSan pass, further optimisation, signing, notarisation and
+auto-update (planned for 2.0 with the Apple Developer account), a Windows installer and
+ASIO.
 
 ### 1.3.0: a deeper instrument
 

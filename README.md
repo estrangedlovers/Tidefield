@@ -100,13 +100,17 @@ Gravity, reverb return, Cloud 1 density and master level.
   hold), Bloom (several sounds across the keyboard, tuned automatically, MPE),
   disintegrating looper, weather (wind, rain, surf), freeze all.
 - **Recording type** (on the master, heard live): digital, cassette, vinyl, sampler.
-- **Effects** for any of 28 slots: reverb with infinite hold, tape delay, worn echo,
+- **Guest**: load an Audio Unit or VST3 instrument as its own source with a mixer
+  strip, played from Bloom's notes, MIDI input or the Cycles. The Cycles can also send
+  their notes to a MIDI output.
+- **Effects** for any of 30 slots: reverb with infinite hold, tape delay, worn echo,
   ensemble, spectral blur, sympathetic strings, Medium, filter, pitch shimmer, phaser,
   tremolo, saturator, grain delay, glue compressor and lo-fi. In the app, any slot can
   also host an Audio Unit or VST3 effect, with its knobs pointed at any of the
   plugin's parameters.
 - **Modulation**: four LFOs, two random sources, input and mix followers, velocity,
   pitch, mod wheel, pressure and the terrain, routed to any control (up to 16 routes).
+  Eight **macros** each move up to eight controls over their own ranges.
 - **Over time**: seasons (minutes-long curves on any parameter), harmonic gravity with
   crossfaded key changes, Tide.
 - **The timeline**: record a whole performance, replay it from any point, erase, mute,
@@ -117,6 +121,11 @@ Gravity, reverb return, Cloud 1 density and master level.
   Ableton Link as a build option.
 - **Installation mode**: opens a session at launch, fades in, follows a daily schedule,
   keeps the computer awake, recovers a lost audio device and logs it all.
+- **Your setup**: controller templates (nanoKONTROL2, MIDImix, Launch Control XL and
+  generic), custom keyboard shortcuts, Places for your own sample folders, and drag and
+  drop from Finder.
+- **Built-in lessons** in a side panel, plus a What's new tour.
+- **Autosave and crash recovery**, and a prompt before discarding unsaved changes.
 - **Undo and redo** for controls, scenes, routes, seasons, effects and timeline edits.
 - **Safety**: lookahead true-peak limiter, DC blocker, NaN guard, panic, CPU guardrails
   that lighten the load before it glitches.

@@ -32,25 +32,26 @@ void Limiter::prepare(const ProcessSpec& spec, float lookaheadMs)
             const double t = (k - 3) - f;
             const double sinc = std::fabs(t) < 1.0e-9 ? 1.0 : std::sin(3.14159265358979323846 * t) / (3.14159265358979323846 * t);
             const double w = 0.5 + 0.5 * std::cos(3.14159265358979323846 * t / 4.25);
-            phaseTaps[p][k] = static_cast<float>(sinc * w);
+            phaseTaps[k][p] = static_cast<float>(sinc * w);
             sum += sinc * w;
         }
         for (int k = 0; k < 8; ++k)
-            phaseTaps[p][k] = static_cast<float>(phaseTaps[p][k] / sum);
+            phaseTaps[k][p] = static_cast<float>(phaseTaps[k][p] / sum);
     }
+    for (int k = 0; k < 8; ++k)
+        phaseTaps[k][3] = 0.0f;
     reset();
 }
 
 float Limiter::truePeak(const float* h) const noexcept
 {
+    float acc[4] {};
+    for (int k = 0; k < 8; ++k)
+        for (int p = 0; p < 4; ++p)
+            acc[p] += h[k] * phaseTaps[k][p];
     float peak = std::max(std::fabs(h[3]), std::fabs(h[4]));
     for (int p = 0; p < 3; ++p)
-    {
-        float acc = 0.0f;
-        for (int k = 0; k < 8; ++k)
-            acc += h[k] * phaseTaps[p][k];
-        peak = std::max(peak, std::fabs(acc));
-    }
+        peak = std::max(peak, std::fabs(acc[p]));
     return peak;
 }
 
@@ -70,6 +71,8 @@ void Limiter::reset() noexcept
     resumCounter = 0;
     released = 1.0f;
     lastGain = 1.0f;
+    previousPeakL = previousPeakR = 0.0f;
+    zeroRunL = zeroRunR = 8;
 }
 
 void Limiter::setCeilingDb(float db) noexcept { ceiling = dbToGain(std::min(db, 0.0f)); }
@@ -82,23 +85,24 @@ void Limiter::setReleaseMs(float ms) noexcept
 float Limiter::pushMin(float g) noexcept
 {
     const int capacity = static_cast<int>(dequeValue.size());
+    auto wrap = [capacity](int i) { return i >= capacity ? i - capacity : i; };
 
     while (dequeSize > 0)
     {
-        const int back = (dequeHead + dequeSize - 1) % capacity;
+        const int back = wrap(dequeHead + dequeSize - 1);
         if (dequeValue[static_cast<size_t>(back)] < g)
             break;
         --dequeSize;
     }
 
-    const int slot = (dequeHead + dequeSize) % capacity;
+    const int slot = wrap(dequeHead + dequeSize);
     dequeValue[static_cast<size_t>(slot)] = g;
     dequeIndex[static_cast<size_t>(slot)] = sampleCounter;
     ++dequeSize;
 
     while (dequeIndex[static_cast<size_t>(dequeHead)] <= sampleCounter - (window + 1))
     {
-        dequeHead = (dequeHead + 1) % capacity;
+        dequeHead = wrap(dequeHead + 1);
         --dequeSize;
     }
 
@@ -121,7 +125,13 @@ void Limiter::process(float* left, float* right, int numSamples, float* gainOut,
         histR[8] = right[i];
         const float inL = histL[4];
         const float inR = histR[4];
-        float peak = std::max({ truePeak(histL), truePeak(histL + 1), truePeak(histR), truePeak(histR + 1) });
+        zeroRunL = left[i] == 0.0f ? std::min(zeroRunL + 1, 8) : 0;
+        zeroRunR = right[i] == 0.0f ? std::min(zeroRunR + 1, 8) : 0;
+        const float nextPeakL = zeroRunL >= 8 ? 0.0f : truePeak(histL + 1);
+        const float nextPeakR = zeroRunR >= 8 ? 0.0f : truePeak(histR + 1);
+        float peak = std::max({ previousPeakL, nextPeakL, previousPeakR, nextPeakR });
+        previousPeakL = nextPeakL;
+        previousPeakR = nextPeakR;
         if (extraPeak != nullptr)
         {
             for (int k = 0; k < 8; ++k)
@@ -152,7 +162,8 @@ void Limiter::process(float* left, float* right, int numSamples, float* gainOut,
         const float outR = delayR[idx] * gain;
         delayL[idx] = inL;
         delayR[idx] = inR;
-        writeIndex = (writeIndex + 1) % window;
+        if (++writeIndex >= window)
+            writeIndex = 0;
 
         left[i] = std::clamp(outL, -ceiling, ceiling);
         right[i] = std::clamp(outR, -ceiling, ceiling);

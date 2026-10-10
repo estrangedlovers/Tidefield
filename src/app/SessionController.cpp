@@ -164,7 +164,13 @@ void SessionController::saveAs(std::function<void(bool)> then)
 void SessionController::openRecovered(const juce::File& recovery, const juce::File& original)
 {
     if (busy)
+    {
+        juce::Timer::callAfterDelay(200, [this, token = alive, recovery, original] {
+            if (*token)
+                openRecovered(recovery, original);
+        });
         return;
+    }
     afterOpen = original;
     replaceAfterOpen = true;
     openFileNow(recovery);

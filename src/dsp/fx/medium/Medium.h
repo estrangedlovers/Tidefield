@@ -88,6 +88,8 @@ private:
     double fs = 48000.0;
     int maxBlock = 512;
     int baseDelay = 144;
+    float coefficientAge = 0.0f;
+    bool coefficientsValid = false;
     Params params;
     Type previousType = Type::Digital;
     float fade = 1.0f;

@@ -381,7 +381,7 @@ void BloomSampler::renderVoice(Voice& v, float* left, float* right, int n, float
     const bool stereo = buffer->isStereo();
     const double sizeD = static_cast<double>(buffer->size());
     auto readAt = [&](int mip, double pos, float& sl, float& sr) {
-        const double p = pos / static_cast<double>(1 << mip);
+        const double p = pos * (1.0 / static_cast<double>(1 << mip));
         const auto sz = buffer->mipSize(mip);
         sl = readHermite(buffer->mipChannel(0, mip), sz, p);
         sr = stereo ? readHermite(buffer->mipChannel(1, mip), sz, p) : sl;

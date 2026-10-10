@@ -5,6 +5,7 @@
 
 #include <algorithm>
 #include <cmath>
+#include <cstdint>
 
 namespace tf::dsp {
 void GranularCloud::prepare(const ProcessSpec& newSpec, std::uint64_t seed)
@@ -184,8 +185,9 @@ void GranularCloud::process(float* left, float* right, int n, float timeScale) n
             if (stereo)
                 for (int i = 0; i < run; ++i)
                 {
-                    const auto k = static_cast<std::size_t>(pos);
-                    const float t = static_cast<float>(pos - static_cast<double>(k));
+                    const auto whole = static_cast<std::int64_t>(pos);
+                    const auto k = static_cast<std::size_t>(whole);
+                    const float t = static_cast<float>(pos - static_cast<double>(whole));
                     left[i] += hermite(srcL[k - 1], srcL[k], srcL[k + 1], srcL[k + 2], t) * w * gl;
                     right[i] += hermite(srcR[k - 1], srcR[k], srcR[k + 1], srcR[k + 2], t) * w * gr;
                     pos += inc;
@@ -194,8 +196,9 @@ void GranularCloud::process(float* left, float* right, int n, float timeScale) n
             else
                 for (int i = 0; i < run; ++i)
                 {
-                    const auto k = static_cast<std::size_t>(pos);
-                    const float t = static_cast<float>(pos - static_cast<double>(k));
+                    const auto whole = static_cast<std::int64_t>(pos);
+                    const auto k = static_cast<std::size_t>(whole);
+                    const float t = static_cast<float>(pos - static_cast<double>(whole));
                     const float v = hermite(srcL[k - 1], srcL[k], srcL[k + 1], srcL[k + 2], t) * w;
                     left[i] += v * gl;
                     right[i] += v * gr;

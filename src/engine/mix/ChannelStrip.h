@@ -27,6 +27,11 @@ public:
     void update(const Settings& s) noexcept
     {
         previous = target;
+        if (s.levelDb == last.levelDb && s.pan == last.pan && s.width == last.width && s.sendADb == last.sendADb && s.sendBDb == last.sendBDb
+            && s.gate == last.gate && hasLast)
+            return;
+        last = s;
+        hasLast = true;
         const float level = faderGain(s.levelDb) * std::clamp(s.gate, 0.0f, 1.0f);
         const auto pan = dsp::equalPowerPan(s.pan);
         target.mid = level;
@@ -46,6 +51,15 @@ public:
     {
         if (isSilent())
             return;
+        if (isZero(inL, n) && isZero(inR, n))
+        {
+            if (stemL != nullptr)
+            {
+                std::fill_n(stemL, n, 0.0f);
+                std::fill_n(stemR, n, 0.0f);
+            }
+            return;
+        }
         const float invTick = 1.0f / static_cast<float>(tickLength);
         for (int i = 0; i < n; ++i)
         {
@@ -77,6 +91,14 @@ public:
         }
     }
 
+    static bool isZero(const float* x, int n) noexcept
+    {
+        bool any = false;
+        for (int i = 0; i < n; ++i)
+            any |= x[i] != 0.0f;
+        return ! any;
+    }
+
     std::pair<float, float> takePeak() noexcept
     {
         const auto p = std::make_pair(peakL, peakR);
@@ -87,6 +109,8 @@ public:
 private:
     struct Gains { float mid = 0.0f, side = 0.0f, panL = 1.0f, panR = 1.0f, sendA = 0.0f, sendB = 0.0f; };
     Gains previous, target;
+    Settings last;
+    bool hasLast = false;
     float peakL = 0.0f, peakR = 0.0f;
 };
 }

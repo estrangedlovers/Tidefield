@@ -34,7 +34,9 @@ private:
     float lastGain = 1.0f;
 
     float histL[9] {}, histR[9] {}, histX[9] {};
-    float phaseTaps[3][8] {};
+    alignas(16) float phaseTaps[8][4] {};
+    float previousPeakL = 0.0f, previousPeakR = 0.0f;
+    int zeroRunL = 8, zeroRunR = 8;
 
     std::vector<float> delayL, delayR, boxBuffer;
     int writeIndex = 0;

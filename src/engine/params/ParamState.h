@@ -5,6 +5,7 @@
 #include <dsp/core/Smoother.h>
 
 #include <array>
+#include <cstdint>
 #include <vector>
 
 namespace tf::engine {
@@ -26,6 +27,10 @@ public:
         cur.assign(n, 0.0f);
         mod.assign(n, 0.0f);
         numModded = 0;
+        numLastModded = 0;
+        moving.assign(n, 0);
+        movingList.assign(n, 0);
+        numMoving = 0;
 
         for (std::size_t i = 0; i < n; ++i)
         {
@@ -39,6 +44,7 @@ public:
             const float initial = keepValues ? kept[i] : s.defaultValue;
             sm.reset(initial);
             prev[i] = cur[i] = initial;
+            markMoving(static_cast<ParamIndex>(i));
         }
     }
 
@@ -47,6 +53,7 @@ public:
         if (i >= smoothers.size())
             return;
         smoothers[i].setTarget(specs->spec(i).clamp(plain));
+        markMoving(i);
     }
 
     void snap(ParamIndex i, float plain) noexcept
@@ -56,6 +63,7 @@ public:
         const float v = specs->spec(i).clamp(plain);
         smoothers[i].reset(v);
         prev[i] = cur[i] = v;
+        markMoving(i);
     }
 
     static constexpr int kMaxModulated = 96;
@@ -84,17 +92,38 @@ public:
 
     void advance(int numSamples) noexcept
     {
-        for (std::size_t i = 0; i < smoothers.size(); ++i)
+        for (int k = 0; k < numLastModded; ++k)
+            markMoving(lastModded[static_cast<std::size_t>(k)]);
+        for (int k = 0; k < numModded; ++k)
+            markMoving(modded[static_cast<std::size_t>(k)]);
+        lastModded = modded;
+        numLastModded = numModded;
+        std::size_t kept = 0;
+        for (std::size_t k = 0; k < numMoving; ++k)
         {
+            const auto i = movingList[k];
             prev[i] = cur[i];
             cur[i] = smoothers[i].skip(numSamples);
+            if (smoothers[i].isSmoothing() || prev[i] != cur[i])
+                movingList[kept++] = i;
+            else
+                moving[i] = 0;
         }
+        numMoving = kept;
         for (int k = 0; k < numModded; ++k)
         {
             const auto i = modded[static_cast<std::size_t>(k)];
             const auto& s = specs->spec(i);
             cur[i] = s.fromNormalised(s.toNormalised(cur[i]) + mod[i]);
         }
+    }
+
+    void markMoving(ParamIndex i) noexcept
+    {
+        if (moving[i] != 0)
+            return;
+        moving[i] = 1;
+        movingList[numMoving++] = i;
     }
 
     float modulation(ParamIndex i) const noexcept { return mod[i]; }
@@ -112,6 +141,7 @@ private:
         dsp::OnePoleSmoother onePole;
 
         void reset(float v) noexcept { kind == Smoothing::Linear ? linear.reset(v) : onePole.reset(v); }
+        bool isSmoothing() const noexcept { return kind == Smoothing::Linear ? linear.isSmoothing() : onePole.isSmoothing(); }
         void setTarget(float v) noexcept { kind == Smoothing::Linear ? linear.setTarget(v) : onePole.setTarget(v); }
         float skip(int n) noexcept { return kind == Smoothing::Linear ? linear.skip(n) : onePole.skip(n); }
         float target() const noexcept { return kind == Smoothing::Linear ? linear.getTarget() : onePole.getTarget(); }
@@ -120,7 +150,11 @@ private:
     const ParamRegistry* specs = nullptr;
     std::vector<Smoother> smoothers;
     std::vector<float> prev, cur, mod;
-    std::array<ParamIndex, kMaxModulated> modded {};
-    int numModded = 0;
+    std::array<ParamIndex, kMaxModulated> modded {}, lastModded {};
+    int numModded = 0, numLastModded = 0;
+    std::vector<std::uint8_t> moving;
+    std::vector<ParamIndex> movingList;
+    std::size_t numMoving = 0;
+
 };
 }

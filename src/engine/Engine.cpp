@@ -1859,19 +1859,21 @@ void Engine::processChunk(const float* const* inputs, int numInputs, int inputOf
     const float exDrone = params.current(P::ResExciteDrone);
     const float exClouds = params.current(P::ResExciteClouds);
     float* ex = excite.data() + o;
-    for (int i = 0; i < n; ++i)
-    {
-        float cloudsMono = 0.0f;
-        for (int k = 0; k < kNumClouds; ++k)
-        {
-            const auto id = static_cast<StripId>(static_cast<int>(StripId::Cloud1) + k);
-            cloudsMono += L(id)[i] + R(id)[i];
-        }
-        ex[i] = in[i] * exIn + 0.5f * (L(StripId::Drone)[i] + R(StripId::Drone)[i]) * exDrone + 0.25f * cloudsMono * exClouds
-                + 0.5f * (L(StripId::Bloom)[i] + R(StripId::Bloom)[i]) * exBloom;
-    }
     if (! strips[static_cast<std::size_t>(StripId::Resonator)].isSilent())
+    {
+        for (int i = 0; i < n; ++i)
+        {
+            float cloudsMono = 0.0f;
+            for (int k = 0; k < kNumClouds; ++k)
+            {
+                const auto id = static_cast<StripId>(static_cast<int>(StripId::Cloud1) + k);
+                cloudsMono += L(id)[i] + R(id)[i];
+            }
+            ex[i] = in[i] * exIn + 0.5f * (L(StripId::Drone)[i] + R(StripId::Drone)[i]) * exDrone + 0.25f * cloudsMono * exClouds
+                    + 0.5f * (L(StripId::Bloom)[i] + R(StripId::Bloom)[i]) * exBloom;
+        }
         resonator.process(ex, L(StripId::Resonator), R(StripId::Resonator), n, tide);
+    }
     else
     {
         std::fill_n(L(StripId::Resonator), n, 0.0f);

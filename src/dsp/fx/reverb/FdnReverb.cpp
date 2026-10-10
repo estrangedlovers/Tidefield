@@ -35,6 +35,7 @@ float FdnReverb::dampingFrom01(float v) noexcept { return 1000.0f * std::pow(16.
 void FdnReverb::prepare(const ProcessSpec& spec)
 {
     fs = spec.sampleRate;
+    controlsSet = false;
     const auto msToSamples = [&](float ms) { return static_cast<std::size_t>(ms * 0.001 * fs) + 8; };
 
     for (int i = 0; i < kLines; ++i)
@@ -69,6 +70,10 @@ void FdnReverb::reset() noexcept
 
 void FdnReverb::setControls(const std::array<float, 6>& c, const ModContext& ctx) noexcept
 {
+    if (controlsSet && c == lastControls && ctx.timeScale == timeScale)
+        return;
+    controlsSet = true;
+    lastControls = c;
     size = sizeFrom01(c[0]);
     decaySeconds = decayFrom01(c[1]);
     dampingHz = dampingFrom01(c[2]);

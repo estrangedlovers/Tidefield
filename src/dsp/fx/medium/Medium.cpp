@@ -58,6 +58,7 @@ void Medium::prepare(const ProcessSpec& spec, std::uint64_t seed)
         v->assign(n, 0.0f);
 
     fadeStep = 1.0f / static_cast<float>(kCrossfadeSeconds * fs);
+    coefficientsValid = false;
     setParams(params);
     reset();
 }
@@ -92,6 +93,10 @@ void Medium::setParams(const Params& p) noexcept
     params = p;
 
     const float age = std::clamp(p.age, 0.0f, 1.0f);
+    if (coefficientsValid && age == coefficientAge)
+        return;
+    coefficientsValid = true;
+    coefficientAge = age;
     cassette.bumpL.setPeak(75.0f, 0.9f, 1.5f + 2.0f * age);
     cassette.bumpR.setPeak(75.0f, 0.9f, 1.5f + 2.0f * age);
     const float tapeHf = 16000.0f * std::pow(0.33f, age);

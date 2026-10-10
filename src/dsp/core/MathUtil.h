@@ -1,7 +1,9 @@
 #pragma once
 
 #include <algorithm>
+#include <bit>
 #include <cmath>
+#include <cstdint>
 
 namespace tf::dsp {
 inline constexpr float kPi = 3.14159265358979323846f;
@@ -51,11 +53,22 @@ public:
     {
         x1 = 0.0;
         f1 = logCosh(0.0);
+        steadyBits = kNoSteady;
     }
 
     float process(float in) noexcept
     {
         const double x = static_cast<double>(in);
+        const auto bits = std::bit_cast<std::uint64_t>(x);
+        if (bits == std::bit_cast<std::uint64_t>(x1))
+        {
+            if (bits != steadyBits)
+            {
+                steadyBits = bits;
+                steadyOut = static_cast<float>(std::tanh(0.5 * (x + x1)));
+            }
+            return steadyOut;
+        }
         const double f = logCosh(x);
         const double d = x - x1;
         const double y = std::fabs(d) < 1.0e-4 ? std::tanh(0.5 * (x + x1)) : (f - f1) / d;
@@ -71,6 +84,9 @@ private:
         return a + std::log1p(std::exp(-2.0 * a)) - 0.69314718055994530942;
     }
 
+    static constexpr std::uint64_t kNoSteady = 0x7ff8dead0000beefull;
     double x1 = 0.0, f1 = 0.0;
+    std::uint64_t steadyBits = kNoSteady;
+    float steadyOut = 0.0f;
 };
 }

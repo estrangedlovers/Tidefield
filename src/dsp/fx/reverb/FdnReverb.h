@@ -42,5 +42,7 @@ private:
     float hold = 0.0f;
     float dampingHz = 6000.0f;
     float timeScale = 1.0f;
+    std::array<float, 6> lastControls {};
+    bool controlsSet = false;
 };
 }

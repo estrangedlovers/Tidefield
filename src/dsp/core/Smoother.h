@@ -80,12 +80,14 @@ public:
         tau = timeSeconds;
         useLog = logDomain;
         coefficient = onePoleCoefficient(tau, fs);
+        skipSamples = -1;
         reset(getTarget());
     }
 
     void reset(float value) noexcept
     {
         state = targetState = toState(value);
+        output = fromState(state);
     }
 
     void setTimeConstant(float seconds) noexcept
@@ -94,6 +96,7 @@ public:
             return;
         tau = seconds;
         coefficient = onePoleCoefficient(tau, fs);
+        skipSamples = -1;
     }
 
     void setTarget(float value) noexcept { targetState = toState(value); }
@@ -103,21 +106,27 @@ public:
         const float before = state;
         state += coefficient * (targetState - state);
         snap(before);
-        return fromState(state);
+        output = fromState(state);
+        return output;
     }
 
     float skip(int n) noexcept
     {
         if (state == targetState)
-            return fromState(state);
+            return output;
+        if (n != skipSamples)
+        {
+            skipSamples = n;
+            skipFactor = 1.0f - std::pow(1.0f - coefficient, static_cast<float>(n));
+        }
         const float before = state;
-        const float k = 1.0f - std::pow(1.0f - coefficient, static_cast<float>(n));
-        state += k * (targetState - state);
+        state += skipFactor * (targetState - state);
         snap(before);
-        return fromState(state);
+        output = fromState(state);
+        return output;
     }
 
-    float getCurrent() const noexcept { return fromState(state); }
+    float getCurrent() const noexcept { return output; }
     float getTarget() const noexcept { return fromState(targetState); }
     bool isSmoothing() const noexcept { return state != targetState; }
 
@@ -137,6 +146,9 @@ private:
     float coefficient = 1.0f;
     float state = 0.0f;
     float targetState = 0.0f;
+    float output = 0.0f;
+    float skipFactor = 0.0f;
+    int skipSamples = -1;
     bool useLog = false;
 };
 }

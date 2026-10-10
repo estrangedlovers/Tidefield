@@ -2,6 +2,8 @@
 
 #include "AppCore.h"
 
+#include <algorithm>
+
 namespace tf::app {
 namespace {
 constexpr const char* kClockKey = "clockOut";
@@ -118,13 +120,14 @@ void CycleMidiOut::send(const Scheduled& s)
             output->sendMessageNow(juce::MidiMessage::noteOff(ch + 1, s.data1 & 127));
         if (held == 0)
             soundingCount.fetch_add(1, std::memory_order_relaxed);
-        held = 1;
+        held = static_cast<std::uint8_t>(std::min(255, held + 1));
     }
     else if (type == 0x80 || type == 0x90)
     {
         if (held == 0)
             return;
-        held = 0;
+        if (--held > 0)
+            return;
         soundingCount.fetch_sub(1, std::memory_order_relaxed);
     }
     else if (type == 0xb0 && s.data1 == 123)

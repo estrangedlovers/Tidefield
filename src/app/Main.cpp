@@ -103,8 +103,19 @@ int runSelfTest()
             pages += static_cast<int>(lesson.pages.size());
         for (const auto& p : problems)
             std::cout << "      " << p << std::endl;
-        check(gui::lessons().size() >= 6 && problems.isEmpty(),
-              "lessons: " + juce::String(static_cast<int>(gui::lessons().size())) + " lessons, " + juce::String(pages) + " pages, every page, tab and parameter known");
+        check(gui::lessons().size() >= 6 && gui::whatsNew().pages.size() >= 2 && problems.isEmpty(),
+              "lessons: " + juce::String(static_cast<int>(gui::lessons().size())) + " lessons, " + juce::String(pages) + " pages and "
+                  + juce::String(static_cast<int>(gui::whatsNew().pages.size()))
+                  + " new in " + gui::kWhatsNewVersion + ", every page, tab, parameter and key action known, no key written out");
+        KeyBindings rebound;
+        rebound.set(KeyAction::Fade, juce::KeyPress('Q', juce::ModifierKeys::shiftModifier, 0));
+        rebound.set(KeyAction::Panic, {});
+        const auto shown = gui::lessonText("Press {key:fade}, then {key:panic}.", rebound);
+        const bool versions = gui::isNewerVersion("1.4.0", "1.3.0") && gui::isNewerVersion("1.10", "1.9.2") && ! gui::isNewerVersion("1.4", "1.4.0")
+                              && gui::shouldOfferWhatsNew({}, "1.3.0") && gui::shouldOfferWhatsNew("1.3.0", "1.4.0")
+                              && ! gui::shouldOfferWhatsNew("1.4.0", "1.4.1") && ! gui::shouldOfferWhatsNew("1.4.0", "1.4.0");
+        check(shown == "Press Shift+Q, then the Panic or resume key (unassigned)." && versions,
+              "lessons follow rebound and cleared keys (" + shown + "); What's new is offered once per new version");
     }
     {
         const auto templates = factoryControllerTemplates(engine.getRegistry());
@@ -231,7 +242,7 @@ public:
     {
         about = 1, settings, newSession, open, save, saveAs, savePerformance, renderPerformance, renderLoop, record, showRecordings, clearRecent,
         undo, redo, capture, release, projector, zoomIn, zoomOut, zoomReset, fullScreen, fade, panic, keys, take, catchNow, freeze, loop,
-        cycles, path, manual, shortcuts, lessons, recentBase = 1000, pageBase = 2000, themeBase = 3000, sceneBase = 4000
+        cycles, path, manual, shortcuts, lessons, whatsNew, recentBase = 1000, pageBase = 2000, themeBase = 3000, sceneBase = 4000
     };
 
     juce::StringArray getMenuBarNames() override { return { "File", "Edit", "View", "Play", "Help" }; }
@@ -330,6 +341,7 @@ public:
         else if (index == 4)
         {
             m.addItem(lessons, "Lessons", v != nullptr, v != nullptr && v->areLessonsOpen());
+            m.addItem(whatsNew, "What's New in Tidefield", v != nullptr);
             m.addItem(manual, "Tidefield Manual");
             m.addItem(shortcuts, "Keyboard Shortcuts...");
             m.addSeparator();
@@ -399,6 +411,7 @@ public:
             case cycles: press(KeyAction::Cycles); break;
             case path: press(KeyAction::DrawPath); break;
             case lessons: if (v != nullptr) v->openLessons(); break;
+            case whatsNew: if (v != nullptr) v->showWhatsNew(); break;
             case manual: juce::URL("https://github.com/estrangedlovers/Tidefield/blob/main/docs/MANUAL.md").launchInDefaultBrowser(); break;
             case shortcuts: if (v != nullptr) v->openSettings(gui::SettingsTab::Keys); break;
             default: break;
@@ -444,6 +457,7 @@ public:
         options.osxLibrarySubFolder = "Application Support";
         options.folderName = "Tidefield";
         settings.setStorageParameters(options);
+        const bool firstLaunch = ! settings.getUserSettings()->getFile().existsAsFile();
 
         host = std::make_unique<AudioHost>(*settings.getUserSettings(), commandLine.contains("--null-audio"));
         core = std::make_unique<AppCore>(*host);
@@ -453,7 +467,7 @@ public:
         window = std::make_unique<MainWindow>(getApplicationName() + " - " + core->session.getName(), view);
         openProjectsIn(commandLine);
         if (! commandLine.contains("--ui-test"))
-            view->offerLessons();
+            view->offerLessons(firstLaunch);
         if (core->recovery != nullptr && ! commandLine.contains("--ui-test"))
             juce::Timer::callAfterDelay(600, [this] {
                 if (core != nullptr && core->recovery != nullptr)
@@ -482,7 +496,14 @@ public:
         if (const auto lesson = commandLine.fromFirstOccurrenceOf("--lesson=", false, false).upToFirstOccurrenceOf(" ", false, false); lesson.isNotEmpty())
             juce::Timer::callAfterDelay(500, [this, lesson] {
                 if (auto* v = window != nullptr ? dynamic_cast<gui::MainView*>(window->getContentComponent()) : nullptr)
-                    v->showLesson(lesson.upToFirstOccurrenceOf(".", false, false).getIntValue() - 1, lesson.fromFirstOccurrenceOf(".", false, false).getIntValue() - 1);
+                {
+                    const auto which = lesson.upToFirstOccurrenceOf(".", false, false);
+                    const int page = lesson.fromFirstOccurrenceOf(".", false, false).getIntValue() - 1;
+                    if (which == "new")
+                        v->showWhatsNew(page);
+                    else
+                        v->showLesson(which.getIntValue() - 1, page);
+                }
             });
         if (commandLine.contains("--ui-test"))
         {
@@ -543,6 +564,18 @@ public:
                             }
                         }
                     });
+            for (int p = 0; p < static_cast<int>(gui::whatsNew().pages.size()); ++p)
+                juce::Timer::callAfterDelay(lessonsStart + 60 * step++, [this, p] {
+                    if (auto* v = window != nullptr ? dynamic_cast<gui::MainView*>(window->getContentComponent()) : nullptr)
+                    {
+                        v->showWhatsNew(p);
+                        if (const auto missing = v->missingLessonTarget(); missing.isNotEmpty())
+                        {
+                            std::cout << "FAIL  what's new page " << p + 1 << " highlights " << missing << ", which is not on screen" << std::endl;
+                            setApplicationReturnValue(1);
+                        }
+                    }
+                });
             juce::Timer::callAfterDelay(lessonsStart + 60 * step + 100, [this, savedLesson, step] {
                 if (auto* v = window != nullptr ? dynamic_cast<gui::MainView*>(window->getContentComponent()) : nullptr)
                 {
@@ -553,7 +586,7 @@ public:
                 gui::saveLessonPosition(host->getSettings(), savedLesson);
                 const bool ok = getApplicationReturnValue() == 0;
                 std::cout << (ok ? "UI test passed" : "UI test FAILED") << ": every page and settings tab shown, every theme, projector opened and closed, "
-                          << step - 1 << " lesson pages stepped through" << std::endl;
+                          << step - 1 << " lesson and what's new pages stepped through" << std::endl;
                 quit();
             });
         }

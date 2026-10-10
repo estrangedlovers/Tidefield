@@ -20,7 +20,7 @@ constexpr LessonPage say(const char* title, const char* text)
 constexpr LessonPage kFirstSound[] = {
     say("Welcome", "Tidefield is an instrument for playing ambient music live. A few sound sources run all the time and you steer them together. "
                    "Each lesson takes a few minutes. Use Next and Back below, or do what a page asks and it moves on by itself."),
-    say("Fade in", "Everything starts silent. Press Space or click Fade in to bring the whole instrument up over a few seconds.")
+    say("Fade in", "Everything starts silent. Press {key:fade} or click Fade in to bring the whole instrument up over a few seconds.")
         .show("button:fade")
         .until(W::FadeIn),
     say("The terrain", "The dark map in the middle is the terrain. Drag across it and the sound glides after your cursor.").show("terrain").until(W::Cursor),
@@ -31,12 +31,12 @@ constexpr LessonPage kFirstSound[] = {
     say("Glide", "Watch the cursor: Tidefield is gliding to another scene for you. Glide sets how long the journey takes, from a blink to half a minute.")
         .show("param:terrain.glide")
         .glide(4),
-    say("Keep what you hear", "When you find a sound you like, double-click an empty spot on the terrain or press C. It becomes a new scene and "
+    say("Keep what you hear", "When you find a sound you like, double-click an empty spot on the terrain or press {key:capture}. It becomes a new scene and "
                               "joins the others in the Browser.")
         .show("browser")
         .until(W::Capture),
-    say("Fade out", "Press Space again to fade out. Esc is Panic: silence at once, and press it again to resume. Hover over anything and the "
-                    "status bar says what it does.")
+    say("Fade out", "Press {key:fade} again to fade out. To silence everything at once, press {key:panic} for Panic and again to resume. "
+                    "Hover over anything and the status bar says what it does.")
         .show("status"),
 };
 
@@ -65,7 +65,7 @@ constexpr LessonPage kDrone[] = {
                    "drone control, so it sounds the same each time.")
         .on("Drone")
         .show("device:Drone"),
-    say("Held controls", "A control you touch turns yellow and stops following the terrain. Press R to hand every held control back, or "
+    say("Held controls", "A control you touch turns yellow and stops following the terrain. Press {key:release} to hand every held control back, or "
                          "right-click one and choose Release to the terrain.")
         .on("Drone")
         .show("device:Tone"),
@@ -95,8 +95,8 @@ constexpr LessonPage kClouds[] = {
                          "Bloom or on the terrain to choose.")
         .on("Clouds")
         .show("devices"),
-    say("Bloom", "Bloom is a keyboard sampler that turns one-shots into ambient material. Pick a Transform, then press M and play the letter "
-                 "keys like a piano. Press M again to leave.")
+    say("Bloom", "Bloom is a keyboard sampler that turns one-shots into ambient material. Pick a Transform, then press {key:noteMode} and play "
+                 "the letter keys like a piano. Press {key:noteMode} again to leave.")
         .on("Bloom")
         .show("param:bloom.transform"),
 };
@@ -104,22 +104,24 @@ constexpr LessonPage kClouds[] = {
 constexpr LessonPage kPerforming[] = {
     say("The pads", "The row under the terrain holds the gestures. Each pad shows its key in the corner and its level as rising water.")
         .show("pads"),
-    say("Swell", "Hold S for a few seconds, then let go. Everything blooms and ebbs back. Hold H to Hush and T to slow time to a quarter.")
+    say("Swell", "Hold {key:swell} for a few seconds, then let go. Everything blooms and ebbs back. Hold {key:hush} to Hush and {key:slow} to slow "
+                 "time to a quarter.")
         .show("pad:Swell")
         .until(W::Param, "swell.hold"),
     say("Shape", "Drag the Shape pad. Left darkens and right brightens. Up sends the sound far into the reverb and down pulls it close. "
                  "Double-click to recentre.")
         .show("pad:Shape")
         .until(W::Param, "perform.colour"),
-    say("Freeze and hold", "F freezes the last two seconds as a cloud while the rest steps back. I holds the live input as an endless pad.")
+    say("Freeze and hold", "Press {key:freeze} to freeze the last two seconds as a cloud while the rest steps back. Press {key:inputFreeze} "
+                            "to hold the live input as an endless pad.")
         .show("pad:Freeze all"),
-    say("Cycles", "Press E to start the Cycles: sparse note loops of different lengths that never line up. Their notes always come from the key.")
+    say("Cycles", "Press {key:cycles} to start the Cycles: sparse note loops of different lengths that never line up. Their notes always come from the key.")
         .show("pad:Cycles")
         .until(W::Param, "loops.on"),
-    say("Catch", "Press K and the last seconds you heard become a new cloud that keeps playing. The Input tab sets how long and where it goes.")
+    say("Catch", "Press {key:catch} and the last seconds you heard become a new cloud that keeps playing. The Input tab sets how long and where it goes.")
         .show("pad:Catch"),
-    say("Takes", "Press G to record your moves, play a little, then press G to stop. Press G again and they play back on a loop while you do "
-                 "something else.")
+    say("Takes", "Press {key:take} to record your moves, play a little, then press it again to stop. Press it once more and they play back "
+                 "on a loop while you do something else.")
         .show("pad:Take")
         .until(W::Take),
     say("Wander and Tide", "Wander lets the sound roam near your cursor by itself. Tide sets the speed of everything that moves. Neither one "
@@ -176,8 +178,54 @@ constexpr LessonPage kModulation[] = {
         .show("param:seasons.depth"),
 };
 
+constexpr LessonPage kGuest[] = {
+    say("Open the Guest tab", "Click the Guest tab along the bottom.").show("tab:Guest").until(W::Page, "Guest"),
+    say("An instrument as a source", "The Guest plays one of your instrument plugins, AU or VST3, alongside everything else. Choose it from the "
+                                     "menu at the top. If the menu is empty, choose Find my plugins. With no instrument loaded the Guest stays silent.")
+        .on("Guest")
+        .show("guest"),
+    say("Play From", "Play From picks the notes the instrument hears: Bloom's notes from the keyboards and takes, MIDI input only, the Cycles "
+                     "only or all of them. Transpose shifts every note in semitones.")
+        .on("Guest")
+        .show("param:guest.playFrom"),
+    say("Its own controls", "Once an instrument is loaded six knobs appear. Choose controls picks the parameter each one moves and Plugin "
+                            "window opens the instrument's own editor. The knobs learn, modulate and map to macros like any other.")
+        .on("Guest")
+        .show("guest"),
+    say("A missing instrument", "Open a session on a computer without its instrument and the Guest says so, stays silent and keeps its "
+                                "settings. Install the plugin or scan again, then choose it once more.")
+        .on("Guest")
+        .show("guest"),
+    say("Note Length", "The Cycles can play the Guest. Note Length sets how long each of their notes holds there and on MIDI out. Bloom and "
+                       "the resonator ring on their own.")
+        .on("Cycles")
+        .show("param:loops.gate"),
+    say("MIDI out", "In the app the Cycles can also send their notes to another app or a synth. Choose an output, turn on MIDI Out and pick "
+                    "one channel for all or one channel per cycle.")
+        .on("Cycles")
+        .show("device:MIDI out"),
+};
+
+constexpr LessonPage kControllers[] = {
+    say("MIDI learn", "Any knob, fader or switch can follow a MIDI controller. Right-click it, choose MIDI learn, then move a control on "
+                      "your controller.")
+        .show("param:terrain.glide"),
+    say("Controller templates", "Settings > Controllers has ready-made layouts for the nanoKONTROL2, the MIDImix, the Launch Control XL "
+                                "and two generic ones. Apply one and its knobs move the macros and its faders the source levels.")
+        .show("button:settings"),
+    say("Your own templates", "When your mappings feel right, save them as a template in Settings > Controllers. Turn on a controller whose "
+                              "name matches a template and the status bar suggests it. Nothing changes until you apply it.")
+        .show("status"),
+    say("Your own keys", "Settings > Keys lists every shortcut. Click one and press the new key, or clear it. Tab, the arrow keys and 1 to 9 "
+                         "stay fixed.")
+        .show("button:settings"),
+    say("Keys follow you", "The menus, the hover help, the status bar and these lessons all show your keys. Right now {key:fade} fades in "
+                           "and out and {key:capture} keeps a scene.")
+        .show("status"),
+};
+
 constexpr LessonPage kRecording[] = {
-    say("Record what you hear", "Press Rec or Shift+R to record to disk and again to stop. Right-click Rec to add stems or choose the folder.")
+    say("Record what you hear", "Press Rec or {key:record} to record to disk and again to stop. Right-click Rec to add stems or choose the folder.")
         .show("button:record"),
     say("The timeline", "The Timeline records a whole performance: every note, control and action. Press Record, play, then Stop.")
         .on("Timeline")
@@ -186,7 +234,7 @@ constexpr LessonPage kRecording[] = {
     say("Playing back", "Play replays the performance from the start of the selection. Double-click the lanes to play from that moment.")
         .on("Timeline")
         .show("device:Performance"),
-    say("Editing", "Drag across the lanes to select a stretch, then Erase, Smooth or Trim. Every edit can be undone with Cmd+Z.")
+    say("Editing", "Drag across the lanes to select a stretch, then Erase, Smooth or Trim. Every edit can be undone with {key:undo}.")
         .on("Timeline")
         .show("device:Performance"),
     say("Rendering", "Render plays the performance offline into WAV files: the master, stems or a seamless loop. It can also loop the sound as "
@@ -196,7 +244,7 @@ constexpr LessonPage kRecording[] = {
 };
 
 constexpr LessonPage kSaving[] = {
-    say("Saving", "Cmd+S saves the session as one .tide file with every setting, scene and sound inside. Copy it to another computer and it "
+    say("Saving", "Press {key:save} to save the session as one .tide file with every setting, scene and sound inside. Copy it to another computer and it "
                   "opens complete.")
         .show("button:session"),
     say("Unsaved changes", "Quitting, New and Open ask first when the session has changes: Save, Don't Save or Cancel.").show("button:session"),
@@ -222,15 +270,48 @@ constexpr Lesson kLessons[] = {
     { "Performing", "Gestures, hold, capture, cycles and catch", kPerforming },
     { "Effects and macros", "Slots, sends, macros and the Medium", kEffects },
     { "Modulation and seasons", "Routes, sources and slow change", kModulation },
+    { "The Guest and MIDI out", "Instruments, Play From and MIDI out", kGuest },
     { "Recording and rendering", "Rec, the timeline and offline renders", kRecording },
+    { "Controllers and shortcuts", "MIDI learn, templates and your keys", kControllers },
     { "Saving and installations", "Sessions, autosave and installation mode", kSaving },
 };
 
-constexpr std::array<const char*, 18> kKnownTargets { "terrain",       "browser",     "performance",    "pads",          "devices",
+constexpr LessonPage kWhatsNewPages[] = {
+    say("What's new", "Tidefield 1.4 adds macros, a Guest instrument, Places in the Browser, controller templates, your own shortcuts, "
+                      "these lessons and autosave. Each page here shows where one of them lives."),
+    say("Macros", "A macro is one knob that moves up to eight controls, each by its own amount. Right-click any knob and choose Map to "
+                  "macro. The Macros tab holds all eight.")
+        .show("tab:Macros"),
+    say("The Guest", "The Guest tab plays one of your instrument plugins as another source, from Bloom's notes, MIDI or the Cycles. With no "
+                     "plugin installed it simply stays silent.")
+        .show("tab:Guest"),
+    say("Cycles out", "The Cycles tab can send its notes to other apps and synths over MIDI out. Note Length sets how long each one holds.")
+        .show("tab:Cycles"),
+    say("Places", "Places in the Browser list your own sound folders. Drop files or folders from Finder or Explorer anywhere on the window "
+                  "to load them.")
+        .show("browser"),
+    say("Controllers", "Settings > Controllers applies a ready-made layout for a common controller in one step, or saves your own mappings "
+                       "as a template.")
+        .show("button:settings"),
+    say("Keys", "Settings > Keys lets you change any shortcut. The menus, the hover help and the lessons always show the keys you chose.")
+        .show("button:settings"),
+    say("Lessons", "Short lessons walk through the whole instrument, a few minutes each. Open them from Help, the session menu or Settings "
+                   "> About.")
+        .show("button:session"),
+    say("Autosave", "Tidefield keeps a recovery copy of the session every two minutes. After a crash the next launch offers to restore it, "
+                    "and quitting asks before unsaved changes are lost.")
+        .show("button:settings"),
+};
+
+constexpr Lesson kWhatsNew { "What's new in 1.4", "Macros, the Guest, Places, keys and more", kWhatsNewPages };
+
+constexpr std::array<const char*, 19> kKnownTargets { "terrain",       "browser",     "performance",    "pads",          "devices",
                                                       "topbar",        "status",      "button:session", "button:fade",   "button:record",
                                                       "button:settings", "pad:Swell", "pad:Shape",      "pad:Freeze all", "pad:Cycles",
-                                                      "pad:Catch",     "pad:Take",    "button:drawpath" };
+                                                      "pad:Catch",     "pad:Take",    "button:drawpath", "guest" };
 
+constexpr const char* kKeyOpen = "{key:";
+constexpr int kKeyOpenLength = 5;
 constexpr const char* kLessonKey = "lesson";
 constexpr const char* kLessonPageKey = "lessonPage";
 constexpr int kPad = 14, kRowH = 52, kFooterH = 42;
@@ -238,6 +319,8 @@ constexpr double kAdvanceMs = 1400.0;
 }
 
 std::span<const Lesson> lessons() { return kLessons; }
+
+const Lesson& whatsNew() { return kWhatsNew; }
 
 int lessonPageIndex(const juce::String& name)
 {
@@ -247,49 +330,139 @@ int lessonPageIndex(const juce::String& name)
     return -1;
 }
 
+juce::String lessonText(const char* text, const KeyBindings& keys)
+{
+    const auto source = juce::String::fromUTF8(text);
+    juce::String out;
+    int from = 0;
+    for (int open = source.indexOf(kKeyOpen); open >= 0; open = source.indexOf(from, kKeyOpen))
+    {
+        const int close = source.indexOfChar(open, '}');
+        if (close < 0)
+            break;
+        out << source.substring(from, open);
+        const auto id = source.substring(open + kKeyOpenLength, close);
+        if (const auto action = keyActionFromId(id))
+            out << (keys.get(*action).isValid() ? keys.text(*action)
+                                                : "the " + juce::String(keyActionInfo(*action).name).upToFirstOccurrenceOf(" (", false, false) + " key (unassigned)");
+        else
+            out << id;
+        from = close + 1;
+    }
+    return out + source.substring(from);
+}
+
+namespace {
+juce::StringArray hardcodedKeys(const juce::String& text)
+{
+    juce::StringArray found;
+    for (const char* modifier : { "Cmd+", "Ctrl+", "Shift+", "Option+", "Alt+" })
+        if (text.contains(modifier))
+            found.add(modifier);
+    juce::StringArray words;
+    words.addTokens(text, " .,:;!?()\"", {});
+    words.removeEmptyStrings();
+    for (int i = 0; i < words.size(); ++i)
+    {
+        const auto& w = words[i];
+        const bool letter = w.length() == 1 && juce::CharacterFunctions::isUpperCase(w[0]) && w != "A";
+        const bool always = w == "Esc" || w == "Backspace";
+        const bool named = w == "Space" || w == "Return" || w == "Delete";
+        const bool verb = i > 0 && (words[i - 1].equalsIgnoreCase("press") || words[i - 1].equalsIgnoreCase("hold"));
+        if (letter || always || (named && verb))
+            found.addIfNotAlreadyThere(w);
+    }
+    return found;
+}
+
+void checkLesson(const Lesson& l, const engine::ParamRegistry& registry, const KeyBindings& keys, juce::StringArray& problems)
+{
+    for (const auto& p : l.pages)
+    {
+        const auto where = juce::String(l.title) + " / " + p.title + ": ";
+        for (const char* raw : { p.title, p.text })
+        {
+            const auto source = juce::String::fromUTF8(raw);
+            for (int open = source.indexOf(kKeyOpen); open >= 0; open = source.indexOf(open + 1, kKeyOpen))
+            {
+                const int close = source.indexOfChar(open, '}');
+                const auto id = close > open ? source.substring(open + kKeyOpenLength, close) : juce::String();
+                if (! keyActionFromId(id).has_value())
+                    problems.add(where + "no key action called " + (id.isNotEmpty() ? id : juce::String("(unclosed)")));
+            }
+            const auto shown = lessonText(raw, keys);
+            for (const auto& key : hardcodedKeys(source.replace(kKeyOpen, " ")))
+                problems.add(where + "names the key " + key + " directly; use {key:...} so it follows Settings > Keys");
+            if (shown.contains("{") || shown.contains("}"))
+                problems.add(where + "has a stray brace");
+        }
+        const auto text = lessonText(p.text, keys);
+        if (text.isEmpty() || text.length() > 260)
+            problems.add(where + "text is empty or longer than 260 characters");
+        if (text.contains(juce::String::fromUTF8("\xe2\x80\x94")))
+            problems.add(where + "text has an em dash");
+        if (p.page != nullptr && lessonPageIndex(p.page) < 0)
+            problems.add(where + "no device page called " + p.page);
+        if (p.highlight != nullptr)
+        {
+            const juce::String target(p.highlight);
+            if (target.startsWith("tab:"))
+            {
+                if (lessonPageIndex(target.substring(4)) < 0)
+                    problems.add(where + "no device tab called " + target.substring(4));
+            }
+            else if (target.startsWith("param:"))
+            {
+                if (! registry.find(target.substring(6).toStdString()).has_value())
+                    problems.add(where + "no parameter " + target.substring(6));
+            }
+            else if (target.startsWith("device:"))
+            {
+                if (target.length() <= 7)
+                    problems.add(where + "device target without a name");
+            }
+            else if (std::find_if(kKnownTargets.begin(), kKnownTargets.end(), [&target](const char* t) { return target == t; }) == kKnownTargets.end())
+                problems.add(where + "unknown highlight " + target);
+        }
+        if (p.wait == LessonWait::Page && (p.waitFor == nullptr || lessonPageIndex(p.waitFor) < 0))
+            problems.add(where + "waits for a page that does not exist");
+        if (p.wait == LessonWait::Param && (p.waitFor == nullptr || ! registry.find(p.waitFor).has_value()))
+            problems.add(where + "waits for a parameter that does not exist");
+        if (p.glideTo >= 9)
+            problems.add(where + "glides to a scene beyond the number keys");
+    }
+}
+}
+
 juce::StringArray lessonProblems(const engine::ParamRegistry& registry)
 {
     juce::StringArray problems;
+    KeyBindings defaults;
     for (const auto& l : kLessons)
-        for (const auto& p : l.pages)
-        {
-            const auto where = juce::String(l.title) + " / " + p.title + ": ";
-            const juce::String text(p.text);
-            if (text.isEmpty() || text.length() > 260)
-                problems.add(where + "text is empty or longer than 260 characters");
-            if (text.contains(juce::String::fromUTF8("\xe2\x80\x94")))
-                problems.add(where + "text has an em dash");
-            if (p.page != nullptr && lessonPageIndex(p.page) < 0)
-                problems.add(where + "no device page called " + p.page);
-            if (p.highlight != nullptr)
-            {
-                const juce::String target(p.highlight);
-                if (target.startsWith("tab:"))
-                {
-                    if (lessonPageIndex(target.substring(4)) < 0)
-                        problems.add(where + "no device tab called " + target.substring(4));
-                }
-                else if (target.startsWith("param:"))
-                {
-                    if (! registry.find(target.substring(6).toStdString()).has_value())
-                        problems.add(where + "no parameter " + target.substring(6));
-                }
-                else if (target.startsWith("device:"))
-                {
-                    if (target.length() <= 7)
-                        problems.add(where + "device target without a name");
-                }
-                else if (std::find_if(kKnownTargets.begin(), kKnownTargets.end(), [&target](const char* t) { return target == t; }) == kKnownTargets.end())
-                    problems.add(where + "unknown highlight " + target);
-            }
-            if (p.wait == LessonWait::Page && (p.waitFor == nullptr || lessonPageIndex(p.waitFor) < 0))
-                problems.add(where + "waits for a page that does not exist");
-            if (p.wait == LessonWait::Param && (p.waitFor == nullptr || ! registry.find(p.waitFor).has_value()))
-                problems.add(where + "waits for a parameter that does not exist");
-            if (p.glideTo >= 9)
-                problems.add(where + "glides to a scene beyond the number keys");
-        }
+        checkLesson(l, registry, defaults, problems);
+    checkLesson(kWhatsNew, registry, defaults, problems);
     return problems;
+}
+
+bool isNewerVersion(const juce::String& version, const juce::String& than)
+{
+    juce::StringArray a, b;
+    a.addTokens(version.trim(), ".", {});
+    b.addTokens(than.trim(), ".", {});
+    for (int i = 0; i < std::max(a.size(), b.size()); ++i)
+    {
+        const int x = a[i].getIntValue(), y = b[i].getIntValue();
+        if (x != y)
+            return x > y;
+    }
+    return false;
+}
+
+bool shouldOfferWhatsNew(const juce::String& lastSeen, const juce::String& running)
+{
+    if (lastSeen.trim().isEmpty())
+        return true;
+    return isNewerVersion(running, lastSeen) && isNewerVersion(kWhatsNewVersion, lastSeen);
 }
 
 LessonPosition savedLessonPosition(juce::PropertiesFile& settings)
@@ -338,18 +511,39 @@ LessonPanel::~LessonPanel()
     view.setLessonHighlight({});
 }
 
-const LessonPage& LessonPanel::current() const { return kLessons[static_cast<std::size_t>(lesson)].pages[static_cast<std::size_t>(page)]; }
+const Lesson& LessonPanel::currentLesson() const { return news ? kWhatsNew : kLessons[static_cast<std::size_t>(lesson)]; }
 
-int LessonPanel::pageCount() const { return static_cast<int>(kLessons[static_cast<std::size_t>(lesson)].pages.size()); }
+const LessonPage& LessonPanel::current() const { return currentLesson().pages[static_cast<std::size_t>(page)]; }
+
+int LessonPanel::pageCount() const { return static_cast<int>(currentLesson().pages.size()); }
 
 void LessonPanel::show(int l, int p)
 {
     if (l < 0)
         return showIndex(true);
+    news = false;
     lesson = juce::jlimit(0, static_cast<int>(std::size(kLessons)) - 1, l);
     page = juce::jlimit(0, pageCount() - 1, p);
     indexShown = false;
     enter();
+    refresh();
+}
+
+void LessonPanel::showWhatsNew(int p)
+{
+    news = true;
+    page = juce::jlimit(0, pageCount() - 1, p);
+    indexShown = false;
+    enter();
+    refresh();
+}
+
+void LessonPanel::restoreWhatsNew(int p)
+{
+    news = true;
+    page = juce::jlimit(0, pageCount() - 1, p);
+    indexShown = false;
+    highlightTarget = current().highlight != nullptr ? juce::String(current().highlight) : juce::String();
     refresh();
 }
 
@@ -383,6 +577,8 @@ void LessonPanel::enter()
                 : p.wait == LessonWait::Route  ? model.core.mod.getRoutes().size()
                 : p.wait == LessonWait::Season ? model.core.seasons.getSeasons().size()
                                                : 0;
+    if (news)
+        return;
     auto& settings = model.core.host.getSettings();
     saveLessonPosition(settings, { lesson, page });
     settings.saveIfNeeded();
@@ -391,6 +587,17 @@ void LessonPanel::enter()
 void LessonPanel::step(int direction)
 {
     const int count = static_cast<int>(std::size(kLessons));
+    if (news)
+    {
+        if (direction > 0 && page + 1 >= pageCount())
+        {
+            auto* owner = &view;
+            later(owner, [owner] { owner->closeLessons(); });
+        }
+        else if (page + direction >= 0)
+            showWhatsNew(page + direction);
+        return;
+    }
     if (direction > 0)
     {
         if (page + 1 < pageCount())
@@ -418,9 +625,10 @@ void LessonPanel::showIndex(bool on)
 
 void LessonPanel::refresh()
 {
-    const bool first = lesson == 0 && page == 0;
+    const bool first = page == 0 && (news || lesson == 0);
     const bool lastPage = page + 1 >= pageCount();
-    const bool lastLesson = lesson + 1 >= static_cast<int>(std::size(kLessons));
+    const bool lastLesson = news || lesson + 1 >= static_cast<int>(std::size(kLessons));
+    shownKeys = model.core.keys.getVersion();
     backButton.setVisible(! indexShown);
     nextButton.setVisible(! indexShown);
     backButton.setEnabled(! first);
@@ -454,6 +662,8 @@ bool LessonPanel::waitDone() const
 
 void LessonPanel::tick()
 {
+    if (model.core.keys.getVersion() != shownKeys)
+        refresh();
     if (indexShown)
         return view.setLessonHighlight({});
     view.setLessonHighlight(highlightTarget.isNotEmpty() ? view.locateLessonTarget(highlightTarget, false) : juce::Rectangle<int>());
@@ -496,7 +706,7 @@ void LessonPanel::resized()
     juce::AttributedString text;
     text.setLineSpacing(4.0f);
     text.setWordWrap(juce::AttributedString::byWord);
-    text.append(shortcut(current().text), font(13.5f), colour::text());
+    text.append(lessonText(current().text, model.core.keys), font(13.5f), colour::text());
     body.createLayout(text, static_cast<float>(w));
     textArea = { kPad, metric::header + 98, w, static_cast<int>(std::ceil(body.getHeight())) };
     tryArea = current().wait != LessonWait::None ? juce::Rectangle<int>(kPad, textArea.getBottom() + 16, w, 46) : juce::Rectangle<int>();
@@ -505,16 +715,18 @@ void LessonPanel::resized()
 void LessonPanel::paint(juce::Graphics& g)
 {
     const int total = static_cast<int>(std::size(kLessons));
-    drawPanel(g, getLocalBounds().toFloat(), indexShown ? juce::String("Lessons") : "Lesson " + juce::String(lesson + 1) + " of " + juce::String(total));
+    drawPanel(g, getLocalBounds().toFloat(),
+              indexShown ? juce::String("Lessons") : news ? juce::String("What's new") : "Lesson " + juce::String(lesson + 1) + " of " + juce::String(total));
     g.setColour(colour::line());
     g.fillRect(getLocalBounds().removeFromBottom(kFooterH).removeFromTop(1).reduced(kPad, 0));
 
     if (indexShown)
     {
-        for (int i = 0; i < total; ++i)
+        for (int i = 0; i <= total; ++i)
         {
+            const bool extra = i == total;
             const auto row = indexRow(i).toFloat();
-            const bool on = i == lesson;
+            const bool on = extra ? news : i == lesson && ! news;
             if (on || i == hoverRow)
             {
                 g.setColour(on ? colour::panelHi() : colour::lift(colour::panel(), 0.05f));
@@ -522,11 +734,16 @@ void LessonPanel::paint(juce::Graphics& g)
             }
             const auto badge = juce::Rectangle<float>(24.0f, 24.0f).withCentre({ row.getX() + 20.0f, row.getCentreY() });
             g.setColour(on ? colour::accent() : colour::textFaint());
-            g.drawEllipse(badge.reduced(0.75f), 1.5f);
-            g.setFont(font(11.5f, 600));
-            g.drawText(juce::String(i + 1), badge, juce::Justification::centred);
+            if (extra)
+                g.fillEllipse(badge.reduced(7.0f));
+            else
+            {
+                g.drawEllipse(badge.reduced(0.75f), 1.5f);
+                g.setFont(font(11.5f, 600));
+                g.drawText(juce::String(i + 1), badge, juce::Justification::centred);
+            }
             auto text = row.withTrimmedLeft(42.0f).reduced(0.0f, 7.0f);
-            const auto& l = kLessons[static_cast<std::size_t>(i)];
+            const auto& l = extra ? kWhatsNew : kLessons[static_cast<std::size_t>(i)];
             g.setColour(colour::textFaint());
             g.setFont(font(11.0f, 500));
             g.drawText(juce::String(static_cast<int>(l.pages.size())) + " pages", text.removeFromRight(56.0f).withTrimmedRight(6.0f).removeFromTop(18.0f),
@@ -542,7 +759,7 @@ void LessonPanel::paint(juce::Graphics& g)
         return;
     }
 
-    const auto& l = kLessons[static_cast<std::size_t>(lesson)];
+    const auto& l = currentLesson();
     const int w = getWidth() - 2 * kPad;
     int y = metric::header + 14;
     g.setColour(colour::accent());
@@ -551,7 +768,7 @@ void LessonPanel::paint(juce::Graphics& g)
     y += 20;
     g.setColour(colour::text());
     g.setFont(font(18.0f, 600));
-    g.drawText(shortcut(current().title), kPad, y, w, 26, juce::Justification::centredLeft, true);
+    g.drawText(lessonText(current().title, model.core.keys), kPad, y, w, 26, juce::Justification::centredLeft, true);
     y += 34;
     const int pages = pageCount();
     for (int i = 0; i < pages; ++i)
@@ -588,7 +805,7 @@ void LessonPanel::mouseMove(const juce::MouseEvent& e)
     if (! indexShown)
         return;
     int h = -1;
-    for (int i = 0; i < static_cast<int>(std::size(kLessons)); ++i)
+    for (int i = 0; i <= static_cast<int>(std::size(kLessons)); ++i)
         if (indexRow(i).contains(e.getPosition()))
             h = i;
     if (h != hoverRow)
@@ -611,8 +828,11 @@ void LessonPanel::mouseUp(const juce::MouseEvent& e)
 {
     if (! indexShown || e.mods.isPopupMenu())
         return;
-    for (int i = 0; i < static_cast<int>(std::size(kLessons)); ++i)
+    const int total = static_cast<int>(std::size(kLessons));
+    if (indexRow(total).contains(e.getPosition()))
+        return showWhatsNew(news ? page : 0);
+    for (int i = 0; i < total; ++i)
         if (indexRow(i).contains(e.getPosition()))
-            return show(i, i == lesson ? page : 0);
+            return show(i, i == lesson && ! news ? page : 0);
 }
 }

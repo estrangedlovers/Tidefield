@@ -9,6 +9,8 @@ target_compile_definitions(tidefield_hostcheck PRIVATE
     JUCE_MODAL_LOOPS_PERMITTED=1)
 target_link_libraries(tidefield_hostcheck PRIVATE
     tidefield_engine
+    tidefield_io
+    juce::juce_audio_formats
     juce::juce_audio_processors
     juce::juce_gui_basics
     juce::juce_recommended_config_flags)

@@ -448,7 +448,8 @@ Built so far, each with tests:
   session differs from what was last opened or saved. The baseline is a capture taken
   half a second after a session is applied (so telemetry reflects it) or the data
   just saved; `io::sameContent` compares parameters with a tolerance and everything
-  else structurally, ignoring the name and the timeline take.
+  else structurally, ignoring the name and the timeline take. Hosted plugin state is
+  compared by edit revision, not by its blob (see the Guest fixes below).
 
 **Browser Places and drag and drop**
 
@@ -474,7 +475,7 @@ Built so far, each with tests:
 
 **Built-in lessons**
 
-- Eight lessons (52 short pages) written from the manual, in `gui/Lessons.cpp` as data:
+- Eight lessons (52 short pages, now ten and 64) written from the manual, in `gui/Lessons.cpp` as data:
   each page has a title, text, an optional device page to open, a highlight target
   (`terrain`, `tab:Clouds`, `device:Motion`, `param:drone.cutoff`, `pad:Swell`,
   `button:fade` and so on) and an optional wait (fade in, cursor moved, page shown,
@@ -497,6 +498,30 @@ Built so far, each with tests:
 - Pads shrink their title to fit when narrow (the panel made "Freeze all" and "Hold
   input" truncate at 1440 px).
 - Verified under Xvfb in Slate, Midnight, Paper and Daylight. Not yet tried on macOS.
+- **Lessons follow the user's keys.** Lesson text names rebindable keys as placeholders
+  (`{key:fade}`, the `KeyActionInfo` id) resolved at display time through
+  `KeyBindings::text`, so a rebound key shows the new chord (Cmd or Ctrl by platform) and a
+  cleared one reads "the Fade in or out key (unassigned)". The panel re-lays out when
+  the bindings change. Tab, the arrows and 1 to 9 stay literal. The self-test fails a
+  placeholder that names no action and any page that writes a key out (a lone capital
+  letter, Esc, "press Space", Cmd+/Ctrl+/Shift+), and checks a rebound and a cleared key.
+- **Two more lessons** (ten, 64 pages): "The Guest and MIDI out" (loading an instrument,
+  Play From, Transpose, Choose controls, a missing instrument, Note Length, MIDI out;
+  written to read the same with no plugin installed; the Guest device has component ID
+  `guest` because its title becomes the plugin's name) and "Controllers and shortcuts"
+  (MIDI learn, templates, suggestions, Settings > Keys, keys following you). They sit
+  before Saving, which ends the course.
+- **What's new in 1.4**: a nine-page tour in the same panel (macros, the Guest, Cycles MIDI
+  out, Places, controller templates, keys, lessons, autosave), each page outlining its
+  tab or button. Settings key `lastSeenVersion`; on launch `MainView::offerLessons`
+  offers the lessons on a first-ever launch (no settings file yet) and otherwise "See
+  what's new" in the status bar when `shouldOfferWhatsNew(lastSeen, TIDEFIELD_VERSION)`
+  (no version seen yet, or one older than both the running version and 1.4). Never both,
+  never modal, not under `--ui-test` or `--self-test`. Also Help > What's New in
+  Tidefield, Settings > About and a row under All lessons. It does not move the saved
+  lesson position, survives a theme change, and `--lesson=new.P` opens a page.
+  `--ui-test` steps through it too (73 pages). The project version is still 1.3.0, so
+  this build offers it to anyone who has not run it yet.
 
 **Controller templates and custom shortcuts**
 
@@ -571,13 +596,54 @@ Built so far, each with tests:
   `GuestManager` missing/restore), the control audit covers every new control and the
   new strip and slots, a session round trip in `tests/io/SessionTests.cpp`, and
   `--self-test` plays an instrument through the Guest strip and checks MIDI out.
-- No score: the Guest needs a plugin, and the render harness hosts none; MIDI out makes
-  no sound. Existing scores render bit-identically (the Guest strip is silent and the
+- No score: the Guest needs a plugin, and the score render harness hosts none; MIDI out
+  makes no sound. Timeline renders do include the Guest (below). Existing scores render bit-identically (the Guest strip is silent and the
   Cycles' random draws are unchanged).
 - Not verified: real third-party instruments (AU or VST3) on macOS or Windows,
   instruments with unusual bus layouts or that need a playhead, MIDI out to real
   hardware or another app (no MIDI devices in the container), and the timing of MIDI out
   against audio on a real interface.
+
+**Guest fixes: renders, shared notes, plugin state**
+
+- **Timeline renders include the Guest.** `io::RenderOptions::makeGuest` is a factory
+  for the session's Guest (`GuestData` and the render's Guest spec in, a prepared
+  `engine::Instrument` out); `renderPerformance` loads it into the render engine's
+  Guest strip before the pre-roll, or renders without it and adds a warning ("The
+  render leaves out the Guest instrument 'X': ..."). The app makes the instance on the
+  message thread before queuing the worker (`PluginHost::createRenderInstrument`: a
+  `HostedInstrument` outside the slot registry, from the performance's start state,
+  prepared non-realtime), lends it to the worker through `engine::SharedInstrument` and
+  lets it go on the message thread with the result. The status line names the
+  instrument while rendering. Applies to performance renders, loop renders and
+  "Seamless loop of the sound as it is now".
+- **Notes from different origins no longer cut each other short.** Each origin has its
+  own table of held keys (Bloom's notes, and each MIDI input channel), and below them
+  the engine counts owners per channel and note (`guestNoteOn`/`guestNoteOff`): a
+  second owner retriggers the note (note-off then note-on), and the note-off reaches
+  the instrument only when the last owner releases. Chosen over a channel per origin
+  because most instruments ignore the channel. MIDI input keeps its channels (MPE).
+- **Plugin state churn no longer makes a session look changed.**
+  `SessionData::pluginEdits` (not saved) holds an edit revision per hosted slot and for a loaded
+  Guest, from `PluginHost::editRevision`: loads, Choose controls changes, and the
+  plugin's own gesture, parameter, program and state notifications while its window is
+  open. `io::sameContent` compares the revisions instead of the blobs when both sides
+  have one, and the blobs otherwise. Built-in effects have no state blob and are
+  compared as before; knobs are parameters.
+- Tests: `tests/io/PerformanceTests.cpp` (a render with a FakeInstrument factory has
+  the Guest's note in its `guest` stem, is identical twice and gets the session's
+  identity and the 128-sample spec; a failing or missing factory only warns, and a
+  session without a Guest never calls it), `tests/engine/GuestTests.cpp` (keyboard
+  and MIDI channel 1, keyboard and Cycles, Cycles and keyboard on the same note),
+  `tests/io/SessionTests.cpp` (`sameContent` with and without revisions).
+  `tidefield_hostcheck` now renders a short performance with Tidefield Test Sine in the
+  Guest on a worker thread (silent before the note, audible during it, identical twice,
+  the live Guest untouched), renders with a missing instrument (a warning), and checks
+  that an untouched instrument is not a change and Choose controls is.
+- Not verified: AU instruments in renders on macOS (creation is on the message thread,
+  as for the live Guest), plugins whose output is not repeatable, and the window-edit
+  tracking with real plugin editors (no display here; the Linux hostcheck has none).
+  Effect plugins in slots are still left out of renders, with a warning, as before.
 
 Still to do for 1.4: signing, notarisation and auto-update (needs the Apple Developer
 account).

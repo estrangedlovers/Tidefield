@@ -2,11 +2,13 @@
 
 #include "Session.h"
 
+#include <engine/guest/Instrument.h>
 #include <engine/perform/Gesture.h>
 
 #include <atomic>
 #include <functional>
 #include <set>
+#include <string>
 #include <vector>
 
 namespace tf::io {
@@ -48,12 +50,15 @@ std::optional<Performance> performanceFromSession(const SessionData& session, co
 
 struct RenderOptions
 {
+    using GuestFactory = std::function<engine::InstrumentPtr(const SessionData::GuestData& guest, const dsp::ProcessSpec& spec, std::string& error)>;
+
     juce::File folder;
     bool stems = false;
     double sampleRate = 48000.0;
     double loopCrossfadeSeconds = 0.0;
     std::function<void(float progress)> onProgress;
     const std::atomic<bool>* cancel = nullptr;
+    GuestFactory makeGuest;
 };
 
 struct RenderResult

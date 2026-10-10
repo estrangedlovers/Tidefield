@@ -1,6 +1,7 @@
 #include "Settings.h"
 
 #include "Controls.h"
+#include "Lessons.h"
 #include "MainView.h"
 #include "Pages.h"
 #include "Places.h"
@@ -1078,6 +1079,7 @@ std::unique_ptr<FormPage> aboutPage(AppCore& core)
     page->note("An instrument for playing ambient music live.", 20);
     page->row("Manual", button("Open the user manual", [] { juce::URL(kManualUrl).launchInDefaultBrowser(); }));
     page->row("Lessons", button("Open the lessons", [&core] { MainView::showLessonsFor(core); }));
+    page->row("What's new", button("What's new in " + juce::String(kWhatsNewVersion), [&core] { MainView::showWhatsNewFor(core); }));
     page->row("Settings file", button("Show settings file", [&core] { core.host.getSettings().getFile().revealToUser(); }));
     page->header("Credits");
     page->note("Built with JUCE. Inter and Quicksand typefaces under the SIL Open Font License. Every factory sound is synthesised by "

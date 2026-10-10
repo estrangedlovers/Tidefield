@@ -112,7 +112,7 @@ Hover over anything and the status bar at the bottom says what it does.
 
 ### Lessons
 
-Tidefield has eight short lessons built in, a few pages each:
+Tidefield has ten short lessons built in, a few pages each:
 
 1. First sound: fading in, the terrain and scenes.
 2. The drone: waves, chords, the filter, movement and presets.
@@ -120,8 +120,12 @@ Tidefield has eight short lessons built in, a few pages each:
 4. Performing: the gestures, Shape, Freeze, Cycles, Catch and takes.
 5. Effects and macros.
 6. Modulation and seasons.
-7. Recording, the timeline and rendering.
-8. Saving, autosave and installation mode.
+7. The Guest and MIDI out: loading an instrument plugin, Play From, Transpose, Choose
+   controls, Note Length and sending the Cycles over MIDI. It reads the same whether or
+   not you have an instrument plugin installed.
+8. Recording, the timeline and rendering.
+9. Controllers and shortcuts: MIDI learn, controller templates and your own keys.
+10. Saving, autosave and installation mode.
 
 Open them from **Help > Lessons**, the session menu or **Settings > About**. They sit in
 a panel on the right of the window, so the terrain stays in view and you can play while
@@ -131,6 +135,18 @@ have done what they ask (fading in, moving the cursor, turning a knob); **Next**
 **Back** are always there, and **All lessons** lists every lesson. Tidefield remembers
 where you stopped. The first time Tidefield opens, the status bar offers the lessons;
 click **Not now** to put the offer away.
+
+The lessons always name the keys you have set in **Settings > Keys**. Change the fade key
+and the first lesson tells you to press the new one; clear a key and the lesson says it is
+unassigned.
+
+**What's new.** The first time a new version of Tidefield opens, the status bar says so
+and offers **See what's new** instead of the lessons offer (never both, and never a
+dialog). It opens a short tour of the 1.4 additions in the same panel, one page each:
+macros, the Guest, the Cycles' MIDI out, Places in the Browser, controller templates,
+your own keys, the lessons and autosave, each outlining where to find it. Open it again
+from **Help > What's New in Tidefield**, **Settings > About** or the bottom row of
+**All lessons**.
 
 ---
 
@@ -524,12 +540,17 @@ effect slots use, see [Your own plugins](#your-own-plugins)).
 
 The instrument hears notes about 3 ms after they are played (it is given audio in steady
 blocks of 128 samples, which keeps its timing exact). Changing Play From, loading another
-instrument or pressing panic releases every note it holds. Its full state and your knob
+instrument or pressing panic releases every note it holds. When the keyboard, a MIDI
+device and the Cycles play the same note at once, the instrument hears it start again
+each time, and it only stops when the last of them lets go, so a Cycles note never cuts
+short a note you are holding (and the other way round). Its full state and your knob
 choices are saved with the session; a session that names an instrument this computer
 does not have opens with the Guest silent, says which plugin is missing, and keeps the
 settings so the session still has them when it is saved again. Instrument plugins play
-in the app only, not when Tidefield runs inside a DAW, and offline renders from the
-timeline leave the Guest out.
+in the app only, not when Tidefield runs inside a DAW. Renders from the timeline play
+the Guest too: Tidefield opens a second copy of the instrument from the state the
+performance started with, so the render sounds like what you heard. If the instrument
+cannot be opened the render goes on without it and the status bar says so.
 
 ---
 
@@ -686,7 +707,8 @@ says which plugin was missing.
 
 The same scan finds instrument plugins for the [Guest](#guest-an-instrument-plugin) tab.
 Plugins are not available when Tidefield itself runs inside a DAW; use the DAW's
-effects there. Offline renders from the timeline cannot include plugins and say so.
+effects there. Offline renders from the timeline cannot include effect plugins yet and
+say so; the Guest instrument is included.
 
 ---
 
@@ -825,7 +847,9 @@ WAV files in a folder you choose:
   recorded performance at all.
 
 The button shows progress and cancels the render if pressed again. A render sounds the
-same every time, because Tidefield's randomness is seeded.
+same every time, because Tidefield's randomness is seeded. A Guest instrument plays in
+the render from a fresh copy of the plugin (as long as the plugin itself is repeatable);
+if it cannot be opened, the render leaves it out and warns.
 
 ---
 
@@ -866,7 +890,11 @@ pressing Save writes a `.tide` copy beside the original, which is left untouched
 If the session has changes that are not saved, quitting, starting a new session or
 opening another one asks first: **Save**, **Don't Save** or **Cancel**. A change is
 anything that would end up in the file, so a knob moved and moved back again does not
-count. The starter session is treated like any other: change it and Tidefield asks.
+count. Some plugins change their saved data on their own (counters, random seeds, the
+size of their window), so a plugin's own state only counts once you have done
+something to it: loaded it, chosen its controls, or changed it in its window. Its
+knobs count like any other knob. The starter session is treated like any other: change
+it and Tidefield asks.
 Inside a DAW the host saves the plug-in's state, so the plug-in never asks.
 
 ### Autosave and crash recovery
@@ -1118,7 +1146,7 @@ in the menu bar. The window has a tab for each area:
 | Plug-ins | which formats to use (VST3, Audio Units), whether to scan the standard folders, extra folders to scan, Rescan, Rescan everything, and plug-ins that crashed while being scanned, with Retry |
 | Files and Startup | the recordings folder, the presets folder, whether Tidefield opens the starter session or the last session, the recent list, autosave, and installation mode |
 | Record and Render | whether recordings include stems, and the sample rate for timeline renders and loops |
-| About | the version, the lessons, the manual and the settings file |
+| About | the version, the lessons, what's new, the manual and the settings file |
 
 Settings are kept between launches.
 
@@ -1131,7 +1159,7 @@ On macOS the menu bar at the top of the screen works like any other app's:
 - **Edit**: undo and redo (naming what they will undo), capture a scene, release held controls.
 - **View**: jump to any device tab, pick a theme, zoom, the projector window and full screen.
 - **Play**: fade, panic, glide to any scene, the computer keyboard, take, Catch, Freeze all, the tape loop, Cycles and path drawing.
-- **Help**: the lessons, the manual and the keyboard shortcuts (Settings > Keys).
+- **Help**: the lessons, What's New in Tidefield, the manual and the keyboard shortcuts (Settings > Keys).
 
 The menus always show the shortcuts you have set.
 

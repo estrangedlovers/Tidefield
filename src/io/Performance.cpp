@@ -278,6 +278,14 @@ RenderResult renderPerformance(const Performance& performance, const RenderOptio
     engine::ModRouteManager mod(engine);
     engine::CatchManager catcher(engine);
     result.warnings = applySession(performance.start, engine, scenes, fx, true, &midi, &seasons, &path, &gestures, &mod);
+    if (const auto& guest = performance.start.guest; ! guest.type.empty())
+    {
+        std::string error;
+        auto instrument = options.makeGuest ? options.makeGuest(guest, engine.getGuestSpec(), error) : nullptr;
+        if (instrument == nullptr || ! engine.sendInstrument(std::move(instrument)))
+            result.warnings.push_back("The render leaves out the Guest instrument" + (guest.name.empty() ? std::string() : " '" + guest.name + "'")
+                                      + (error.empty() ? std::string(": it cannot be opened here") : ": " + error));
+    }
 
     std::vector<float> l(kBlock), r(kBlock);
     float* outs[2] = { l.data(), r.data() };

@@ -358,6 +358,7 @@ public:
     explicit GuestDevice(Model& m) : Device(m, "Guest", colour::forScene(9))
     {
         model.add(this);
+        setComponentID("guest");
         menu = setTop(std::make_unique<juce::ComboBox>(), 24, 4 * metric::knobW);
         menu->setTextWhenNothingSelected("Choose an instrument plugin...");
         menu->onChange = [this] { chosen(menu->getSelectedId()); };

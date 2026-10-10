@@ -7,6 +7,7 @@
 #include <memory>
 #include <string>
 #include <string_view>
+#include <utility>
 
 namespace tf::engine {
 struct GuestEvent
@@ -43,6 +44,24 @@ public:
 };
 
 using InstrumentPtr = std::unique_ptr<Instrument>;
+
+class SharedInstrument final : public Instrument
+{
+public:
+    explicit SharedInstrument(std::shared_ptr<Instrument> shared) : inner(std::move(shared)) {}
+
+    void prepare(const dsp::ProcessSpec& spec) override { inner->prepare(spec); }
+    void reset() noexcept override { inner->reset(); }
+    void setControls(const std::array<float, 6>& controls) noexcept override { inner->setControls(controls); }
+    void process(const GuestEvent* events, int numEvents, float* left, float* right, int numSamples) noexcept override
+    {
+        inner->process(events, numEvents, left, right, numSamples);
+    }
+    int getLatencySamples() const noexcept override { return inner->getLatencySamples(); }
+
+private:
+    std::shared_ptr<Instrument> inner;
+};
 
 class ExternalInstruments
 {

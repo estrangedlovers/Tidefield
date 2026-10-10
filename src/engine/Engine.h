@@ -302,7 +302,9 @@ private:
     int guestPendingCount = 0;
     std::array<GuestEvent, kMaxGuestEvents> guestEvents {};
     std::array<float, kGuestBlock> guestOutL {}, guestOutR {}, guestAltL {}, guestAltR {};
-    std::array<std::array<std::uint8_t, 128>, 16> guestKeys {};
+    static constexpr int kGuestKeyboardKeys = 16;
+    std::array<std::array<std::uint8_t, 128>, 17> guestKeys {};
+    std::array<std::array<std::uint8_t, 128>, 16> guestOwners {};
     std::array<CycleHold, 8> cycleHolds {};
     std::array<std::uint16_t, 16> midiOutHeld {};
     int guestFrom = kFromBloomNotes;
@@ -311,8 +313,10 @@ private:
     SpscQueue<MidiOutEvent> midiOut { 1024 };
     bool guestPlays(int from) const noexcept { return guestFrom == kFromAll || guestFrom == from || (from == kFromMidi && guestFrom == kFromBloomNotes); }
     void pushGuest(std::uint8_t status, std::uint8_t data1, std::uint8_t data2) noexcept;
-    void guestKey(int channel, int note, float velocity) noexcept;
-    void guestKeyOff(int note) noexcept { guestKey(0, note, 0.0f); }
+    void guestKey(int keys, int note, float velocity) noexcept;
+    void guestKeyOff(int note) noexcept { guestKey(kGuestKeyboardKeys, note, 0.0f); }
+    void guestNoteOn(int channel, int note, std::uint8_t velocity) noexcept;
+    void guestNoteOff(int channel, int note) noexcept;
     void releaseGuestKeys() noexcept;
     void releaseCycleNotes(bool guest, bool midi) noexcept;
     void pushMidiOut(std::uint8_t status, std::uint8_t data1, std::uint8_t data2) noexcept;

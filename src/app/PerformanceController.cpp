@@ -286,6 +286,7 @@ void PerformanceController::startRender(std::shared_ptr<const io::Performance> c
     const juce::String what = loopCrossfadeSeconds > 0.0 ? "a seamless loop" : "the performance";
     core.status(guestInstrument != nullptr ? "Rendering " + what + " with " + juce::String(guestData.name.empty() ? "the Guest instrument" : guestData.name) + "..."
                                            : "Rendering " + what + "...");
+    lentInstrument = guestInstrument;
     core.workers.addJob([this, copy, folder, stems, loopCrossfadeSeconds, rate, guestInstrument, guestError, token = std::weak_ptr<bool>(alive)]() mutable {
         io::RenderResult result;
         {
@@ -296,20 +297,21 @@ void PerformanceController::startRender(std::shared_ptr<const io::Performance> c
             options.loopCrossfadeSeconds = loopCrossfadeSeconds;
             options.cancel = &cancel;
             options.onProgress = [this](float p) { progress.store(p); };
-            options.makeGuest = [guestInstrument, guestError](const io::SessionData::GuestData&, const dsp::ProcessSpec&, std::string& error) -> engine::InstrumentPtr {
-                if (guestInstrument == nullptr)
+            options.makeGuest = [lent = std::move(guestInstrument), guestError](const io::SessionData::GuestData&, const dsp::ProcessSpec&,
+                                                                                 std::string& error) -> engine::InstrumentPtr {
+                if (lent == nullptr)
                 {
                     error = guestError.toStdString();
                     return nullptr;
                 }
-                return std::make_unique<engine::SharedInstrument>(guestInstrument);
+                return std::make_unique<engine::SharedInstrument>(lent);
             };
             result = io::renderPerformance(*copy, options);
         }
-        juce::MessageManager::callAsync([this, token, result, guestInstrument = std::move(guestInstrument)]() mutable {
-            guestInstrument.reset();
+        juce::MessageManager::callAsync([this, token, result] {
             if (token.expired())
                 return;
+            lentInstrument.reset();
             rendering = false;
             if (! result.ok)
             {

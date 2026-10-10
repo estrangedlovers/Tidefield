@@ -64,6 +64,7 @@ private:
     std::atomic<bool> cancel { false };
     std::atomic<float> progress { 0.0f };
     bool rendering = false;
+    std::shared_ptr<engine::Instrument> lentInstrument;
     std::shared_ptr<bool> alive = std::make_shared<bool>(true);
 };
 }

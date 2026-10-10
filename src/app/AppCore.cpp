@@ -108,6 +108,7 @@ AppCore::~AppCore()
 {
     stopTimer();
     performance.cancelRender();
+    workers.removeAllJobs(true, 30000);
     installation.reset();
     recovery.reset();
     osc.reset();

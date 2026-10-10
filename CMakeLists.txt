@@ -87,6 +87,7 @@ add_subdirectory(src/fx_juce)
 
 if(TIDEFIELD_BUILD_RENDER)
     add_subdirectory(tools/render)
+    add_subdirectory(tools/bench)
 endif()
 
 if(TIDEFIELD_BUILD_TESTS)

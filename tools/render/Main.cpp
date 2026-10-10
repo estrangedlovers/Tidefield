@@ -14,6 +14,7 @@
 #include <juce_audio_formats/juce_audio_formats.h>
 #include <juce_core/juce_core.h>
 
+#include <chrono>
 #include <iostream>
 #include <memory>
 #include <optional>
@@ -26,6 +27,7 @@ struct Options
     juce::File report;
     std::optional<std::uint64_t> seed;
     bool strict = false;
+    bool timing = false;
     juce::File saveSession;
     juce::File stems;
 };
@@ -33,7 +35,7 @@ struct Options
 void printUsage()
 {
     std::cerr << "usage: tidefield_render <score.json> [-o out.wav] [--report out.json] [--seed N] [--strict] [--save-session out.tide]\n"
-                 "                       [--stems dir]\n";
+                 "                       [--stems dir] [--time]\n";
 }
 
 std::optional<Options> parseArgs(int argc, char** argv)
@@ -53,6 +55,8 @@ std::optional<Options> parseArgs(int argc, char** argv)
             o.seed = static_cast<std::uint64_t>(next().getLargeIntValue());
         else if (arg == "--strict")
             o.strict = true;
+        else if (arg == "--time")
+            o.timing = true;
         else if (arg == "--save-session")
             o.saveSession = cwd.getChildFile(next());
         else if (arg == "--stems")
@@ -217,6 +221,7 @@ int main(int argc, char** argv)
         tf::dsp::Random blockRng(score.seed ^ 0xb10cull);
         std::size_t nextEvent = 0;
         std::uint64_t pos = 0;
+        double processSeconds = 0.0;
 
         while (pos < total)
         {
@@ -234,11 +239,15 @@ int main(int argc, char** argv)
                 for (int i = 0; i < block; ++i, ++inputPos)
                     inputBlock[static_cast<std::size_t>(i)] = input->left[inputPos % input->size()];
                 const float* ins[2] = { inputBlock.data(), inputBlock.data() };
+                const auto started = std::chrono::steady_clock::now();
                 engine.process(ins, 2, ptrs, 2, block);
+                processSeconds += std::chrono::duration<double>(std::chrono::steady_clock::now() - started).count();
             }
             else
             {
+                const auto started = std::chrono::steady_clock::now();
                 engine.process(nullptr, 0, ptrs, 2, block);
+                processSeconds += std::chrono::duration<double>(std::chrono::steady_clock::now() - started).count();
             }
 
             scenes.tick();
@@ -259,6 +268,14 @@ int main(int argc, char** argv)
                 recorder->drainNow();
 
             pos += static_cast<std::uint64_t>(block);
+        }
+
+        if (options->timing)
+        {
+            const double audioSeconds = static_cast<double>(total) / score.sampleRate;
+            std::cerr << "timing: process " << processSeconds << " s for " << audioSeconds << " s of audio ("
+                      << (processSeconds > 0.0 ? audioSeconds / processSeconds : 0.0) << "x realtime, "
+                      << 100.0 * processSeconds / audioSeconds << " % of one core)\n";
         }
 
         if (recorder != nullptr)

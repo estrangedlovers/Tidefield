@@ -113,6 +113,13 @@ void Engine::prepare(double newSampleRate, int maxBlockSize)
     releaseCycleNotes(false, true);
     cycleHolds.fill({});
     midiOutHeld.fill(0);
+    for (int k = 0; k < macroActiveCount; ++k)
+    {
+        macroOffset[macroActive[static_cast<std::size_t>(k)]] = 0.0f;
+        macroListed[macroActive[static_cast<std::size_t>(k)]] = 0;
+    }
+    macroActiveCount = 0;
+    macroSnap = true;
     guestFrom = std::clamp(toInt(params.current(P::GuestPlayFrom)), 0, 3);
     cycleMidiOn = false;
     cycleMidiMode = -1;
@@ -1276,16 +1283,7 @@ void Engine::updateModulation(float dt) noexcept
             if (depth != 0.0f)
                 params.addModulation(r.param, depth * modValue[static_cast<std::size_t>(r.source)]);
         }
-    if (const auto* macroSet = macroChannel.current())
-        for (int m = 0; m < kNumMacros; ++m)
-        {
-            const float amount = params.current(static_cast<ParamIndex>(idx(P::Macro1) + m));
-            for (int k = 0; k < macroSet->count[static_cast<std::size_t>(m)]; ++k)
-            {
-                const auto& t = macroSet->targets[static_cast<std::size_t>(m)][static_cast<std::size_t>(k)];
-                params.addModulation(t.param, t.from + (t.to - t.from) * amount);
-            }
-        }
+    applyMacros(dt);
 
     const auto* set = seasonChannel.current();
     if (set == nullptr)
@@ -1555,6 +1553,48 @@ void Engine::updateLoops(float dt) noexcept
         hold.remaining = gate;
         loopFlash[uk] = 1.0f;
     }
+}
+
+void Engine::applyMacros(float dt) noexcept
+{
+    for (int k = 0; k < macroActiveCount; ++k)
+        macroWanted[macroActive[static_cast<std::size_t>(k)]] = 0.0f;
+    if (const auto* macroSet = macroChannel.current())
+        for (int m = 0; m < kNumMacros; ++m)
+        {
+            const float amount = params.current(static_cast<ParamIndex>(idx(P::Macro1) + m));
+            for (int k = 0; k < macroSet->count[static_cast<std::size_t>(m)]; ++k)
+            {
+                const auto& t = macroSet->targets[static_cast<std::size_t>(m)][static_cast<std::size_t>(k)];
+                if (t.param >= kNumParams)
+                    continue;
+                if (macroListed[t.param] == 0)
+                {
+                    macroListed[t.param] = 1;
+                    macroWanted[t.param] = 0.0f;
+                    macroActive[static_cast<std::size_t>(macroActiveCount++)] = t.param;
+                }
+                macroWanted[t.param] += t.from + (t.to - t.from) * amount;
+            }
+        }
+    const float glide = macroSnap ? 1.0f : 1.0f - std::exp(-dt / kMacroGlideSeconds);
+    macroSnap = false;
+    int kept = 0;
+    for (int k = 0; k < macroActiveCount; ++k)
+    {
+        const auto p = macroActive[static_cast<std::size_t>(k)];
+        auto& offset = macroOffset[p];
+        offset = dsp::flushDenormal(offset + (macroWanted[p] - offset) * glide);
+        if (macroWanted[p] == 0.0f && std::abs(offset) < 1.0e-5f)
+        {
+            offset = 0.0f;
+            macroListed[p] = 0;
+            continue;
+        }
+        macroActive[static_cast<std::size_t>(kept++)] = p;
+        params.addModulation(p, offset);
+    }
+    macroActiveCount = kept;
 }
 
 void Engine::pushGuest(std::uint8_t status, std::uint8_t data1, std::uint8_t data2) noexcept

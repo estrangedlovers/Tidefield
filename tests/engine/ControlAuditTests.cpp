@@ -385,6 +385,26 @@ std::vector<Check> guestChecks()
     return v;
 }
 
+std::vector<Check> macroChecks()
+{
+    std::vector<Check> v;
+    for (int m = 0; m < kNumMacros; ++m)
+    {
+        const auto p = static_cast<P>(idx(P::Macro1) + m);
+        auto c = timed(sweep(p, "drone solo, the macro mapped to Brightness", [m](Rig& r) {
+                           r.solo({ StripId::Drone });
+                           auto set = std::make_unique<MacroSet>();
+                           set->targets[static_cast<std::size_t>(m)][0] = { idx(P::DroneCutoff), -0.3f, 0.3f };
+                           set->count[static_cast<std::size_t>(m)] = 1;
+                           set->version = 1;
+                           r.engine.publishMacros(std::move(set));
+                       }, Metric::Centroid, 1), 2.0, 1.0);
+        c.values = { 0.0f, 0.5f, 1.0f };
+        v.push_back(c);
+    }
+    return v;
+}
+
 std::vector<Check> masterChecks()
 {
     std::vector<Check> v;
@@ -1680,7 +1700,7 @@ std::vector<std::vector<Check>> allGroups()
 {
     std::vector<std::vector<Check>> g { masterChecks(), droneChecks(), resonatorChecks(), inputChecks(), bloomChecks(), bloomRootChecks(), looperChecks(),
                                         weatherChecks(), freezeChecks(), gestureChecks(), harmonyChecks(), mediumChecks(), terrainChecks(), cycleChecks(),
-                                        patternChecks(), guestChecks() };
+                                        patternChecks(), guestChecks(), macroChecks() };
     for (auto& [type, checks] : builtinEffectGroups())
         g.push_back(std::move(checks));
     for (int k = 0; k < kNumClouds; ++k)
@@ -1718,6 +1738,7 @@ TEST_CASE("Control audit: terrain and tide", "[audit]") { runChecks(terrainCheck
 TEST_CASE("Control audit: cycles and tempo", "[audit]") { runChecks(cycleChecks()); }
 TEST_CASE("Control audit: cycle patterns", "[audit]") { runChecks(patternChecks()); }
 TEST_CASE("Control audit: guest instrument and Cycles MIDI out", "[audit]") { runChecks(guestChecks()); }
+TEST_CASE("Control audit: macros", "[audit]") { runChecks(macroChecks()); }
 TEST_CASE("Control audit: effect tf.reverb", "[audit]") { runChecks(reverbChecks()); }
 TEST_CASE("Control audit: effect tf.delay", "[audit]") { runChecks(delayChecks()); }
 TEST_CASE("Control audit: effect tf.wornEcho", "[audit]") { runChecks(wornEchoChecks()); }
@@ -2042,8 +2063,6 @@ TEST_CASE("Control audit: every parameter is covered", "[audit]")
     for (P p : { P::MasterFadeSecs, P::HarmonyMorph, P::TerrainGlide, P::SwellAttack, P::SwellRelease, P::CatchSeconds, P::CatchSource, P::CatchTarget,
                  P::ModFollowAttack, P::ModFollowRelease, P::ModFollowGain, P::SyncSource, P::SpaceMode, P::SpaceSpread, P::SpaceRotate, P::DroneChord, P::DroneGlide, P::DroneRevoice })
         seen.insert(idx(p));
-    for (int m = 0; m < kNumMacros; ++m)
-        seen.insert(static_cast<ParamIndex>(idx(P::Macro1) + m));
     for (const auto& s : kStrips)
         seen.insert(idx(s.azimuth));
     for (ParamIndex i = idx(P::ModLfo1Rate); i < idx(P::ModFollowAttack); ++i)

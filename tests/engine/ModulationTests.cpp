@@ -187,3 +187,51 @@ TEST_CASE("A macro at rest leaves the knob's own value untouched when its range 
     CHECK(std::abs(target - 2000.0f) < 0.01f);
     CHECK(std::abs(mod) < 1.0e-6f);
 }
+
+TEST_CASE("Mapping, unmapping or reshaping a macro glides its targets instead of stepping", "[mod][macro]")
+{
+    Rig rig;
+    rig.engine.setParam(engine::P::Macro1, 1.0f);
+    rig.run(0.3, 0.0f, [](const engine::TelemetryFrame&) {});
+    const auto cutoff = engine::idx(engine::P::DroneCutoff);
+    const auto watch = [&rig, cutoff](double seconds) {
+        std::vector<float> seen;
+        rig.run(seconds, 0.0f, [&](const engine::TelemetryFrame& f) { seen.push_back(f.paramMod[cutoff]); });
+        return seen;
+    };
+    REQUIRE(rig.routes.addMacroTarget(0, cutoff, 0.0f, 0.5f));
+    auto seen = watch(0.4);
+    REQUIRE(seen.size() > 4);
+    CHECK(seen.front() < 0.45f);
+    CHECK(std::abs(seen.back() - 0.5f) < 0.01f);
+    for (std::size_t k = 1; k < seen.size(); ++k)
+        CHECK(seen[k] >= seen[k - 1] - 1.0e-6f);
+
+    rig.routes.setMacroRange(0, 0, 0.0f, -0.5f);
+    seen = watch(0.4);
+    CHECK(seen.front() > -0.45f);
+    CHECK(std::abs(seen.back() + 0.5f) < 0.01f);
+
+    rig.routes.removeMacroTarget(0, 0);
+    seen = watch(0.4);
+    CHECK(seen.front() < -0.05f);
+    CHECK(std::abs(seen.back()) < 1.0e-4f);
+}
+
+TEST_CASE("Macros at rest and in motion never allocate on the audio thread", "[mod][macro][rt]")
+{
+    Rig rig;
+    for (int m = 0; m < engine::kNumMacros; ++m)
+        REQUIRE(rig.routes.addMacroTarget(m, engine::idx(engine::P::DroneCutoff), -0.1f, 0.1f));
+    rig.run(0.2, 0.0f, [](const engine::TelemetryFrame&) {});
+    float* outs[2] = { rig.l.data(), rig.r.data() };
+    const float* ins[1] = { rig.in.data() };
+    test::ScopedAllocationCounter counter;
+    for (int b = 0; b < 200; ++b)
+    {
+        if (b % 25 == 0)
+            rig.engine.setParam(engine::P::Macro3, static_cast<float>(b % 50) / 50.0f);
+        rig.engine.process(ins, 1, outs, 2, kBlock);
+    }
+    CHECK(counter.count() == 0);
+}

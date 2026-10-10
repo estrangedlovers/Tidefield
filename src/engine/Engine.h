@@ -198,6 +198,13 @@ private:
     SnapshotChannel<TerrainPath> pathChannel { 4 };
     SnapshotChannel<ModRouteSet> modChannel { 4 };
     SnapshotChannel<MacroSet> macroChannel { 4 };
+    static constexpr float kMacroGlideSeconds = 0.03f;
+    std::array<float, kNumParams> macroOffset {}, macroWanted {};
+    std::array<ParamIndex, kNumParams> macroActive {};
+    std::array<std::uint8_t, kNumParams> macroListed {};
+    int macroActiveCount = 0;
+    bool macroSnap = true;
+    void applyMacros(float dt) noexcept;
     std::array<float, kNumModSources> modValue {};
     std::array<float, kNumLfos> lfoPhase {}, lfoStep {};
     std::array<float, kNumRandoms> randomValue {}, randomTarget {}, randomClock {};
